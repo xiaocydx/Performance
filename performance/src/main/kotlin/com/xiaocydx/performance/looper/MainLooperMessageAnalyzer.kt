@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 xiaocydx
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.xiaocydx.performance.looper
 
 import android.os.Build
@@ -51,8 +67,8 @@ internal sealed class MainLooperMessageAnalyzer {
     }
 }
 
-private class MainLooperMessageAnalyzerImpl(
-    private val originalPrinter: Printer?
+private class MainLooperMessageAnalyzerImpl private constructor(
+    private val original: Printer?
 ) : MainLooperMessageAnalyzer() {
     private var isStarted = false
     private val printer = PrinterImpl()
@@ -69,7 +85,7 @@ private class MainLooperMessageAnalyzerImpl(
 
         @MainThread
         override fun println(x: String?) {
-            originalPrinter?.println(x)
+            original?.println(x)
             isStarted = !isStarted
             if (isStarted) {
                 start(msg = null)
@@ -83,12 +99,12 @@ private class MainLooperMessageAnalyzerImpl(
 
         @MainThread
         fun setup(): MainLooperMessageAnalyzer {
-            val delegate = runCatching {
+            val original = runCatching {
                 val fields = Looper::class.java.toSafe().declaredInstanceFields
                 val mLogging = fields.find("mLogging").apply { isAccessible = true }
                 mLogging.get(Looper.getMainLooper()) as? Printer
             }.getOrNull()
-            val analyzer = MainLooperMessageAnalyzerImpl(delegate)
+            val analyzer = MainLooperMessageAnalyzerImpl(original)
             Looper.getMainLooper().setMessageLogging(analyzer.printer)
             return analyzer
         }
@@ -96,12 +112,12 @@ private class MainLooperMessageAnalyzerImpl(
 }
 
 @RequiresApi(29)
-private class MainLooperMessageAnalyzerImpl29(
-    originalObserver: Any?
+private class MainLooperMessageAnalyzerImpl29 private constructor(
+    original: Any?
 ) : MainLooperMessageAnalyzer() {
     private val mainLooper = Looper.getMainLooper()
     private val fakeObserver = FakeLooperObserverImpl()
-    private val realObserver = fakeObserver.toReal(originalObserver)
+    private val realObserver = fakeObserver.toReal(original)
 
     override fun trackGC(thunk: Runnable) {
         Cleaner.add(realObserver, thunk)
@@ -145,8 +161,8 @@ private class MainLooperMessageAnalyzerImpl29(
             val sObserver = fields.find("sObserver").apply { isAccessible = true }
             val setObserver = methods.find("setObserver").apply { isAccessible = true }
 
-            val originalObserver = sObserver.get(null)
-            val analyzer = MainLooperMessageAnalyzerImpl29(originalObserver)
+            val original = sObserver.get(null)
+            val analyzer = MainLooperMessageAnalyzerImpl29(original)
             setObserver.invoke(null, analyzer.realObserver)
             return analyzer
         }

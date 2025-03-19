@@ -31,8 +31,8 @@ interface FakeLooperObserver {
     fun dispatchingThrewException(msg: Message, exception: Exception)
 }
 
-fun FakeLooperObserver.toReal(originalObserver: Any?): Any {
-    val delegate = originalObserver as? Looper.Observer
+fun FakeLooperObserver.toReal(original: Any?): Any {
+    val delegate = original as? Looper.Observer
     return object : Looper.Observer {
         override fun messageDispatchStarting(): Any? {
             val token = delegate?.messageDispatchStarting()

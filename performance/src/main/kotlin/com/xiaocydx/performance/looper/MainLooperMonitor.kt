@@ -34,8 +34,16 @@ internal object MainLooperMonitor {
         if (!isInitialized.compareAndSet(false, true)) return
         log { "初始化${MainLooperMonitor::class.java.simpleName}" }
         runOnMainThread {
-            // TODO: IdleHandler
+            setupIdleAnalyzer(fromInit = true)
             setupMessageAnalyzer(fromInit = true)
+        }
+    }
+
+    private fun setupIdleAnalyzer(fromInit: Boolean) {
+        val reason = if (fromInit) "设置" else "重新设置"
+        log { "${reason}${MainLooperIdleAnalyzer::class.java.simpleName}" }
+        runOnMainThread {
+            MainLooperIdleAnalyzer.setup().trackGC { setupIdleAnalyzer(fromInit = false) }
         }
     }
 
