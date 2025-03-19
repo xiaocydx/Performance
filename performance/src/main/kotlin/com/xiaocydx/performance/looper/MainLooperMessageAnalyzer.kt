@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.Looper
 import android.os.Message
 import android.util.Printer
+import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
@@ -20,16 +21,20 @@ import com.xiaocydx.performance.reference.Cleaner
 internal sealed class MainLooperMessageAnalyzer {
     private var startTime = 0L
 
+    @MainThread
     abstract fun trackGC(thunk: Runnable)
 
+    @MainThread
     @VisibleForTesting
     abstract fun remove()
 
+    @MainThread
     fun start(msg: Message?) {
         log { "MainLooperMessageAnalyzer start" }
         startTime = System.currentTimeMillis()
     }
 
+    @MainThread
     fun end(msg: Message?) {
         log { "MainLooperMessageAnalyzer end, ${System.currentTimeMillis() - startTime}ms, msg = $msg" }
     }
@@ -62,6 +67,7 @@ private class MainLooperMessageAnalyzerImpl(
 
     private inner class PrinterImpl : Printer {
 
+        @MainThread
         override fun println(x: String?) {
             originalPrinter?.println(x)
             isStarted = !isStarted
@@ -113,14 +119,18 @@ private class MainLooperMessageAnalyzerImpl29(
     }
 
     private inner class FakeLoopObserverImpl : FakeLooperObserver {
+
+        @AnyThread
         override fun messageDispatchStarting() {
             ifMainThread { start(msg = null) }
         }
 
+        @AnyThread
         override fun messageDispatched(msg: Message) {
             ifMainThread { end(msg = msg) }
         }
 
+        @AnyThread
         override fun dispatchingThrewException(msg: Message, exception: Exception) {
             ifMainThread { end(msg = msg) }
         }
