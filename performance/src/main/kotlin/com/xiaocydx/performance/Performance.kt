@@ -27,8 +27,8 @@ import com.xiaocydx.performance.reference.PerformanceDaemons
 object Performance {
 
     @AnyThread
-    fun setup() {
-        PerformanceDaemons.start()
-        MainLooperMonitor.start()
+    fun init() {
+        PerformanceDaemons.init()
+        MainLooperMonitor.init()
     }
 }

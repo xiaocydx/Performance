@@ -17,6 +17,7 @@
 package com.xiaocydx.performance.reference
 
 import androidx.annotation.AnyThread
+import com.xiaocydx.performance.log
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -24,13 +25,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @date 2025/3/19
  */
 internal object PerformanceDaemons {
-    private val isStarted = AtomicBoolean(false)
+    private val isInitialized = AtomicBoolean(false)
     private val referenceQueueDaemon = ReferenceQueueDaemon()
     private val referenceWatchdogDaemon = ReferenceWatchdogDaemon()
 
     @AnyThread
-    fun start() {
-        if (!isStarted.compareAndSet(false, true)) return
+    fun init() {
+        if (!isInitialized.compareAndSet(false, true)) return
+        log { "初始化${PerformanceDaemons::class.java.simpleName}" }
         arrayOf(referenceQueueDaemon, referenceWatchdogDaemon).forEach { it.start() }
     }
 
