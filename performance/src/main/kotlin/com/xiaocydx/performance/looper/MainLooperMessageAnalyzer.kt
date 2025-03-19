@@ -100,7 +100,7 @@ private class MainLooperMessageAnalyzerImpl29(
     originalObserver: Any?
 ) : MainLooperMessageAnalyzer() {
     private val mainLooper = Looper.getMainLooper()
-    private val fakeObserver = FakeLoopObserverImpl()
+    private val fakeObserver = FakeLooperObserverImpl()
     private val realObserver = fakeObserver.toReal(originalObserver)
 
     override fun trackGC(thunk: Runnable) {
@@ -118,7 +118,7 @@ private class MainLooperMessageAnalyzerImpl29(
         if (mainLooper.isCurrentThread) action()
     }
 
-    private inner class FakeLoopObserverImpl : FakeLooperObserver {
+    private inner class FakeLooperObserverImpl : FakeLooperObserver {
 
         @AnyThread
         override fun messageDispatchStarting() {
