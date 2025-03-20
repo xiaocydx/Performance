@@ -16,50 +16,43 @@
 
 package com.xiaocydx.performance.looper
 
-import android.os.Handler
-import android.os.Looper
-import androidx.annotation.AnyThread
+import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.log
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * @author xcc
  * @date 2025/3/19
  */
-internal object MainLooperMonitor {
-    private val isInitialized = AtomicBoolean(false)
+internal class MainLooperMonitor(private val host: Performance.Host) {
+    private val scope = host.createMainScope()
 
-    @AnyThread
     fun init() {
-        if (!isInitialized.compareAndSet(false, true)) return
         log { "初始化${MainLooperMonitor::class.java.simpleName}" }
-        runOnMainThread {
-            setupIdleAnalyzer(fromInit = true)
-            setupMessageAnalyzer(fromInit = true)
+        scope.launch {
+            log { "设置${MainLooperIdleAnalyzer::class.java.simpleName}" }
+            while (true) {
+                MainLooperIdleAnalyzer.setup().awaitGC()
+                log { "重新设置${MainLooperIdleAnalyzer::class.java.simpleName}" }
+            }
+        }
+
+        scope.launch {
+            log { "设置${MainLooperMessageAnalyzer::class.java.simpleName}" }
+            while (true) {
+                MainLooperMessageAnalyzer.setup().awaitGC()
+                log { "重新设置${MainLooperMessageAnalyzer::class.java.simpleName}" }
+            }
         }
     }
 
-    private fun setupIdleAnalyzer(fromInit: Boolean) {
-        val reason = if (fromInit) "设置" else "重新设置"
-        log { "${reason}${MainLooperIdleAnalyzer::class.java.simpleName}" }
-        runOnMainThread {
-            MainLooperIdleAnalyzer.setup().trackGC { setupIdleAnalyzer(fromInit = false) }
-        }
+    private suspend fun MainLooperIdleAnalyzer.awaitGC() {
+        suspendCancellableCoroutine { cont -> trackGC { cont.resume(Unit) } }
     }
 
-    private fun setupMessageAnalyzer(fromInit: Boolean) {
-        val reason = if (fromInit) "设置" else "重新设置"
-        log { "${reason}${MainLooperMessageAnalyzer::class.java.simpleName}" }
-        runOnMainThread {
-            MainLooperMessageAnalyzer.setup().trackGC { setupMessageAnalyzer(fromInit = false) }
-        }
-    }
-
-    private inline fun runOnMainThread(crossinline action: () -> Unit) {
-        if (Looper.getMainLooper().isCurrentThread) {
-            action()
-        } else {
-            Handler(Looper.getMainLooper()).post { action() }
-        }
+    private suspend fun MainLooperMessageAnalyzer.awaitGC() {
+        suspendCancellableCoroutine { cont -> trackGC { cont.resume(Unit) } }
     }
 }

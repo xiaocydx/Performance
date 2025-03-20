@@ -11,6 +11,6 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Performance.init()
+        Performance.init(this)
     }
 }

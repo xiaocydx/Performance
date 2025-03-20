@@ -33,4 +33,6 @@ dependencies {
     implementation(project(":performance-fake"))
     implementation(libs.androidx.appcompat)
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
 }
