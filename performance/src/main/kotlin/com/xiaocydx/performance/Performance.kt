@@ -18,6 +18,7 @@ package com.xiaocydx.performance
 
 import android.app.Activity
 import android.app.Application
+import android.os.Looper
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.activity.ActivityEvent
 import com.xiaocydx.performance.activity.ActivityManager
@@ -25,6 +26,7 @@ import com.xiaocydx.performance.looper.MainLooperMonitor
 import com.xiaocydx.performance.reference.Cleaner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -50,11 +52,16 @@ object Performance {
     private class HostImpl : Host {
         private val parentJob = SupervisorJob()
 
+        override val mainLooper = Looper.getMainLooper()!!
+
+        override val mainDispatcher: MainCoroutineDispatcher
+            get() = Dispatchers.Main.immediate
+
         override val activityEvent: SharedFlow<ActivityEvent>
             get() = activityManager.event
 
         override fun createMainScope(): CoroutineScope {
-            return CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Main.immediate)
+            return CoroutineScope(SupervisorJob(parentJob) + mainDispatcher)
         }
 
         override fun getLastActivity(): Activity? {
@@ -79,6 +86,10 @@ object Performance {
     }
 
     internal interface Host {
+        val mainLooper: Looper
+
+        val mainDispatcher: MainCoroutineDispatcher
+
         val activityEvent: SharedFlow<ActivityEvent>
 
         fun createMainScope(): CoroutineScope

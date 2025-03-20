@@ -29,12 +29,12 @@ import kotlin.coroutines.resume
 internal class MainLooperMonitor(private val host: Performance.Host) {
     private val scope = host.createMainScope()
 
-    fun init() {
-        log { "初始化${MainLooperMonitor::class.java.simpleName}" }
+    fun init(resetAfterGC: Boolean = true) {
         scope.launch {
             log { "设置${MainLooperIdleAnalyzer::class.java.simpleName}" }
             while (true) {
-                MainLooperIdleAnalyzer.setup().awaitGC()
+                val analyzer = MainLooperIdleAnalyzer.setup()
+                if (resetAfterGC) analyzer.awaitGC() else break
                 log { "重新设置${MainLooperIdleAnalyzer::class.java.simpleName}" }
             }
         }
@@ -42,9 +42,15 @@ internal class MainLooperMonitor(private val host: Performance.Host) {
         scope.launch {
             log { "设置${MainLooperMessageAnalyzer::class.java.simpleName}" }
             while (true) {
-                MainLooperMessageAnalyzer.setup().awaitGC()
+                val analyzer = MainLooperMessageAnalyzer.setup()
+                if (resetAfterGC) analyzer.awaitGC() else break
                 log { "重新设置${MainLooperMessageAnalyzer::class.java.simpleName}" }
             }
+        }
+
+        scope.launch {
+            log { "设置${MainLooperIdleCheck::class.java.simpleName}" }
+            MainLooperIdleCheck(host).repeatCheckOnActivityResumed()
         }
     }
 
