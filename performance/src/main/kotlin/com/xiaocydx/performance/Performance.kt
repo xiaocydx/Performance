@@ -21,7 +21,7 @@ import android.app.Application
 import android.os.Looper
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.activity.ActivityEvent
-import com.xiaocydx.performance.activity.ActivityManager
+import com.xiaocydx.performance.activity.ActivityMonitor
 import com.xiaocydx.performance.looper.MainLooperMonitor
 import com.xiaocydx.performance.reference.Cleaner
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +36,7 @@ import kotlinx.coroutines.flow.SharedFlow
  */
 object Performance {
     private val host = HostImpl()
-    private val activityManager = ActivityManager()
+    private val activityMonitor = ActivityMonitor()
     private var isInitialized = false
 
     @MainThread
@@ -45,7 +45,7 @@ object Performance {
         if (isInitialized) return
         isInitialized = true
         ReferenceQueueDaemon().start()
-        activityManager.init(application)
+        activityMonitor.init(application)
         MainLooperMonitor(host).init()
     }
 
@@ -58,14 +58,14 @@ object Performance {
             get() = Dispatchers.Main.immediate
 
         override val activityEvent: SharedFlow<ActivityEvent>
-            get() = activityManager.event
+            get() = activityMonitor.event
 
         override fun createMainScope(): CoroutineScope {
             return CoroutineScope(SupervisorJob(parentJob) + mainDispatcher)
         }
 
         override fun getLastActivity(): Activity? {
-            return activityManager.getLastActivity()
+            return activityMonitor.getLastActivity()
         }
     }
 

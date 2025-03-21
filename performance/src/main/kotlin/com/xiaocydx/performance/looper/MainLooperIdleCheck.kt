@@ -35,20 +35,27 @@ import kotlin.coroutines.resume
 internal class MainLooperIdleCheck(private val host: Performance.Host) {
 
     suspend fun repeatCheckOnActivityResumed() = withContext<Unit>(host.mainDispatcher) {
+        var checkHashCode = 0
         var checkJob: Job? = null
         host.activityEvent.collect {
-            // FIXME: 消除不同activity事件的影响
-            val resumed = it as? ActivityEvent.Resumed
-            when {
-                checkJob == null && resumed != null -> {
+            when (it) {
+                is ActivityEvent.Created,
+                is ActivityEvent.Started -> return@collect
+                is ActivityEvent.Resumed -> {
+                    checkHashCode = it.hashCode
+                    checkJob?.cancel()
                     checkJob = launch {
                         val pass = withTimeoutOrNull(TIME_OUT_MS) { awaitIdle() }
                         if (pass == null) showTimeoutDialog()
                     }
                 }
-                checkJob != null && resumed == null -> {
-                    checkJob?.cancel()
-                    checkJob = null
+                is ActivityEvent.Paused,
+                is ActivityEvent.Stopped,
+                is ActivityEvent.Destroyed -> {
+                    if (checkHashCode == it.hashCode) {
+                        checkJob?.cancel()
+                        checkJob = null
+                    }
                 }
             }
         }

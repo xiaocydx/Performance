@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.asSharedFlow
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityManager {
+internal class ActivityMonitor {
     private val list = mutableListOf<Activity>()
     private val _event = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
     val event = _event.asSharedFlow()
@@ -79,6 +79,7 @@ internal class ActivityManager {
 
 internal sealed class ActivityEvent(activity: Activity) {
     val clazz = activity::class.java
+    val hashCode = activity.hashCode()
 
     class Created(activity: Activity) : ActivityEvent(activity)
     class Started(activity: Activity) : ActivityEvent(activity)
