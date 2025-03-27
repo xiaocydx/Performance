@@ -16,7 +16,6 @@
 
 package com.xiaocydx.performance.monitor
 
-import android.os.Message
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
@@ -29,12 +28,11 @@ internal class MainLooperANRMonitor : MainLooperCallback {
     fun init() = apply {
     }
 
-    override fun start(msg: Message?, type: Type) {
+    override fun start(type: Type, data: Any?) {
+
     }
 
-    override fun end(msg: Message?, type: Type) {
-        if (msg != null) {
-            // TODO: 收集msg的信息进队列
-        }
+    override fun end(type: Type, data: Any?) {
+        // TODO: 收集data的信息进队列
     }
 }

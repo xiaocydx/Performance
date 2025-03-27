@@ -18,7 +18,10 @@ package com.xiaocydx.performance.watcher.looper
 
 import android.os.Looper
 import android.os.Message
+import android.os.MessageQueue.IdleHandler
+import android.view.MotionEvent
 import androidx.annotation.MainThread
+import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
 /**
  * 主线程[Looper]的处理回调
@@ -30,20 +33,28 @@ internal interface MainLooperCallback {
 
     /**
      * 开始处理[type]
+     *
+     * @param data
+     * [Type.Message] - [Message]，
+     * [Type.IdleHandler] - [IdleHandler]，
+     * [Type.NativeTouch] - [MotionEvent]
      */
     @MainThread
-    fun start(msg: Message?, type: Type)
+    fun start(type: Type, data: Any?)
 
     /**
      * 结束处理[type]
      *
-     * @param msg 当[Type]为[Type.Message]，且是高版本实现时，才不为`null`
+     * @param data
+     * [Type.Message] - [Message]，
+     * [Type.IdleHandler] - [IdleHandler]，
+     * [Type.NativeTouch] - [MotionEvent]
      */
     @MainThread
-    fun end(msg: Message?, type: Type)
+    fun end(type: Type, data: Any?)
 
     enum class Type {
-        Message, IdleHandler
+        Message, IdleHandler, NativeTouch
     }
 }
 
@@ -54,15 +65,33 @@ internal class CompositeMainLooperCallback : MainLooperCallback {
         callbacks.add(callback)
     }
 
-    override fun start(msg: Message?, type: MainLooperCallback.Type) {
-        dispatchCallbacks { it.start(msg, type) }
+    override fun start(type: Type, data: Any?) {
+        dispatchCallbacks { it.start(type, data) }
     }
 
-    override fun end(msg: Message?, type: MainLooperCallback.Type) {
-        dispatchCallbacks { it.end(msg, type) }
+    override fun end(type: Type, data: Any?) {
+        dispatchCallbacks { it.end(type, data) }
     }
 
     private inline fun dispatchCallbacks(action: (MainLooperCallback) -> Unit) {
         for (i in 0 until callbacks.size) action(callbacks[i])
+    }
+}
+
+internal class NotReentrantMainLooperCallback(
+    private val delegate: MainLooperCallback
+) : MainLooperCallback {
+    private var current: Type? = null
+
+    override fun start(type: Type, data: Any?) {
+        if (current != null) return
+        current = type
+        delegate.start(type, data)
+    }
+
+    override fun end(type: Type, data: Any?) {
+        if (current != type) return
+        current = null
+        delegate.end(type, data)
     }
 }

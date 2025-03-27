@@ -55,9 +55,9 @@ internal class MainLooperMessageWatcher private constructor(
             original?.println(x)
             isStarted = !isStarted
             if (isStarted) {
-                callback.start(msg = null, type = Type.Message)
+                callback.start(type = Type.Message, data = null)
             } else {
-                callback.end(msg = null, type = Type.Message)
+                callback.end(type = Type.Message, data = null)
             }
         }
     }
@@ -109,17 +109,17 @@ internal class MainLooperMessageWatcher29 private constructor(
 
         @AnyThread
         override fun messageDispatchStarting() {
-            ifMainThread { callback.start(msg = null, type = Type.Message) }
+            ifMainThread { callback.start(type = Type.Message, data = null) }
         }
 
         @AnyThread
         override fun messageDispatched(msg: Message) {
-            ifMainThread { callback.end(msg = msg, type = Type.Message) }
+            ifMainThread { callback.end(type = Type.Message, data = msg) }
         }
 
         @AnyThread
         override fun dispatchingThrewException(msg: Message, exception: Exception) {
-            ifMainThread { callback.end(msg = msg, type = Type.Message) }
+            ifMainThread { callback.end(type = Type.Message, data = msg) }
         }
     }
 

@@ -16,7 +16,6 @@
 
 package com.xiaocydx.performance.monitor
 
-import android.os.Message
 import com.xiaocydx.performance.log
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
@@ -32,12 +31,12 @@ internal class MainLooperBlockMonitor : MainLooperCallback {
         // TODO: 实现dump线程获取调用栈
     }
 
-    override fun start(msg: Message?, type: Type) {
+    override fun start(type: Type, data: Any?) {
         startTime = System.currentTimeMillis()
     }
 
-    override fun end(msg: Message?, type: Type) {
+    override fun end(type: Type, data: Any?) {
         val time = System.currentTimeMillis() - startTime
-        log { "MainLooperBlockMonitor: time = $time ms, msg = $msg, type = $type" }
+        log { "MainLooperBlockMonitor: time = $time ms,   type = $type,   data = $data" }
     }
 }

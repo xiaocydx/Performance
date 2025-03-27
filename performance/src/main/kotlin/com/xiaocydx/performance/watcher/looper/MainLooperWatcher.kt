@@ -6,6 +6,8 @@ import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.log
+import com.xiaocydx.performance.watcher.activity.ActivityEvent
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -40,15 +42,16 @@ internal sealed class MainLooperWatcher {
             resetAfterGC: Boolean = true
         ) {
             val mainLooper = host.mainLooper
+            val finalCallback = NotReentrantMainLooperCallback(callback)
             val scope = host.createMainScope()
             scope.launch {
                 log { "设置MainLooperMessageWatcher" }
                 while (true) {
                     val watcher = if (Build.VERSION.SDK_INT < 29) {
-                        MainLooperMessageWatcher.setup(mainLooper, callback)
+                        MainLooperMessageWatcher.setup(mainLooper, finalCallback)
                     } else {
-                        runCatching { MainLooperMessageWatcher29.setupOrThrow(mainLooper, callback) }
-                            .getOrNull() ?: MainLooperMessageWatcher.setup(mainLooper, callback)
+                        runCatching { MainLooperMessageWatcher29.setupOrThrow(mainLooper, finalCallback) }
+                            .getOrNull() ?: MainLooperMessageWatcher.setup(mainLooper, finalCallback)
                     }
                     if (resetAfterGC) watcher.awaitGC() else break
                     log { "重新设置MainLooperMessageWatcher" }
@@ -58,9 +61,17 @@ internal sealed class MainLooperWatcher {
             scope.launch {
                 log { "设置MainLooperIdleHandlerWatcher" }
                 while (true) {
-                    val watcher = MainLooperIdleHandlerWatcher.setup(mainLooper, callback)
+                    val watcher = MainLooperIdleHandlerWatcher.setup(mainLooper, finalCallback)
                     if (resetAfterGC) watcher.awaitGC() else break
                     log { "重新设置MainLooperIdleHandlerWatcher" }
+                }
+            }
+
+            scope.launch {
+                log { "设置MainLooperNativeTouchWatcher" }
+                host.activityEvent.filterIsInstance<ActivityEvent.Created>().collect {
+                    val activity = host.getActivity(it.actHashCode) ?: return@collect
+                    MainLooperNativeTouchWatcher.setup(activity.window, finalCallback)
                 }
             }
         }

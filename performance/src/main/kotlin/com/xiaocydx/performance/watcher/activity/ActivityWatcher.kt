@@ -59,13 +59,12 @@ internal class ActivityWatcher {
                     _event.tryEmit(ActivityEvent.Stopped(activity))
                 }
 
-                override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
-                }
-
                 override fun onActivityDestroyed(activity: Activity) {
                     map.remove(activity.hashCode())
                     _event.tryEmit(ActivityEvent.Destroyed(activity))
                 }
+
+                override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             }
         )
     }
@@ -75,16 +74,4 @@ internal class ActivityWatcher {
         assertMainThread()
         return map[hashCode]
     }
-}
-
-internal sealed class ActivityEvent(activity: Activity) {
-    val clazz = activity::class.java
-    val hashCode = activity.hashCode()
-
-    class Created(activity: Activity) : ActivityEvent(activity)
-    class Started(activity: Activity) : ActivityEvent(activity)
-    class Resumed(activity: Activity) : ActivityEvent(activity)
-    class Paused(activity: Activity) : ActivityEvent(activity)
-    class Stopped(activity: Activity) : ActivityEvent(activity)
-    class Destroyed(activity: Activity) : ActivityEvent(activity)
 }

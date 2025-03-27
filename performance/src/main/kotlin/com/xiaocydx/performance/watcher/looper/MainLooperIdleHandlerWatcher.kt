@@ -71,9 +71,9 @@ internal class MainLooperIdleHandlerWatcher private constructor(
     ) : MessageQueue.IdleHandler {
 
         override fun queueIdle(): Boolean {
-            callback.start(msg = null, type = Type.IdleHandler)
+            callback.start(type = Type.IdleHandler, data = delegate)
             val keep = delegate.queueIdle()
-            callback.end(msg = null, type = Type.IdleHandler)
+            callback.end(type = Type.IdleHandler, data = delegate)
             return keep
         }
     }

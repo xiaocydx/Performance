@@ -47,7 +47,7 @@ internal class ActivityResumedIdleMonitor(private val host: Performance.Host) {
                     is ActivityEvent.Created,
                     is ActivityEvent.Started -> return@collect
                     is ActivityEvent.Resumed -> {
-                        checkHashCode = it.hashCode
+                        checkHashCode = it.actHashCode
                         checkJob?.cancel()
                         checkJob = launch {
                             val pass = withTimeoutOrNull(TIME_OUT_MS) { awaitIdle() }
@@ -57,7 +57,7 @@ internal class ActivityResumedIdleMonitor(private val host: Performance.Host) {
                     is ActivityEvent.Paused,
                     is ActivityEvent.Stopped,
                     is ActivityEvent.Destroyed -> {
-                        if (checkHashCode == it.hashCode) {
+                        if (checkHashCode == it.actHashCode) {
                             checkJob?.cancel()
                             checkJob = null
                         }
