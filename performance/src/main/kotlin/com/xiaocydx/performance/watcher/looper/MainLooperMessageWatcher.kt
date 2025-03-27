@@ -14,62 +14,29 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.looper
+package com.xiaocydx.performance.watcher.looper
 
-import android.os.Build
 import android.os.Looper
 import android.os.Message
 import android.util.Printer
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
-import androidx.annotation.VisibleForTesting
 import com.xiaocydx.performance.Reflection
 import com.xiaocydx.performance.fake.FakeLooperObserver
 import com.xiaocydx.performance.fake.toReal
-import com.xiaocydx.performance.log
 import com.xiaocydx.performance.reference.Cleaner
+import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
 /**
  * @author xcc
  * @date 2025/3/19
  */
-internal sealed class MainLooperMessageAnalyzer {
-    private var startTime = 0L
-
-    @MainThread
-    abstract fun trackGC(thunk: Runnable)
-
-    @MainThread
-    @VisibleForTesting
-    abstract fun remove()
-
-    @MainThread
-    fun start(msg: Message?) {
-        log { "MainLooperMessageAnalyzer start" }
-        startTime = System.currentTimeMillis()
-    }
-
-    @MainThread
-    fun end(msg: Message?) {
-        log { "MainLooperMessageAnalyzer end, ${System.currentTimeMillis() - startTime}ms, msg = $msg" }
-    }
-
-    companion object {
-
-        @MainThread
-        fun setup() = if (Build.VERSION.SDK_INT < 29) {
-            MainLooperMessageAnalyzerImpl.setup()
-        } else {
-            runCatching { MainLooperMessageAnalyzerImpl29.setupOrThrow() }
-                .getOrNull() ?: MainLooperMessageAnalyzerImpl.setup()
-        }
-    }
-}
-
-private class MainLooperMessageAnalyzerImpl private constructor(
-    private val original: Printer?
-) : MainLooperMessageAnalyzer() {
+internal class MainLooperMessageWatcher private constructor(
+    private val original: Printer?,
+    private val mainLooper: Looper,
+    private val callback: MainLooperCallback
+) : MainLooperWatcher() {
     private var isStarted = false
     private val printer = PrinterImpl()
 
@@ -78,7 +45,7 @@ private class MainLooperMessageAnalyzerImpl private constructor(
     }
 
     override fun remove() {
-        Looper.getMainLooper().setMessageLogging(null)
+        mainLooper.setMessageLogging(null)
     }
 
     private inner class PrinterImpl : Printer {
@@ -88,9 +55,9 @@ private class MainLooperMessageAnalyzerImpl private constructor(
             original?.println(x)
             isStarted = !isStarted
             if (isStarted) {
-                start(msg = null)
+                callback.start(msg = null, type = Type.Message)
             } else {
-                end(msg = null)
+                callback.end(msg = null, type = Type.Message)
             }
         }
     }
@@ -98,24 +65,28 @@ private class MainLooperMessageAnalyzerImpl private constructor(
     companion object : Reflection {
 
         @MainThread
-        fun setup(): MainLooperMessageAnalyzer {
+        fun setup(
+            mainLooper: Looper,
+            callback: MainLooperCallback
+        ): MainLooperWatcher {
             val original = runCatching {
                 val fields = Looper::class.java.toSafe().declaredInstanceFields
                 val mLogging = fields.find("mLogging").apply { isAccessible = true }
-                mLogging.get(Looper.getMainLooper()) as? Printer
+                mLogging.get(mainLooper) as? Printer
             }.getOrNull()
-            val analyzer = MainLooperMessageAnalyzerImpl(original)
-            Looper.getMainLooper().setMessageLogging(analyzer.printer)
-            return analyzer
+            val watcher = MainLooperMessageWatcher(original, mainLooper, callback)
+            mainLooper.setMessageLogging(watcher.printer)
+            return watcher
         }
     }
 }
 
 @RequiresApi(29)
-private class MainLooperMessageAnalyzerImpl29 private constructor(
-    original: Any?
-) : MainLooperMessageAnalyzer() {
-    private val mainLooper = Looper.getMainLooper()
+internal class MainLooperMessageWatcher29 private constructor(
+    original: Any?,
+    private val mainLooper: Looper,
+    private val callback: MainLooperCallback
+) : MainLooperWatcher() {
     private val fakeObserver = FakeLooperObserverImpl()
     private val realObserver = fakeObserver.toReal(original)
 
@@ -138,33 +109,35 @@ private class MainLooperMessageAnalyzerImpl29 private constructor(
 
         @AnyThread
         override fun messageDispatchStarting() {
-            ifMainThread { start(msg = null) }
+            ifMainThread { callback.start(msg = null, type = Type.Message) }
         }
 
         @AnyThread
         override fun messageDispatched(msg: Message) {
-            ifMainThread { end(msg = msg) }
+            ifMainThread { callback.end(msg = msg, type = Type.Message) }
         }
 
         @AnyThread
         override fun dispatchingThrewException(msg: Message, exception: Exception) {
-            ifMainThread { end(msg = msg) }
+            ifMainThread { callback.end(msg = msg, type = Type.Message) }
         }
     }
 
     companion object : Reflection {
 
         @MainThread
-        fun setupOrThrow(): MainLooperMessageAnalyzer {
+        fun setupOrThrow(
+            mainLooper: Looper,
+            callback: MainLooperCallback
+        ): MainLooperWatcher {
             val fields = Looper::class.java.toSafe().declaredStaticFields
             val methods = Looper::class.java.toSafe().declaredMethods
             val sObserver = fields.find("sObserver").apply { isAccessible = true }
             val setObserver = methods.find("setObserver").apply { isAccessible = true }
-
             val original = sObserver.get(null)
-            val analyzer = MainLooperMessageAnalyzerImpl29(original)
-            setObserver.invoke(null, analyzer.realObserver)
-            return analyzer
+            val watcher = MainLooperMessageWatcher29(original, mainLooper, callback)
+            setObserver.invoke(null, watcher.realObserver)
+            return watcher
         }
     }
 }

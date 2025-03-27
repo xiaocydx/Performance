@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.looper
+package com.xiaocydx.performance.monitor
 
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.activity.ActivityEvent
 import com.xiaocydx.performance.assertMainThread
+import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
@@ -32,39 +31,46 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/20
  */
-internal class MainLooperIdleCheck(private val host: Performance.Host) {
+internal class ActivityResumedIdleMonitor(private val host: Performance.Host) {
+    private val scope = host.createMainScope()
 
-    suspend fun repeatCheckOnActivityResumed() = withContext<Unit>(host.mainDispatcher) {
-        var checkHashCode = 0
-        var checkJob: Job? = null
-        host.activityEvent.collect {
-            when (it) {
-                is ActivityEvent.Created,
-                is ActivityEvent.Started -> return@collect
-                is ActivityEvent.Resumed -> {
-                    checkHashCode = it.hashCode
-                    checkJob?.cancel()
-                    checkJob = launch {
-                        val pass = withTimeoutOrNull(TIME_OUT_MS) { awaitIdle() }
-                        if (pass == null) showTimeoutDialog()
-                    }
-                }
-                is ActivityEvent.Paused,
-                is ActivityEvent.Stopped,
-                is ActivityEvent.Destroyed -> {
-                    if (checkHashCode == it.hashCode) {
+    fun init() {
+        repeatCheckOnActivityResumed()
+    }
+
+    private fun repeatCheckOnActivityResumed() {
+        scope.launch {
+            var checkHashCode = 0
+            var checkJob: Job? = null
+            host.activityEvent.collect {
+                when (it) {
+                    is ActivityEvent.Created,
+                    is ActivityEvent.Started -> return@collect
+                    is ActivityEvent.Resumed -> {
+                        checkHashCode = it.hashCode
                         checkJob?.cancel()
-                        checkJob = null
+                        checkJob = launch {
+                            val pass = withTimeoutOrNull(TIME_OUT_MS) { awaitIdle() }
+                            if (pass == null) showTimeoutDialog(checkHashCode)
+                        }
+                    }
+                    is ActivityEvent.Paused,
+                    is ActivityEvent.Stopped,
+                    is ActivityEvent.Destroyed -> {
+                        if (checkHashCode == it.hashCode) {
+                            checkJob?.cancel()
+                            checkJob = null
+                        }
                     }
                 }
             }
         }
     }
 
-    private fun showTimeoutDialog() {
-        val activity = host.getLastActivity() ?: return
+    private fun showTimeoutDialog(hashCode: Int) {
+        val activity = host.getActivity(hashCode) ?: return
         AlertDialog.Builder(activity)
-            .setTitle("AwaitMainLooperIdle")
+            .setTitle("AwaitActivityResumedIdle")
             .setMessage("timeout")
             .show()
     }

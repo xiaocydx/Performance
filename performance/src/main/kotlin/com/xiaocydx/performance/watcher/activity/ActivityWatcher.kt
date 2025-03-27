@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.activity
+package com.xiaocydx.performance.watcher.activity
 
 import android.app.Activity
 import android.app.Application
@@ -28,8 +28,8 @@ import kotlinx.coroutines.flow.asSharedFlow
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityMonitor {
-    private val list = mutableListOf<Activity>()
+internal class ActivityWatcher {
+    private val map = HashMap<Int, Activity>()
     private val _event = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
     val event = _event.asSharedFlow()
 
@@ -39,7 +39,7 @@ internal class ActivityMonitor {
         application.registerActivityLifecycleCallbacks(
             object : Application.ActivityLifecycleCallbacks {
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-                    list.add(activity)
+                    map[activity.hashCode()] = activity
                     _event.tryEmit(ActivityEvent.Created(activity))
                 }
 
@@ -63,7 +63,7 @@ internal class ActivityMonitor {
                 }
 
                 override fun onActivityDestroyed(activity: Activity) {
-                    list.remove(activity)
+                    map.remove(activity.hashCode())
                     _event.tryEmit(ActivityEvent.Destroyed(activity))
                 }
             }
@@ -71,9 +71,9 @@ internal class ActivityMonitor {
     }
 
     @MainThread
-    fun getLastActivity(): Activity? {
+    fun getActivity(hashCode: Int): Activity? {
         assertMainThread()
-        return list.lastOrNull()
+        return map[hashCode]
     }
 }
 

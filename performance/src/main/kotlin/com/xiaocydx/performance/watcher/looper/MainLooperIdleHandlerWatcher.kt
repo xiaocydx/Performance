@@ -14,48 +14,50 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.looper
+package com.xiaocydx.performance.watcher.looper
 
 import android.os.Looper
 import android.os.MessageQueue
-import android.os.MessageQueue.IdleHandler
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.Reflection
-import com.xiaocydx.performance.log
 import com.xiaocydx.performance.reference.Cleaner
+import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
 /**
  * @author xcc
  * @date 2025/3/19
  */
-internal class MainLooperIdleAnalyzer private constructor() {
+internal class MainLooperIdleHandlerWatcher private constructor(
+    private val callback: MainLooperCallback
+) : MainLooperWatcher() {
     private val list = IdleHandlerList()
     private var canTrackGC = false
 
-    @MainThread
-    fun trackGC(thunk: Runnable) {
+    override fun trackGC(thunk: Runnable) {
         if (canTrackGC) Cleaner.add(list, thunk)
     }
 
+    override fun remove() = Unit
+
     @MainThread
-    private fun set(original: List<IdleHandler>?) {
+    private fun set(original: List<MessageQueue.IdleHandler>?) {
         canTrackGC = original != null
         original?.forEach { list.add(it) }
     }
 
     @MainThread
-    private fun get(): List<IdleHandler> = list
+    private fun get(): List<MessageQueue.IdleHandler> = list
 
-    private class IdleHandlerList : ArrayList<IdleHandler>() {
-        private val map = mutableMapOf<IdleHandler, IdleHandlerWrapper>()
+    private inner class IdleHandlerList : ArrayList<MessageQueue.IdleHandler>() {
+        private val map = mutableMapOf<MessageQueue.IdleHandler, IdleHandlerWrapper>()
 
-        override fun add(element: IdleHandler): Boolean {
+        override fun add(element: MessageQueue.IdleHandler): Boolean {
             val wrapper = IdleHandlerWrapper(element)
             map[element] = wrapper
             return super.add(wrapper)
         }
 
-        override fun remove(element: IdleHandler): Boolean {
+        override fun remove(element: MessageQueue.IdleHandler): Boolean {
             val wrapper = when (element) {
                 is IdleHandlerWrapper -> map.remove(element.delegate)
                 else -> map.remove(element)
@@ -64,13 +66,14 @@ internal class MainLooperIdleAnalyzer private constructor() {
         }
     }
 
-    private class IdleHandlerWrapper(val delegate: IdleHandler) : IdleHandler {
+    private inner class IdleHandlerWrapper(
+        val delegate: MessageQueue.IdleHandler
+    ) : MessageQueue.IdleHandler {
 
         override fun queueIdle(): Boolean {
-            val startTime = System.currentTimeMillis()
-            log { "MainLooperIdleAnalyzer start" }
+            callback.start(msg = null, type = Type.IdleHandler)
             val keep = delegate.queueIdle()
-            log { "MainLooperIdleAnalyzer end, ${System.currentTimeMillis() - startTime}ms" }
+            callback.end(msg = null, type = Type.IdleHandler)
             return keep
         }
     }
@@ -79,16 +82,19 @@ internal class MainLooperIdleAnalyzer private constructor() {
 
         @MainThread
         @Suppress("UNCHECKED_CAST")
-        fun setup(): MainLooperIdleAnalyzer {
-            val analyzer = MainLooperIdleAnalyzer()
+        fun setup(
+            mainLooper: Looper,
+            callback: MainLooperCallback
+        ): MainLooperIdleHandlerWatcher {
+            val watcher = MainLooperIdleHandlerWatcher(callback)
             runCatching {
                 val fields = MessageQueue::class.java.toSafe().declaredInstanceFields
                 val mIdleHandlers = fields.find("mIdleHandlers").apply { isAccessible = true }
-                val original = mIdleHandlers.get(Looper.getMainLooper().queue) as? List<IdleHandler>
-                analyzer.set(original)
-                mIdleHandlers.set(Looper.getMainLooper().queue, analyzer.get())
+                val original = mIdleHandlers.get(mainLooper.queue) as? List<MessageQueue.IdleHandler>
+                watcher.set(original)
+                mIdleHandlers.set(mainLooper.queue, watcher.get())
             }
-            return analyzer
+            return watcher
         }
     }
 }

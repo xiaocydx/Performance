@@ -20,10 +20,14 @@ import android.app.Activity
 import android.app.Application
 import android.os.Looper
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.activity.ActivityEvent
-import com.xiaocydx.performance.activity.ActivityMonitor
-import com.xiaocydx.performance.looper.MainLooperMonitor
+import com.xiaocydx.performance.monitor.ActivityResumedIdleMonitor
+import com.xiaocydx.performance.monitor.MainLooperANRMonitor
+import com.xiaocydx.performance.monitor.MainLooperBlockMonitor
 import com.xiaocydx.performance.reference.Cleaner
+import com.xiaocydx.performance.watcher.activity.ActivityEvent
+import com.xiaocydx.performance.watcher.activity.ActivityWatcher
+import com.xiaocydx.performance.watcher.looper.CompositeMainLooperCallback
+import com.xiaocydx.performance.watcher.looper.MainLooperWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainCoroutineDispatcher
@@ -36,7 +40,7 @@ import kotlinx.coroutines.flow.SharedFlow
  */
 object Performance {
     private val host = HostImpl()
-    private val activityMonitor = ActivityMonitor()
+    private val activityWatcher = ActivityWatcher()
     private var isInitialized = false
 
     @MainThread
@@ -45,8 +49,14 @@ object Performance {
         if (isInitialized) return
         isInitialized = true
         ReferenceQueueDaemon().start()
-        activityMonitor.init(application)
-        MainLooperMonitor(host).init()
+
+        activityWatcher.init(application)
+        ActivityResumedIdleMonitor(host).init()
+
+        val callback = CompositeMainLooperCallback()
+        callback.add(MainLooperANRMonitor().init())
+        callback.add(MainLooperBlockMonitor().init())
+        MainLooperWatcher.init(host, callback)
     }
 
     private class HostImpl : Host {
@@ -58,14 +68,14 @@ object Performance {
             get() = Dispatchers.Main.immediate
 
         override val activityEvent: SharedFlow<ActivityEvent>
-            get() = activityMonitor.event
+            get() = activityWatcher.event
 
         override fun createMainScope(): CoroutineScope {
             return CoroutineScope(SupervisorJob(parentJob) + mainDispatcher)
         }
 
-        override fun getLastActivity(): Activity? {
-            return activityMonitor.getLastActivity()
+        override fun getActivity(hashCode: Int): Activity? {
+            return activityWatcher.getActivity(hashCode)
         }
     }
 
@@ -95,6 +105,6 @@ object Performance {
         fun createMainScope(): CoroutineScope
 
         @MainThread
-        fun getLastActivity(): Activity?
+        fun getActivity(hashCode: Int): Activity?
     }
 }
