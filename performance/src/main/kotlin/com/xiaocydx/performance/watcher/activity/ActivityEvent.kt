@@ -7,8 +7,8 @@ import android.app.Activity
  * @date 2025/3/27
  */
 internal sealed class ActivityEvent(activity: Activity) {
-    val actClass = activity::class.java
-    val actHashCode = activity.hashCode()
+    val activityKey = activity.hashCode()
+    val activityClass = activity::class.java
 
     class Created(activity: Activity) : ActivityEvent(activity)
     class Started(activity: Activity) : ActivityEvent(activity)

@@ -14,27 +14,24 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.reference
+package com.xiaocydx.performance.gc
 
 /**
  * @author xcc
- * @date 2025/3/19
+ * @date 2025/4/1
  */
-internal object GCHelper {
+internal class ReferenceQueueDaemon : Runnable {
 
-    fun runGC() {
-        // AOSP FinalizationTest:
-        // https://android.googlesource.com/platform/libcore/+/master/support/src/test/java/libcore/
-        Runtime.getRuntime().gc()
-        enqueueReferences()
-        System.runFinalization()
+    override fun run() {
+        while (true) {
+            val reference = Cleaner.queue.remove() as Cleaner
+            reference.clean()
+        }
     }
 
-    private fun enqueueReferences() {
-        try {
-            Thread.sleep(100)
-        } catch (e: InterruptedException) {
-            throw AssertionError(e)
-        }
+    fun start() {
+        val thread = Thread(this, "PerformanceReferenceQueueDaemon")
+        thread.isDaemon = true
+        thread.start()
     }
 }

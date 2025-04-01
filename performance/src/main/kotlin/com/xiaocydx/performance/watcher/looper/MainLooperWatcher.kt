@@ -70,7 +70,7 @@ internal sealed class MainLooperWatcher {
             scope.launch {
                 log { "设置MainLooperNativeTouchWatcher" }
                 host.activityEvent.filterIsInstance<ActivityEvent.Created>().collect {
-                    val activity = host.getActivity(it.actHashCode) ?: return@collect
+                    val activity = host.getActivity(it.activityKey) ?: return@collect
                     MainLooperNativeTouchWatcher.setup(activity.window, finalCallback)
                 }
             }

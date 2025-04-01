@@ -35,9 +35,9 @@ internal interface MainLooperCallback {
      * 开始处理[type]
      *
      * @param data
-     * [Type.Message] - [Message]，
-     * [Type.IdleHandler] - [IdleHandler]，
-     * [Type.NativeTouch] - [MotionEvent]
+     * * [Type.Message]: Android 10以下 - Printer字符串，Android 10及以上 - `null`。
+     * * [Type.IdleHandler]：[IdleHandler]。
+     * * [Type.NativeTouch]：[MotionEvent]。
      */
     @MainThread
     fun start(type: Type, data: Any?)
@@ -46,9 +46,9 @@ internal interface MainLooperCallback {
      * 结束处理[type]
      *
      * @param data
-     * [Type.Message] - [Message]，
-     * [Type.IdleHandler] - [IdleHandler]，
-     * [Type.NativeTouch] - [MotionEvent]
+     * * [Type.Message]: Android 10以下 - Printer字符串，Android 10及以上 - [Message]。
+     * * [Type.IdleHandler]：[IdleHandler]。
+     * * [Type.NativeTouch]：[MotionEvent]。
      */
     @MainThread
     fun end(type: Type, data: Any?)

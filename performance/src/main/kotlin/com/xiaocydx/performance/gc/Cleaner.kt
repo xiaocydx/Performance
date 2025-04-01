@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.reference
+package com.xiaocydx.performance.gc
 
 import java.lang.ref.PhantomReference
 import java.lang.ref.ReferenceQueue
@@ -34,6 +34,7 @@ internal class Cleaner private constructor(
     }
 
     companion object {
+        // TODO: 改为双向链表
         private val list = mutableListOf<Cleaner>()
         val queue = ReferenceQueue<Any>()
 
@@ -44,7 +45,6 @@ internal class Cleaner private constructor(
 
         @Synchronized
         private fun remove(cleaner: Cleaner): Boolean {
-            // 少量长周期对象使用Cleaner，不用构建双向链表优化remove
             return list.remove(cleaner)
         }
     }

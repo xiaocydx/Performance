@@ -18,12 +18,13 @@ package com.xiaocydx.performance
 
 import android.app.Activity
 import android.app.Application
+import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.monitor.ActivityResumedIdleMonitor
-import com.xiaocydx.performance.monitor.MainLooperANRMonitor
-import com.xiaocydx.performance.monitor.MainLooperBlockMonitor
-import com.xiaocydx.performance.reference.Cleaner
+import com.xiaocydx.performance.analyzer.ActivityResumedIdleAnalyzer
+import com.xiaocydx.performance.analyzer.MainLooperANRAnalyzer
+import com.xiaocydx.performance.analyzer.MainLooperBlockAnalyzer
+import com.xiaocydx.performance.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import com.xiaocydx.performance.watcher.activity.ActivityWatcher
 import com.xiaocydx.performance.watcher.looper.CompositeMainLooperCallback
@@ -51,18 +52,21 @@ object Performance {
         ReferenceQueueDaemon().start()
 
         activityWatcher.init(application)
-        ActivityResumedIdleMonitor(host).init()
+        ActivityResumedIdleAnalyzer(host).init()
 
         val callback = CompositeMainLooperCallback()
-        callback.add(MainLooperANRMonitor().init())
-        callback.add(MainLooperBlockMonitor().init())
+        callback.add(MainLooperANRAnalyzer().init())
+        callback.add(MainLooperBlockAnalyzer(host).init(threshold = 300L))
         MainLooperWatcher.init(host, callback)
     }
 
     private class HostImpl : Host {
         private val parentJob = SupervisorJob()
+        private val dumpThread by lazy { HandlerThread("PerformanceDumpThread").apply { start() } }
 
         override val mainLooper = Looper.getMainLooper()!!
+
+        override val dumpLooper by lazy { dumpThread.looper!! }
 
         override val mainDispatcher: MainCoroutineDispatcher
             get() = Dispatchers.Main.immediate
@@ -74,29 +78,19 @@ object Performance {
             return CoroutineScope(SupervisorJob(parentJob) + mainDispatcher)
         }
 
-        override fun getActivity(hashCode: Int): Activity? {
-            return activityWatcher.getActivity(hashCode)
-        }
-    }
-
-    private class ReferenceQueueDaemon : Runnable {
-
-        override fun run() {
-            while (true) {
-                val reference = Cleaner.queue.remove() as Cleaner
-                reference.clean()
-            }
+        override fun getActivity(key: Int): Activity? {
+            return activityWatcher.getActivity(key)
         }
 
-        fun start() {
-            val thread = Thread(this, "PerformanceReferenceQueueDaemon")
-            thread.isDaemon = true
-            thread.start()
+        override fun getLastActivity(): Activity? {
+            return activityWatcher.getLastActivity()
         }
     }
 
     internal interface Host {
         val mainLooper: Looper
+
+        val dumpLooper: Looper
 
         val mainDispatcher: MainCoroutineDispatcher
 
@@ -105,6 +99,8 @@ object Performance {
         fun createMainScope(): CoroutineScope
 
         @MainThread
-        fun getActivity(hashCode: Int): Activity?
+        fun getActivity(key: Int): Activity?
+
+        fun getLastActivity(): Activity?
     }
 }

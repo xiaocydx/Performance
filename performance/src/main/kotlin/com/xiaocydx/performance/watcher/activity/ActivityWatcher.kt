@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.asSharedFlow
  */
 internal class ActivityWatcher {
     private val map = HashMap<Int, Activity>()
+    private val list = mutableListOf<Activity>()
     private val _event = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
     val event = _event.asSharedFlow()
 
@@ -39,8 +40,10 @@ internal class ActivityWatcher {
         application.registerActivityLifecycleCallbacks(
             object : Application.ActivityLifecycleCallbacks {
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-                    map[activity.hashCode()] = activity
-                    _event.tryEmit(ActivityEvent.Created(activity))
+                    val event = ActivityEvent.Created(activity)
+                    map[event.activityKey] = activity
+                    list.add(activity)
+                    _event.tryEmit(event)
                 }
 
                 override fun onActivityStarted(activity: Activity) {
@@ -60,8 +63,10 @@ internal class ActivityWatcher {
                 }
 
                 override fun onActivityDestroyed(activity: Activity) {
-                    map.remove(activity.hashCode())
-                    _event.tryEmit(ActivityEvent.Destroyed(activity))
+                    val event = ActivityEvent.Destroyed(activity)
+                    map.remove(event.activityKey)
+                    list.remove(activity)
+                    _event.tryEmit(event)
                 }
 
                 override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
@@ -70,8 +75,14 @@ internal class ActivityWatcher {
     }
 
     @MainThread
-    fun getActivity(hashCode: Int): Activity? {
+    fun getActivity(key: Int): Activity? {
         assertMainThread()
-        return map[hashCode]
+        return map[key]
+    }
+
+    @MainThread
+    fun getLastActivity(): Activity? {
+        assertMainThread()
+        return list.lastOrNull()
     }
 }

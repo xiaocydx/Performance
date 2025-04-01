@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.monitor
+package com.xiaocydx.performance.analyzer
 
-import com.xiaocydx.performance.log
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
@@ -24,19 +23,16 @@ import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
  * @author xcc
  * @date 2025/3/27
  */
-internal class MainLooperBlockMonitor : MainLooperCallback {
-    private var startTime = 0L
+internal class MainLooperANRAnalyzer : MainLooperCallback {
 
     fun init() = apply {
-        // TODO: 实现dump线程获取调用栈
     }
 
     override fun start(type: Type, data: Any?) {
-        startTime = System.currentTimeMillis()
+
     }
 
     override fun end(type: Type, data: Any?) {
-        val time = System.currentTimeMillis() - startTime
-        log { "MainLooperBlockMonitor: time = $time ms,   type = $type,   data = $data" }
+        // TODO: 收集data的信息进队列
     }
 }

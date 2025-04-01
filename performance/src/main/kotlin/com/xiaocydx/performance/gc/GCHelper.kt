@@ -14,25 +14,27 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.monitor
-
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+package com.xiaocydx.performance.gc
 
 /**
  * @author xcc
- * @date 2025/3/27
+ * @date 2025/3/19
  */
-internal class MainLooperANRMonitor : MainLooperCallback {
+internal object GCHelper {
 
-    fun init() = apply {
+    fun runGC() {
+        // AOSP FinalizationTest:
+        // https://android.googlesource.com/platform/libcore/+/master/support/src/test/java/libcore/
+        Runtime.getRuntime().gc()
+        enqueueReferences()
+        System.runFinalization()
     }
 
-    override fun start(type: Type, data: Any?) {
-
-    }
-
-    override fun end(type: Type, data: Any?) {
-        // TODO: 收集data的信息进队列
+    private fun enqueueReferences() {
+        try {
+            Thread.sleep(100)
+        } catch (e: InterruptedException) {
+            throw AssertionError(e)
+        }
     }
 }

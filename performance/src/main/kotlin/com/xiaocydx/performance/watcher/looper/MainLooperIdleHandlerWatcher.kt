@@ -20,7 +20,7 @@ import android.os.Looper
 import android.os.MessageQueue
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.Reflection
-import com.xiaocydx.performance.reference.Cleaner
+import com.xiaocydx.performance.gc.Cleaner
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
 /**

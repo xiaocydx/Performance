@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.monitor
+package com.xiaocydx.performance.analyzer
 
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
@@ -31,7 +31,7 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityResumedIdleMonitor(private val host: Performance.Host) {
+internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) {
     private val scope = host.createMainScope()
 
     fun init() {
@@ -40,24 +40,24 @@ internal class ActivityResumedIdleMonitor(private val host: Performance.Host) {
 
     private fun repeatCheckOnActivityResumed() {
         scope.launch {
-            var checkHashCode = 0
+            var checkKey = 0
             var checkJob: Job? = null
             host.activityEvent.collect {
                 when (it) {
                     is ActivityEvent.Created,
                     is ActivityEvent.Started -> return@collect
                     is ActivityEvent.Resumed -> {
-                        checkHashCode = it.actHashCode
+                        checkKey = it.activityKey
                         checkJob?.cancel()
                         checkJob = launch {
                             val pass = withTimeoutOrNull(TIME_OUT_MS) { awaitIdle() }
-                            if (pass == null) showTimeoutDialog(checkHashCode)
+                            if (pass == null) showTimeoutDialog(checkKey)
                         }
                     }
                     is ActivityEvent.Paused,
                     is ActivityEvent.Stopped,
                     is ActivityEvent.Destroyed -> {
-                        if (checkHashCode == it.actHashCode) {
+                        if (checkKey == it.activityKey) {
                             checkJob?.cancel()
                             checkJob = null
                         }
@@ -67,8 +67,8 @@ internal class ActivityResumedIdleMonitor(private val host: Performance.Host) {
         }
     }
 
-    private fun showTimeoutDialog(hashCode: Int) {
-        val activity = host.getActivity(hashCode) ?: return
+    private fun showTimeoutDialog(key: Int) {
+        val activity = host.getActivity(key) ?: return
         AlertDialog.Builder(activity)
             .setTitle("AwaitActivityResumedIdle")
             .setMessage("timeout")

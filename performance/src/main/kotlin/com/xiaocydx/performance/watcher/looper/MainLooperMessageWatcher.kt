@@ -25,7 +25,7 @@ import androidx.annotation.RequiresApi
 import com.xiaocydx.performance.Reflection
 import com.xiaocydx.performance.fake.FakeLooperObserver
 import com.xiaocydx.performance.fake.toReal
-import com.xiaocydx.performance.reference.Cleaner
+import com.xiaocydx.performance.gc.Cleaner
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 
 /**
@@ -37,7 +37,6 @@ internal class MainLooperMessageWatcher private constructor(
     private val mainLooper: Looper,
     private val callback: MainLooperCallback
 ) : MainLooperWatcher() {
-    private var isStarted = false
     private val printer = PrinterImpl()
 
     override fun trackGC(thunk: Runnable) {
@@ -51,13 +50,11 @@ internal class MainLooperMessageWatcher private constructor(
     private inner class PrinterImpl : Printer {
 
         @MainThread
-        override fun println(x: String?) {
+        override fun println(x: String) {
             original?.println(x)
-            isStarted = !isStarted
-            if (isStarted) {
-                callback.start(type = Type.Message, data = null)
-            } else {
-                callback.end(type = Type.Message, data = null)
+            when {
+                x[0] == '>' -> callback.start(type = Type.Message, data = x)
+                x[0] == '<' -> callback.end(type = Type.Message, data = x)
             }
         }
     }
