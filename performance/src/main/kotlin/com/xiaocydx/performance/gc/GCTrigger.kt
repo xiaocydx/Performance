@@ -20,7 +20,7 @@ package com.xiaocydx.performance.gc
  * @author xcc
  * @date 2025/3/19
  */
-internal object GCHelper {
+internal object GCTrigger {
 
     fun runGC() {
         // AOSP FinalizationTest:

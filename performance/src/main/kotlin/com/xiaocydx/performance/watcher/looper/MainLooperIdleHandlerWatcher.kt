@@ -18,6 +18,7 @@ package com.xiaocydx.performance.watcher.looper
 
 import android.os.Looper
 import android.os.MessageQueue
+import android.os.MessageQueue.IdleHandler
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.Reflection
 import com.xiaocydx.performance.gc.Cleaner
@@ -40,24 +41,24 @@ internal class MainLooperIdleHandlerWatcher private constructor(
     override fun remove() = Unit
 
     @MainThread
-    private fun set(original: List<MessageQueue.IdleHandler>?) {
+    private fun set(original: List<IdleHandler>?) {
         canTrackGC = original != null
         original?.forEach { list.add(it) }
     }
 
     @MainThread
-    private fun get(): List<MessageQueue.IdleHandler> = list
+    private fun get(): List<IdleHandler> = list
 
-    private inner class IdleHandlerList : ArrayList<MessageQueue.IdleHandler>() {
-        private val map = mutableMapOf<MessageQueue.IdleHandler, IdleHandlerWrapper>()
+    private inner class IdleHandlerList : ArrayList<IdleHandler>() {
+        private val map = mutableMapOf<IdleHandler, IdleHandlerWrapper>()
 
-        override fun add(element: MessageQueue.IdleHandler): Boolean {
+        override fun add(element: IdleHandler): Boolean {
             val wrapper = IdleHandlerWrapper(element)
             map[element] = wrapper
             return super.add(wrapper)
         }
 
-        override fun remove(element: MessageQueue.IdleHandler): Boolean {
+        override fun remove(element: IdleHandler): Boolean {
             val wrapper = when (element) {
                 is IdleHandlerWrapper -> map.remove(element.delegate)
                 else -> map.remove(element)
@@ -66,9 +67,7 @@ internal class MainLooperIdleHandlerWatcher private constructor(
         }
     }
 
-    private inner class IdleHandlerWrapper(
-        val delegate: MessageQueue.IdleHandler
-    ) : MessageQueue.IdleHandler {
+    private inner class IdleHandlerWrapper(val delegate: IdleHandler) : IdleHandler {
 
         override fun queueIdle(): Boolean {
             callback.start(type = Type.IdleHandler, data = delegate)
@@ -90,7 +89,7 @@ internal class MainLooperIdleHandlerWatcher private constructor(
             runCatching {
                 val fields = MessageQueue::class.java.toSafe().declaredInstanceFields
                 val mIdleHandlers = fields.find("mIdleHandlers").apply { isAccessible = true }
-                val original = mIdleHandlers.get(mainLooper.queue) as? List<MessageQueue.IdleHandler>
+                val original = mIdleHandlers.get(mainLooper.queue) as? List<IdleHandler>
                 watcher.set(original)
                 mIdleHandlers.set(mainLooper.queue, watcher.get())
             }
