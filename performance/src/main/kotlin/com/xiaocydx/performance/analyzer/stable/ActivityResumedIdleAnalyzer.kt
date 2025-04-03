@@ -22,6 +22,7 @@ import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.assertMainThread
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -36,6 +37,10 @@ internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) {
 
     fun init() {
         repeatCheckOnActivityResumed()
+    }
+
+    fun cancel() {
+        scope.coroutineContext.cancelChildren()
     }
 
     private fun repeatCheckOnActivityResumed() {

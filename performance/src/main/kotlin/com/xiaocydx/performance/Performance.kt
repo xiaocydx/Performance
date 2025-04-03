@@ -21,9 +21,10 @@ import android.app.Application
 import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
 import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
+import com.xiaocydx.performance.analyzer.frame.FrameAnalyzer24
 import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
+import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
 import com.xiaocydx.performance.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import com.xiaocydx.performance.watcher.activity.ActivityWatcher
@@ -31,7 +32,6 @@ import com.xiaocydx.performance.watcher.looper.CompositeMainLooperCallback
 import com.xiaocydx.performance.watcher.looper.MainLooperWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -58,24 +58,25 @@ object Performance {
         callback.add(ANRAnalyzer().init())
         callback.add(JankAnalyzer(host).init(threshold = 300L))
         MainLooperWatcher.init(host, callback)
+
+        FrameAnalyzer24(host).init()
     }
 
     private class HostImpl : Host {
         private val parentJob = SupervisorJob()
         private val dumpThread by lazy { HandlerThread("PerformanceDumpThread").apply { start() } }
+        private val defaultThread by lazy { HandlerThread("PerformanceDefaultThread").apply { start() } }
 
         override val mainLooper = Looper.getMainLooper()!!
 
         override val dumpLooper by lazy { dumpThread.looper!! }
 
-        override val mainDispatcher: MainCoroutineDispatcher
-            get() = Dispatchers.Main.immediate
+        override val defaultLooper by lazy { defaultThread.looper!! }
 
-        override val activityEvent: SharedFlow<ActivityEvent>
-            get() = activityWatcher.event
+        override val activityEvent get() = activityWatcher.event
 
         override fun createMainScope(): CoroutineScope {
-            return CoroutineScope(SupervisorJob(parentJob) + mainDispatcher)
+            return CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Main.immediate)
         }
 
         override fun getActivity(key: Int): Activity? {
@@ -92,7 +93,7 @@ object Performance {
 
         val dumpLooper: Looper
 
-        val mainDispatcher: MainCoroutineDispatcher
+        val defaultLooper: Looper
 
         val activityEvent: SharedFlow<ActivityEvent>
 
@@ -101,6 +102,7 @@ object Performance {
         @MainThread
         fun getActivity(key: Int): Activity?
 
+        @MainThread
         fun getLastActivity(): Activity?
     }
 }
