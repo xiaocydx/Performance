@@ -26,39 +26,46 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
 import androidx.core.view.doOnAttach
 import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.log
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
+import kotlin.system.measureTimeMillis
 
 /**
  * @author xcc
  * @date 2025/4/3
  */
 @RequiresApi(24)
-internal class FrameAnalyzer24(private val host: Performance.Host) {
+internal class FrameAnalyzer24(
+    config: FrameConfig,
+    private val host: Performance.Host
+) {
     private val scope = host.createMainScope()
     private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
+    private val frameMetricsAccumulators = config.receivers.map(::FrameMetricsAccumulator)
     @Volatile private var latestRefreshRate = DEFAULT_REFRESH_RATE
 
     fun init() {
-        val handler = Handler(host.defaultLooper)
-        val job = host.activityEvent.onEach {
-            val activity = host.getActivity(it.activityKey)
-            when (it) {
-                is ActivityEvent.Created -> if (activity != null) {
-                    syncRefreshRateOnAttach(activity.window)
-                    val listener = FrameMetricsListener(activity)
-                    frameMetricsListeners[it.activityKey] = listener
-                    activity.window.addOnFrameMetricsAvailableListener(listener, handler)
+        val job = scope.launch {
+            val handler = Handler(host.defaultLooper)
+            host.activityEvent.collect {
+                val activity = host.getActivity(it.activityKey)
+                when (it) {
+                    is ActivityEvent.Created -> if (activity != null) {
+                        syncRefreshRateOnAttach(activity.window)
+                        val listener = FrameMetricsListener(activity)
+                        frameMetricsListeners[it.activityKey] = listener
+                        activity.window.addOnFrameMetricsAvailableListener(listener, handler)
+                    }
+                    is ActivityEvent.Destroyed -> {
+                        frameMetricsListeners.remove(it.activityKey)?.removeListener()
+                    }
+                    else -> return@collect
                 }
-                is ActivityEvent.Destroyed -> {
-                    frameMetricsListeners.remove(it.activityKey)?.removeListener()
-                }
-                else -> return@onEach
             }
-        }.launchIn(scope)
+        }
 
         job.invokeOnCompletion {
             frameMetricsListeners.forEach { it.value.removeListener() }
@@ -81,11 +88,11 @@ internal class FrameAnalyzer24(private val host: Performance.Host) {
         }
     }
 
-    private inner class FrameMetricsListener(activity: Activity?) : Window.OnFrameMetricsAvailableListener {
+    private inner class FrameMetricsListener(
+        activity: Activity?
+    ) : Window.OnFrameMetricsAvailableListener {
         private val activityRef = activity?.let(::WeakReference)
         private val activityName = activity?.javaClass?.simpleName ?: ""
-        private val frameInfo = FrameInfo()
-
 
         @MainThread
         fun removeListener() {
@@ -100,52 +107,72 @@ internal class FrameAnalyzer24(private val host: Performance.Host) {
         ) {
             // TODO: 要计算平均刷新率吗？
             val refreshRate = latestRefreshRate
-            frameInfo.makeAccumulateStart()
-            frameInfo.accumulate(frameMetrics, refreshRate)
-            frameInfo.makeAccumulateEnd()
+            val timeMillis = measureTimeMillis {
+                dispatchAccumulators { it.makeStart(activityName, frameMetrics) }
+                dispatchAccumulators { it.accumulate(refreshRate, frameMetrics) }
+                dispatchAccumulators { it.makeEnd() }
+            }
+            log { "FrameMetricsListener dispatchAccumulators timeMillis = $timeMillis" }
+        }
 
-            val copyFrameMetrics = FrameMetrics(frameMetrics)
-            println("test -> copyFrameMetrics = ${copyFrameMetrics}, name = $activityName")
+        @WorkerThread
+        private inline fun dispatchAccumulators(action: (FrameMetricsAccumulator) -> Unit) {
+            for (i in frameMetricsAccumulators.indices) action(frameMetricsAccumulators[i])
         }
     }
 
-    private class FrameInfo {
-        private var accStartMillis = 0L
-        private var accFrames = 0
-        private var accDroppedFrames = 0f
-        private var accRefreshRate = 0f
+    @WorkerThread
+    private class FrameMetricsAccumulator(
+        private val receiver: FrameMetricsReceiver
+    ) : FrameMetricsAccumulation {
+        private var startMillis = 0L
+        private var refreshRates = 0f
+        override val intervalMillis = receiver.intervalMillis
+        override var targetName = ""; private set
+        override var totalFrames = 0; private set
+        override var droppedFrames = 0f; private set
+        override var avgFps = 0f; private set
+        override var avgDroppedFrames = 0f; private set
+        override var avgRefreshRate = 0f; private set
 
-        fun makeAccumulateStart() {
-            if (accStartMillis != 0L) return
-            accStartMillis = SystemClock.uptimeMillis()
+        fun makeStart(activityName: String, frameMetrics: FrameMetrics) {
+            // TODO: 补充是否跳过首帧的判断
+            if (startMillis != 0L || frameMetrics.isFirstDrawFrame) return
+            startMillis = SystemClock.uptimeMillis()
+            targetName = activityName
         }
 
-        fun accumulate(frameMetrics: FrameMetrics, refreshRate: Float) {
-            if (accStartMillis == 0L) return
+        fun accumulate(refreshRate: Float, frameMetrics: FrameMetrics) {
+            if (startMillis == 0L) return
             val frameIntervalNanos = TIME_SECOND_TO_NANO / refreshRate
-            var droppedFrames = (frameMetrics.totalNanos - frameIntervalNanos) / frameIntervalNanos
-            droppedFrames = droppedFrames.coerceAtLeast(0f)
-
-            accFrames++
-            accDroppedFrames += droppedFrames
-            accRefreshRate += refreshRate
+            val dropped = (frameMetrics.totalNanos - frameIntervalNanos) / frameIntervalNanos
+            totalFrames++
+            droppedFrames += dropped.coerceAtLeast(0f)
+            refreshRates += refreshRate
         }
 
-        fun makeAccumulateEnd() {
-            if (accStartMillis == 0L || accFrames == 0) return
-            val threshold = 5 * 1000
-            if (SystemClock.uptimeMillis() - accStartMillis < threshold) return
+        fun makeEnd() {
+            if (startMillis == 0L || totalFrames == 0) return
+            if (SystemClock.uptimeMillis() - startMillis < intervalMillis) return
+            // TODO: 补充至少帧数，或者周期上限
+            avgFps = totalFrames / (intervalMillis.toFloat() / 1000)
+            avgDroppedFrames = droppedFrames / totalFrames
+            avgRefreshRate = refreshRates / totalFrames
+            // TODO: 对计算值设定上限
+            avgFps = avgFps.coerceAtMost(avgRefreshRate)
+            receiver.onAvailable(accumulation = this)
+            reset()
+        }
 
-            val avgFps = accFrames.toFloat() / (threshold / 1000)
-            val avgDroppedFrames = accDroppedFrames / accFrames
-            val avgRefreshRate = accRefreshRate / accFrames
-            println("test -> avgFps = $avgFps, avgDroppedFrames = $avgDroppedFrames, avgRefreshRate = $avgRefreshRate")
-            // TODO: 补充分发
-
-            accStartMillis = 0L
-            accFrames = 0
-            accDroppedFrames = 0f
-            accRefreshRate = 0f
+        private fun reset() {
+            startMillis = 0L
+            refreshRates = 0f
+            targetName = ""
+            totalFrames = 0
+            droppedFrames = 0f
+            avgFps = 0f
+            avgDroppedFrames = 0f
+            avgRefreshRate = 0f
         }
     }
 

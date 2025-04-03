@@ -43,7 +43,7 @@ inline val FrameMetrics.swapBuffersNanos: Long
 inline val FrameMetrics.totalNanos: Long
     get() = getMetric(FrameMetrics.TOTAL_DURATION)
 
-inline val FrameMetrics.firstDrawFrame: Boolean
+inline val FrameMetrics.isFirstDrawFrame: Boolean
     get() = getMetric(FrameMetrics.FIRST_DRAW_FRAME) == 1L
 
 @get:RequiresApi(26)

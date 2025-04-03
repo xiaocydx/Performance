@@ -23,6 +23,7 @@ import android.os.Looper
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameAnalyzer24
+import com.xiaocydx.performance.analyzer.frame.FrameConfig
 import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
 import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
 import com.xiaocydx.performance.gc.ReferenceQueueDaemon
@@ -45,7 +46,10 @@ object Performance {
     private var isInitialized = false
 
     @MainThread
-    fun init(application: Application) {
+    fun init(
+        config: Config,
+        application: Application
+    ) {
         assertMainThread()
         if (isInitialized) return
         isInitialized = true
@@ -59,7 +63,7 @@ object Performance {
         callback.add(JankAnalyzer(host).init(threshold = 300L))
         MainLooperWatcher.init(host, callback)
 
-        FrameAnalyzer24(host).init()
+        FrameAnalyzer24(config.frameConfig, host).init()
     }
 
     private class HostImpl : Host {
@@ -105,4 +109,6 @@ object Performance {
         @MainThread
         fun getLastActivity(): Activity?
     }
+
+    data class Config(val frameConfig: FrameConfig = FrameConfig())
 }
