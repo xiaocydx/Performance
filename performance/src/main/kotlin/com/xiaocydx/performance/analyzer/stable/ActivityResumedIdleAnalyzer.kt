@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer
+package com.xiaocydx.performance.analyzer.stable
 
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer
+package com.xiaocydx.performance.analyzer.jank
 
 import android.os.Handler
 import android.os.Looper
@@ -27,9 +27,7 @@ import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
  * @author xcc
  * @date 2025/3/27
  */
-internal class MainLooperBlockAnalyzer(
-    private val host: Performance.Host
-) : MainLooperCallback {
+internal class JankAnalyzer(private val host: Performance.Host) : MainLooperCallback {
     private val dumpRunner = DumpRunner()
 
     fun init(threshold: Long) = apply {

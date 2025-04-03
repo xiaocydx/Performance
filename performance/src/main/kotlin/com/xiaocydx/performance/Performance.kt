@@ -21,9 +21,9 @@ import android.app.Application
 import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.analyzer.ActivityResumedIdleAnalyzer
-import com.xiaocydx.performance.analyzer.MainLooperANRAnalyzer
-import com.xiaocydx.performance.analyzer.MainLooperBlockAnalyzer
+import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
+import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
+import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
 import com.xiaocydx.performance.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import com.xiaocydx.performance.watcher.activity.ActivityWatcher
@@ -55,8 +55,8 @@ object Performance {
         ActivityResumedIdleAnalyzer(host).init()
 
         val callback = CompositeMainLooperCallback()
-        callback.add(MainLooperANRAnalyzer().init())
-        callback.add(MainLooperBlockAnalyzer(host).init(threshold = 300L))
+        callback.add(ANRAnalyzer().init())
+        callback.add(JankAnalyzer(host).init(threshold = 300L))
         MainLooperWatcher.init(host, callback)
     }
 
