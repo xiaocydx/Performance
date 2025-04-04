@@ -19,48 +19,48 @@ package com.xiaocydx.performance.analyzer.frame
 import android.view.FrameMetrics
 import androidx.annotation.RequiresApi
 
-inline val FrameMetrics.unknownDelayNanos: Long
+internal inline val FrameMetrics.unknownDelayNanos: Long
     get() = getMetric(FrameMetrics.UNKNOWN_DELAY_DURATION)
 
-inline val FrameMetrics.inputNanos: Long
+internal inline val FrameMetrics.inputNanos: Long
     get() = getMetric(FrameMetrics.INPUT_HANDLING_DURATION)
 
-inline val FrameMetrics.animationNanos: Long
+internal inline val FrameMetrics.animationNanos: Long
     get() = getMetric(FrameMetrics.ANIMATION_DURATION)
 
-inline val FrameMetrics.layoutMeasureNanos: Long
+internal inline val FrameMetrics.layoutMeasureNanos: Long
     get() = getMetric(FrameMetrics.LAYOUT_MEASURE_DURATION)
 
-inline val FrameMetrics.drawNanos: Long
+internal inline val FrameMetrics.drawNanos: Long
     get() = getMetric(FrameMetrics.DRAW_DURATION)
 
-inline val FrameMetrics.syncNanos: Long
+internal inline val FrameMetrics.syncNanos: Long
     get() = getMetric(FrameMetrics.SYNC_DURATION)
 
-inline val FrameMetrics.commandIssueNanos: Long
+internal inline val FrameMetrics.commandIssueNanos: Long
     get() = getMetric(FrameMetrics.COMMAND_ISSUE_DURATION)
 
-inline val FrameMetrics.swapBuffersNanos: Long
+internal inline val FrameMetrics.swapBuffersNanos: Long
     get() = getMetric(FrameMetrics.SWAP_BUFFERS_DURATION)
 
-inline val FrameMetrics.totalNanos: Long
+internal inline val FrameMetrics.totalNanos: Long
     get() = getMetric(FrameMetrics.TOTAL_DURATION)
 
-inline val FrameMetrics.isFirstDrawFrame: Boolean
+internal inline val FrameMetrics.isFirstDrawFrame: Boolean
     get() = getMetric(FrameMetrics.FIRST_DRAW_FRAME) == 1L
 
 @get:RequiresApi(26)
-inline val FrameMetrics.intendedVsyncTimestamp: Long
+internal inline val FrameMetrics.intendedVsyncTimestamp: Long
     get() = getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP)
 
 @get:RequiresApi(26)
-inline val FrameMetrics.vsyncTimestamp: Long
+internal inline val FrameMetrics.vsyncTimestamp: Long
     get() = getMetric(FrameMetrics.VSYNC_TIMESTAMP)
 
 @get:RequiresApi(31)
-inline val FrameMetrics.gpuNanos: Long
+internal inline val FrameMetrics.gpuNanos: Long
     get() = getMetric(FrameMetrics.GPU_DURATION)
 
 @get:RequiresApi(31)
-inline val FrameMetrics.deadline: Long
+internal inline val FrameMetrics.deadline: Long
     get() = getMetric(FrameMetrics.DEADLINE)
