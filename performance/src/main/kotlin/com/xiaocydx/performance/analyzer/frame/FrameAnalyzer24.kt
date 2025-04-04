@@ -18,18 +18,20 @@ package com.xiaocydx.performance.analyzer.frame
 
 import android.app.Activity
 import android.os.Handler
-import android.os.SystemClock
 import android.view.FrameMetrics
 import android.view.Window
+import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
 import androidx.core.view.doOnAttach
+import com.xiaocydx.performance.Cancellable
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.log
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
-import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import java.lang.ref.WeakReference
 import kotlin.system.measureTimeMillis
 
@@ -41,61 +43,66 @@ import kotlin.system.measureTimeMillis
 internal class FrameAnalyzer24(
     config: FrameConfig,
     private val host: Performance.Host
-) {
-    private val scope = host.createMainScope()
+) : Cancellable {
+    private val coroutineScope = host.createMainScope()
+    private val frameMetricsHandler = Handler(host.defaultLooper)
     private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
     private val frameMetricsAccumulators = config.receivers.map(::FrameMetricsAccumulator)
-    @Volatile private var latestRefreshRate = DEFAULT_REFRESH_RATE
+    @Volatile private var defaultRefreshRate = 60.0f
 
     fun init() {
-        val job = scope.launch {
-            val handler = Handler(host.defaultLooper)
-            host.activityEvent.collect {
-                val activity = host.getActivity(it.activityKey)
-                when (it) {
-                    is ActivityEvent.Created -> if (activity != null) {
-                        syncRefreshRateOnAttach(activity.window)
-                        val listener = FrameMetricsListener(activity)
-                        frameMetricsListeners[it.activityKey] = listener
-                        activity.window.addOnFrameMetricsAvailableListener(listener, handler)
+        val job = host.activityEvent.onEach {
+            val activity = host.getActivity(it.activityKey)
+            when (it) {
+                is ActivityEvent.Created -> if (activity != null) {
+                    val window = activity.window
+                    window.decorView.doOnAttach {
+                        defaultRefreshRate = window.getRefreshRate(defaultRefreshRate)
                     }
-                    is ActivityEvent.Destroyed -> {
-                        frameMetricsListeners.remove(it.activityKey)?.removeListener()
-                    }
-                    else -> return@collect
+                    val listener = FrameMetricsListener(activity).attach()
+                    frameMetricsListeners[it.activityKey] = listener
                 }
+                is ActivityEvent.Destroyed -> {
+                    frameMetricsListeners.remove(it.activityKey)?.detach()
+                }
+                else -> return@onEach
             }
-        }
+        }.launchIn(coroutineScope)
 
         job.invokeOnCompletion {
-            frameMetricsListeners.forEach { it.value.removeListener() }
+            frameMetricsListeners.forEach { it.value.detach() }
             frameMetricsListeners.clear()
         }
     }
 
-    fun cancel() {
-        scope.coroutineContext.cancelChildren()
+    override fun cancel() {
+        coroutineScope.cancel()
     }
 
-    private fun syncRefreshRateOnAttach(window: Window) {
-        window.decorView.doOnAttach {
-            var refreshRate = DEFAULT_REFRESH_RATE
-            window.decorView.display?.let {
-                val displayRefreshRate = it.refreshRate
-                if (displayRefreshRate >= 30.0f) refreshRate = displayRefreshRate
-            }
-            latestRefreshRate = refreshRate
+    @AnyThread
+    private fun Window.getRefreshRate(default: Float): Float {
+        var refreshRate = default
+        decorView.display?.let {
+            val displayRefreshRate = it.refreshRate
+            if (displayRefreshRate >= 30.0f) refreshRate = displayRefreshRate
         }
+        return refreshRate
     }
 
     private inner class FrameMetricsListener(
-        activity: Activity?
+        activity: Activity?,
     ) : Window.OnFrameMetricsAvailableListener {
         private val activityRef = activity?.let(::WeakReference)
         private val activityName = activity?.javaClass?.simpleName ?: ""
 
         @MainThread
-        fun removeListener() {
+        fun attach() = apply {
+            val window = activityRef?.get()?.window ?: return@apply
+            window.addOnFrameMetricsAvailableListener(this, frameMetricsHandler)
+        }
+
+        @MainThread
+        fun detach() = apply {
             activityRef?.get()?.window?.removeOnFrameMetricsAvailableListener(this)
         }
 
@@ -105,8 +112,7 @@ internal class FrameAnalyzer24(
             frameMetrics: FrameMetrics,
             dropCountSinceLastInvocation: Int
         ) {
-            // TODO: 要计算平均刷新率吗？
-            val refreshRate = latestRefreshRate
+            val refreshRate = window.getRefreshRate(defaultRefreshRate)
             val timeMillis = measureTimeMillis {
                 dispatchAccumulators { it.makeStart(activityName, frameMetrics) }
                 dispatchAccumulators { it.accumulate(refreshRate, frameMetrics) }
@@ -119,65 +125,5 @@ internal class FrameAnalyzer24(
         private inline fun dispatchAccumulators(action: (FrameMetricsAccumulator) -> Unit) {
             for (i in frameMetricsAccumulators.indices) action(frameMetricsAccumulators[i])
         }
-    }
-
-    @WorkerThread
-    private class FrameMetricsAccumulator(
-        private val receiver: FrameMetricsReceiver
-    ) : FrameMetricsAccumulation {
-        private var startMillis = 0L
-        private var refreshRates = 0f
-        override val intervalMillis = receiver.intervalMillis
-        override var targetName = ""; private set
-        override var totalFrames = 0; private set
-        override var droppedFrames = 0f; private set
-        override var avgFps = 0f; private set
-        override var avgDroppedFrames = 0f; private set
-        override var avgRefreshRate = 0f; private set
-
-        fun makeStart(activityName: String, frameMetrics: FrameMetrics) {
-            // TODO: 补充是否跳过首帧的判断
-            if (startMillis != 0L || frameMetrics.isFirstDrawFrame) return
-            startMillis = SystemClock.uptimeMillis()
-            targetName = activityName
-        }
-
-        fun accumulate(refreshRate: Float, frameMetrics: FrameMetrics) {
-            if (startMillis == 0L) return
-            val frameIntervalNanos = TIME_SECOND_TO_NANO / refreshRate
-            val dropped = (frameMetrics.totalNanos - frameIntervalNanos) / frameIntervalNanos
-            totalFrames++
-            droppedFrames += dropped.coerceAtLeast(0f)
-            refreshRates += refreshRate
-        }
-
-        fun makeEnd() {
-            if (startMillis == 0L || totalFrames == 0) return
-            if (SystemClock.uptimeMillis() - startMillis < intervalMillis) return
-            // TODO: 补充至少帧数，或者周期上限
-            avgFps = totalFrames / (intervalMillis.toFloat() / 1000)
-            avgDroppedFrames = droppedFrames / totalFrames
-            avgRefreshRate = refreshRates / totalFrames
-            // TODO: 对计算值设定上限
-            avgFps = avgFps.coerceAtMost(avgRefreshRate)
-            receiver.onAvailable(accumulation = this)
-            reset()
-        }
-
-        private fun reset() {
-            startMillis = 0L
-            refreshRates = 0f
-            targetName = ""
-            totalFrames = 0
-            droppedFrames = 0f
-            avgFps = 0f
-            avgDroppedFrames = 0f
-            avgRefreshRate = 0f
-        }
-    }
-
-    private companion object {
-        const val DEFAULT_REFRESH_RATE = 60.0f
-        const val TIME_SECOND_TO_NANO = 1000000000
     }
 }

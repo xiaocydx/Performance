@@ -19,6 +19,9 @@ package com.xiaocydx.performance.analyzer.frame
 import android.view.FrameMetrics
 import androidx.annotation.RequiresApi
 
+inline val FrameMetrics.unknownDelayNanos: Long
+    get() = getMetric(FrameMetrics.UNKNOWN_DELAY_DURATION)
+
 inline val FrameMetrics.inputNanos: Long
     get() = getMetric(FrameMetrics.INPUT_HANDLING_DURATION)
 

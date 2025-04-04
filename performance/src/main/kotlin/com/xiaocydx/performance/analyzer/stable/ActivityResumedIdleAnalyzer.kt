@@ -18,11 +18,11 @@ package com.xiaocydx.performance.analyzer.stable
 
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
+import com.xiaocydx.performance.Cancellable
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.assertMainThread
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -32,19 +32,11 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) {
-    private val scope = host.createMainScope()
+internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) : Cancellable {
+    private val coroutineScope = host.createMainScope()
 
     fun init() {
-        repeatCheckOnActivityResumed()
-    }
-
-    fun cancel() {
-        scope.coroutineContext.cancelChildren()
-    }
-
-    private fun repeatCheckOnActivityResumed() {
-        scope.launch {
+        coroutineScope.launch {
             var checkKey = 0
             var checkJob: Job? = null
             host.activityEvent.collect {
@@ -55,7 +47,7 @@ internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) {
                         checkKey = it.activityKey
                         checkJob?.cancel()
                         checkJob = launch {
-                            val pass = withTimeoutOrNull(TIME_OUT_MS) { awaitIdle() }
+                            val pass = withTimeoutOrNull(TIME_OUT_MILLIS) { awaitIdle() }
                             if (pass == null) showTimeoutDialog(checkKey)
                         }
                     }
@@ -72,6 +64,10 @@ internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) {
         }
     }
 
+    override fun cancel() {
+        coroutineScope.cancel()
+    }
+
     private fun showTimeoutDialog(key: Int) {
         val activity = host.getActivity(key) ?: return
         AlertDialog.Builder(activity)
@@ -86,15 +82,13 @@ internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) {
                 cont.resume(Unit)
                 false
             }
-            host.mainLooper.queue.addIdleHandler(idleHandler)
-            cont.invokeOnCancellation {
-                assertMainThread()
-                host.mainLooper.queue.removeIdleHandler(idleHandler)
-            }
+            val queue = host.mainLooper.queue
+            queue.addIdleHandler(idleHandler)
+            cont.invokeOnCancellation { queue.removeIdleHandler(idleHandler) }
         }
     }
 
     private companion object {
-        const val TIME_OUT_MS = 10 * 1000L
+        const val TIME_OUT_MILLIS = (10 * 1000L * 0.8).toLong()
     }
 }

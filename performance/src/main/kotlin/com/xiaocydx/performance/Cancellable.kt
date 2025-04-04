@@ -14,28 +14,13 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.frame
-
-import androidx.annotation.IntRange
-import androidx.annotation.WorkerThread
+package com.xiaocydx.performance
 
 /**
  * @author xcc
- * @date 2025/4/3
+ * @date 2025/4/4
  */
-interface FrameMetricsReceiver {
+internal interface Cancellable {
 
-    @get:IntRange(from = 0)
-    val intervalMillis: Long
-        get() = DEFAULT_INTERVAL_MILLIS
-
-    val skipFirstFrame: Boolean
-        get() = true
-
-    @WorkerThread
-    fun onAvailable(accumulation: FrameMetricsAccumulation)
-
-    companion object {
-        const val DEFAULT_INTERVAL_MILLIS = 5 * 1000L
-    }
+    fun cancel()
 }
