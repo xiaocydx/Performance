@@ -32,10 +32,14 @@ interface FrameMetricsReceiver {
     val skipFirstFrame: Boolean
         get() = true
 
+    val dropLevelThreshold: DropLevel.Threshold
+        get() = DefaultDropLevelThreshold
+
     @WorkerThread
-    fun onAvailable(accumulation: FrameMetricsAccumulation)
+    fun onAvailable(aggregate: FrameMetricsAggregate)
 
     companion object {
+        private val DefaultDropLevelThreshold = DropLevel.Threshold()
         const val DEFAULT_INTERVAL_MILLIS = 5 * 1000L
     }
 }

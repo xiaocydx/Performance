@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -8,10 +8,8 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        minSdk = 24
-
+        minSdk = 21
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
@@ -31,7 +29,7 @@ android {
 
 dependencies {
     implementation(project(":performance-fake"))
-    implementation(libs.androidx.appcompat)
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")

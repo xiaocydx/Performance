@@ -47,7 +47,7 @@ internal class FrameAnalyzer24(
     private val coroutineScope = host.createMainScope()
     private val frameMetricsHandler = Handler(host.defaultLooper)
     private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
-    private val frameMetricsAccumulators = config.receivers.map(::FrameMetricsAccumulator)
+    private val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregator)
     @Volatile private var defaultRefreshRate = 60.0f
 
     fun init() {
@@ -104,6 +104,7 @@ internal class FrameAnalyzer24(
         @MainThread
         fun detach() = apply {
             activityRef?.get()?.window?.removeOnFrameMetricsAvailableListener(this)
+            frameMetricsHandler.post { dispatchAggregators { it.makeEnd(ignoreIntervalMillis = true) } }
         }
 
         @WorkerThread
@@ -114,16 +115,16 @@ internal class FrameAnalyzer24(
         ) {
             val refreshRate = window.getRefreshRate(defaultRefreshRate)
             val timeMillis = measureTimeMillis {
-                dispatchAccumulators { it.makeStart(activityName, frameMetrics) }
-                dispatchAccumulators { it.accumulate(refreshRate, frameMetrics) }
-                dispatchAccumulators { it.makeEnd() }
+                dispatchAggregators { it.makeStart(activityName, frameMetrics) }
+                dispatchAggregators { it.accumulate(refreshRate, frameMetrics) }
+                dispatchAggregators { it.makeEnd(ignoreIntervalMillis = false) }
             }
-            log { "FrameMetricsListener dispatchAccumulators timeMillis = $timeMillis" }
+            log { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
         }
 
         @WorkerThread
-        private inline fun dispatchAccumulators(action: (FrameMetricsAccumulator) -> Unit) {
-            for (i in frameMetricsAccumulators.indices) action(frameMetricsAccumulators[i])
+        private inline fun dispatchAggregators(action: (FrameMetricsAggregator) -> Unit) {
+            for (i in frameMetricsAggregators.indices) action(frameMetricsAggregators[i])
         }
     }
 }
