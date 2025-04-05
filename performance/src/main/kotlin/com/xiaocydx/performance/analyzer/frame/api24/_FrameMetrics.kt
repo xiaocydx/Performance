@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.frame
+package com.xiaocydx.performance.analyzer.frame.api24
 
 import android.view.FrameMetrics
 import androidx.annotation.RequiresApi

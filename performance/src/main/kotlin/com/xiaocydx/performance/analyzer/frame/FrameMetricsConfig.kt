@@ -20,29 +20,29 @@ package com.xiaocydx.performance.analyzer.frame
  * @author xcc
  * @date 2025/4/3
  */
-data class FrameConfig(val receivers: List<FrameMetricsReceiver> = emptyList()) {
+data class FrameMetricsConfig(val receivers: List<FrameMetricsReceiver> = emptyList()) {
 
     internal fun checkProperty() {
         receivers.forEach { receiver ->
             val name = receiver.javaClass.simpleName
-            val threshold = receiver.dropLevelThreshold
+            val threshold = receiver.droppedFramesThreshold
             require(receiver.intervalMillis >= 0) {
                 "${name}.intervalMillis < 0"
             }
             require(threshold.best >= 0) {
-                "${name}.dropLevelThreshold.best < 0"
+                "${name}.droppedFramesThreshold.best < 0"
             }
             require(threshold.normal > threshold.best) {
-                "${name}.dropLevelThreshold.normal <= ${name}.dropLevelThreshold.best"
+                "${name}.droppedFramesThreshold.normal <= ${name}.droppedFramesThreshold.best"
             }
             require(threshold.middle > threshold.normal) {
-                "${name}.dropLevelThreshold.middle <= ${name}.dropLevelThreshold.normal"
+                "${name}.droppedFramesThreshold.middle <= ${name}.droppedFramesThreshold.normal"
             }
             require(threshold.high > threshold.middle) {
-                "${name}.dropLevelThreshold.high <= ${name}.dropLevelThreshold.middle"
+                "${name}.droppedFramesThreshold.high <= ${name}.droppedFramesThreshold.middle"
             }
             require(threshold.frozen > threshold.high) {
-                "${name}.dropLevelThreshold.frozen <= ${name}.dropLevelThreshold.high"
+                "${name}.droppedFramesThreshold.frozen <= ${name}.droppedFramesThreshold.high"
             }
         }
     }

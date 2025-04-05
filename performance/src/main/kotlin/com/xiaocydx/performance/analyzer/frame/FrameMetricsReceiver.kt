@@ -20,26 +20,52 @@ import androidx.annotation.IntRange
 import androidx.annotation.WorkerThread
 
 /**
+ * [FrameMetricsAggregate]的接收者
+ *
  * @author xcc
  * @date 2025/4/3
  */
 interface FrameMetricsReceiver {
 
+    /**
+     * 接收[FrameMetricsAggregate]的时间间隔
+     */
     @get:IntRange(from = 0)
     val intervalMillis: Long
         get() = DEFAULT_INTERVAL_MILLIS
 
+    /**
+     * 是否跳过视图树的首帧，不做统计
+     *
+     * **注意**：首帧通常耗时较长，会被划分进[FrameMetricsAggregate.droppedFramesOf]。
+     */
     val skipFirstFrame: Boolean
         get() = true
 
-    val dropLevelThreshold: DropLevel.Threshold
-        get() = DefaultDropLevelThreshold
+    /**
+     * [DroppedFrames]划分等级的阈值，阈值的解释可以看[DroppedFrames.Threshold]的注释
+     */
+    val droppedFramesThreshold: DroppedFrames.Threshold
+        get() = DefaultDroppedFramesThreshold
 
+    /**
+     * 达到[intervalMillis]，接收可用的[FrameMetricsAggregate]
+     *
+     * **注意**：
+     * 1. 该函数不能执行耗时较长的逻辑（比如IO操作），这会导致[aggregate]不准确。
+     * 2. 只能在该函数下使用[aggregate]，若需要在其他线程处理[aggregate]的数据，
+     * 避免第1点的影响，则使用[FrameMetricsAggregateVisitor] copy [aggregate]，
+     * 或者调用[FrameMetricsAggregate.copy]。
+     *
+     * [FrameMetricsAggregateVisitor]的使用可以参考[FrameMetricsPrinter]。
+     * [FrameMetricsPrinter]将[FrameMetricsAggregateVisitor]作为缓存使用，
+     * 每次接收[aggregate]只copy数据，不创建对象。
+     */
     @WorkerThread
     fun onAvailable(aggregate: FrameMetricsAggregate)
 
     companion object {
-        private val DefaultDropLevelThreshold = DropLevel.Threshold()
+        private val DefaultDroppedFramesThreshold = DroppedFrames.Threshold()
         const val DEFAULT_INTERVAL_MILLIS = 5 * 1000L
     }
 }

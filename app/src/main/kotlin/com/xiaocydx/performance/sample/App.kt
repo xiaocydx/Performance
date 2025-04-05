@@ -2,7 +2,8 @@ package com.xiaocydx.performance.sample
 
 import android.app.Application
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.analyzer.frame.FrameConfig
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsPrinter
 
 /**
  * @author xcc
@@ -12,8 +13,8 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        val frameConfig = FrameConfig(receivers = listOf(FrameMetricsPrinter()))
-        val performanceConfig = Performance.Config(frameConfig = frameConfig)
+        val frameConfig = FrameMetricsConfig(receivers = listOf(FrameMetricsPrinter()))
+        val performanceConfig = Performance.Config(frameMetrics = frameConfig)
         Performance.init(performanceConfig, this)
     }
 }

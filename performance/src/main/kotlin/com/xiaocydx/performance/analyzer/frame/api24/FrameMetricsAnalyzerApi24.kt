@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.frame
+package com.xiaocydx.performance.analyzer.frame.api24
 
 import android.app.Activity
 import android.os.Handler
@@ -25,8 +25,9 @@ import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
 import androidx.core.view.doOnAttach
-import com.xiaocydx.performance.Cancellable
 import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.log
 import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import kotlinx.coroutines.cancel
@@ -40,17 +41,17 @@ import kotlin.system.measureTimeMillis
  * @date 2025/4/3
  */
 @RequiresApi(24)
-internal class FrameAnalyzer24(
-    config: FrameConfig,
+internal class FrameMetricsAnalyzerApi24(
+    config: FrameMetricsConfig,
     private val host: Performance.Host
-) : Cancellable {
+) : FrameMetricsAnalyzer {
     private val coroutineScope = host.createMainScope()
     private val frameMetricsHandler = Handler(host.defaultLooper)
     private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
-    private val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregator)
+    private val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregatorApi24)
     @Volatile private var defaultRefreshRate = 60.0f
 
-    fun init() {
+    override fun init() {
         val job = host.activityEvent.onEach {
             val activity = host.getActivity(it.activityKey)
             when (it) {
@@ -93,6 +94,7 @@ internal class FrameAnalyzer24(
         activity: Activity?,
     ) : Window.OnFrameMetricsAvailableListener {
         private val activityRef = activity?.let(::WeakReference)
+        private val activityKey = activity?.hashCode()?.toLong() ?: 0L
         private val activityName = activity?.javaClass?.simpleName ?: ""
 
         @MainThread
@@ -115,15 +117,17 @@ internal class FrameAnalyzer24(
         ) {
             val refreshRate = window.getRefreshRate(defaultRefreshRate)
             val timeMillis = measureTimeMillis {
-                dispatchAggregators { it.makeStart(activityName, frameMetrics) }
+                dispatchAggregators { it.makeStart(activityKey, activityName, frameMetrics) }
                 dispatchAggregators { it.accumulate(refreshRate, frameMetrics) }
                 dispatchAggregators { it.makeEnd(ignoreIntervalMillis = false) }
             }
-            log { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
+            if (timeMillis > 1) {
+                log { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
+            }
         }
 
         @WorkerThread
-        private inline fun dispatchAggregators(action: (FrameMetricsAggregator) -> Unit) {
+        private inline fun dispatchAggregators(action: (FrameMetricsAggregatorApi24) -> Unit) {
             for (i in frameMetricsAggregators.indices) action(frameMetricsAggregators[i])
         }
     }

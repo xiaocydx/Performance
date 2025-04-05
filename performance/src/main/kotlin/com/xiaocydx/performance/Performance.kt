@@ -18,13 +18,12 @@ package com.xiaocydx.performance
 
 import android.app.Activity
 import android.app.Application
-import android.os.Build
 import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
-import com.xiaocydx.performance.analyzer.frame.FrameAnalyzer24
-import com.xiaocydx.performance.analyzer.frame.FrameConfig
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
 import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
 import com.xiaocydx.performance.gc.ReferenceQueueDaemon
@@ -66,8 +65,8 @@ object Performance {
         callback.add(JankAnalyzer(host).init(threshold = 300L))
         MainLooperWatcher.init(host, callback)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            FrameAnalyzer24(config.frameConfig, host).init()
+        if (config.frameMetrics.receivers.isNotEmpty()) {
+            FrameMetricsAnalyzer.create(host, config.frameMetrics).init()
         }
     }
 
@@ -115,9 +114,9 @@ object Performance {
         fun getLastActivity(): Activity?
     }
 
-    data class Config(val frameConfig: FrameConfig = FrameConfig()) {
+    data class Config(val frameMetrics: FrameMetricsConfig = FrameMetricsConfig()) {
         internal fun checkProperty() {
-            frameConfig.checkProperty()
+            frameMetrics.checkProperty()
         }
     }
 }
