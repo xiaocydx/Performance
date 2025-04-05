@@ -52,7 +52,7 @@ internal class DroppedFramesStore(threshold: Threshold) {
     @RequiresApi(24)
     fun accumulate(frameMetrics: FrameMetrics, frameIntervalNanos: Float) {
         val frames = (frameMetrics.totalNanos / frameIntervalNanos).toInt()
-        if (frames <= 1) return
+        if (frames < 1) return
         var i = last
         while (i > total) {
             if (frames >= threshold[i]) {
