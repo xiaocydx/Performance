@@ -41,95 +41,108 @@ class FrameMetricsPrinter(
     private val json = Json()
 
     override fun onAvailable(aggregate: FrameMetricsAggregate) {
-        val candidate = visitorPool.acquire()
-        if (candidate == null) {
-            Log.e(TAG, "candidate = null, targetName = ${aggregate.targetName}")
+        var visitor = visitorPool.acquire()
+        if (visitor == null) {
+            visitor = FrameMetricsAggregateVisitor()
+            Log.e(TAG, "visitor = null, targetName = ${aggregate.targetName}")
         }
-        val visitor = candidate ?: FrameMetricsAggregateVisitor()
         aggregate.accept(visitor)
         Dispatchers.Default.dispatch(EmptyCoroutineContext) {
-            var str = ""
-            try {
-                json.apply(visitor)
-                str = json.toString()
-            } finally {
-                visitorPool.release(visitor)
-                if (str.isNotEmpty()) Log.e(TAG, str)
-            }
+            val outcome = json.apply(visitor)
+            visitorPool.release(visitor)
+            Log.e(TAG, outcome)
         }
     }
 
     private class Json {
-        private val result = JSONObject()
-        private val temp = StringBuilder()
         private val dropNames = DroppedFrames.entries.map { it.name.lowercase() }
         private val avgDropNames = DroppedFrames.entries.map { "avgDroppedDuration-${it.name.lowercase()}" }
 
-        fun apply(visitor: FrameMetricsAggregateVisitor) {
-            result.put("targetName", visitor.targetName)
-            result.put("intervalMillis", visitor.intervalMillis)
-            result.put("renderedFrames", visitor.renderedFrames)
-            result.put("avgFps", visitor.avgFps.roundToInt())
-            result.put("avgRefreshRate", visitor.avgRefreshRate.roundToInt())
-            result.put("droppedFrames", droppedFramesString(visitor))
+        fun apply(visitor: FrameMetricsAggregateVisitor): String {
+            var json = jsonPool.acquire()
+            if (json == null) {
+                json = JSONObject()
+                Log.e(TAG, "json = null, targetName = ${visitor.targetName}")
+            }
+
+            var str = strPool.acquire()
+            if (str == null) {
+                str = StringBuilder()
+                Log.e(TAG, "str = null, targetName = ${visitor.targetName}")
+            }
+
+            json.put("targetName", visitor.targetName)
+            json.put("intervalMillis", visitor.intervalMillis)
+            json.put("renderedFrames", visitor.renderedFrames)
+            json.put("avgFps", visitor.avgFps.roundToInt())
+            json.put("avgRefreshRate", visitor.avgRefreshRate.roundToInt())
+            json.put("droppedFrames", droppedFramesString(str, visitor))
             if (Build.VERSION.SDK_INT >= 24) {
-                avgDropNames.forEach { result.remove(it) }
+                avgDropNames.forEach { json.remove(it) }
                 DroppedFrames.entries.forEachIndexed { i, drop ->
                     val total = visitor.avgDroppedDurationOf(drop, FrameDuration.Total)
                     if (total == 0L) return@forEachIndexed
-                    val str = avgDroppedDurationString(drop, visitor)
-                    result.put(avgDropNames[i], str)
+                    val str = avgDroppedDurationString(str, drop, visitor)
+                    json.put(avgDropNames[i], str)
                 }
             }
+
+            val outcome = json.toString(2)
+            jsonPool.release(json)
+            strPool.release(str)
+            return outcome
         }
 
-        private fun droppedFramesString(visitor: FrameMetricsAggregateVisitor): String {
-            temp.clear()
-            temp.append("{")
+        private fun droppedFramesString(
+            str: StringBuilder,
+            visitor: FrameMetricsAggregateVisitor
+        ): String {
+            str.clear()
+            str.append("{")
             var total = 0
             val last = DroppedFrames.entries.lastIndex
             DroppedFrames.entries.forEachIndexed { i, drop ->
                 val frames = visitor.droppedFramesOf(drop)
                 if (drop == DroppedFrames.Total) {
                     total = frames
-                    temp.append("total").append(" = ").append(total)
+                    str.append("total").append(" = ").append(total)
                 } else {
                     var rate = if (total > 0) frames.toFloat() / total else 0f
                     rate *= 100
                     rate = (rate * 10).toInt() / 10f
-                    temp.append(dropNames[i]).append(" = ").append(rate).append('%')
+                    str.append(dropNames[i]).append(" = ").append(rate).append('%')
                 }
-                if (i != last) temp.append(", ")
+                if (i != last) str.append(", ")
             }
-            temp.append("}")
-            return temp.toString()
+            str.append("}")
+            return str.toString()
         }
 
         @RequiresApi(24)
         private fun avgDroppedDurationString(
+            str: StringBuilder,
             drop: DroppedFrames,
             visitor: FrameMetricsAggregateVisitor
         ): String {
-            temp.clear()
-            temp.append("{")
+            str.clear()
+            str.append("{")
             val last = FrameDuration.entries.lastIndex
             FrameDuration.entries.forEachIndexed { i, id ->
                 val ns = visitor.avgDroppedDurationOf(drop, id)
                 val ms = ns / FrameMetricsAggregate.NANOS_PER_MILLIS
-                temp.append(id.name.lowercase()).append(" = ").append(ms).append("ms")
-                if (i != last) temp.append(", ")
+                str.append(id.name.lowercase()).append(" = ").append(ms).append("ms")
+                if (i != last) str.append(", ")
             }
-            temp.append("}")
-            return temp.toString()
-        }
-
-        override fun toString(): String {
-            return result.toString(2)
+            str.append("}")
+            return str.toString()
         }
     }
 
     private companion object {
         const val TAG = "FrameMetricsPrinter"
-        val visitorPool = SynchronizedPool<FrameMetricsAggregateVisitor>(5)
+        const val POOL_SIZE = 5
+        val visitorPool = SynchronizedPool<FrameMetricsAggregateVisitor>(POOL_SIZE)
+        val jsonPool = SynchronizedPool<JSONObject>(POOL_SIZE)
+        val strPool = SynchronizedPool<StringBuilder>(POOL_SIZE)
     }
 }
