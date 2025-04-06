@@ -19,10 +19,10 @@ package com.xiaocydx.performance.analyzer.frame
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.core.util.Pools.SynchronizedPool
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsReceiver.Companion.DEFAULT_INTERVAL_MILLIS
 import kotlinx.coroutines.Dispatchers
 import org.json.JSONObject
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.roundToInt
 
@@ -38,23 +38,23 @@ class FrameMetricsPrinter(
      */
     override val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS
 ) : FrameMetricsReceiver {
-    private val state = AtomicInteger(STATE_IDLE)
-    private val visitor = FrameMetricsAggregateVisitor()
     private val json = Json()
 
     override fun onAvailable(aggregate: FrameMetricsAggregate) {
-        // 构建Json字符串耗时不长，短间隔内再次接收aggregate，自旋次数不多或没有
-        @Suppress("ControlFlowWithEmptyBody")
-        while (!state.compareAndSet(STATE_IDLE, STATE_VISITING));
+        val candidate = visitorPool.acquire()
+        if (candidate == null) {
+            Log.e(TAG, "candidate = null, targetName = ${aggregate.targetName}")
+        }
+        val visitor = candidate ?: FrameMetricsAggregateVisitor()
         aggregate.accept(visitor)
-
         Dispatchers.Default.dispatch(EmptyCoroutineContext) {
-            if (!state.compareAndSet(STATE_VISITING, STATE_PRINTING)) return@dispatch
+            var str = ""
             try {
                 json.apply(visitor)
-                Log.e("FrameMetricsPrinter", json.toString())
+                str = json.toString()
             } finally {
-                state.compareAndSet(STATE_PRINTING, STATE_IDLE)
+                visitorPool.release(visitor)
+                if (str.isNotEmpty()) Log.e(TAG, str)
             }
         }
     }
@@ -129,8 +129,7 @@ class FrameMetricsPrinter(
     }
 
     private companion object {
-        const val STATE_IDLE = 0
-        const val STATE_VISITING = 1
-        const val STATE_PRINTING = 2
+        const val TAG = "FrameMetricsPrinter"
+        val visitorPool = SynchronizedPool<FrameMetricsAggregateVisitor>(5)
     }
 }
