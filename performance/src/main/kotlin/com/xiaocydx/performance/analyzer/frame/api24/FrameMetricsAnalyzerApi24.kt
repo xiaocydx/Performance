@@ -42,13 +42,12 @@ import kotlin.system.measureTimeMillis
  */
 @RequiresApi(24)
 internal class FrameMetricsAnalyzerApi24(
-    config: FrameMetricsConfig,
-    private val host: Performance.Host
+    private val host: Performance.Host,
+    private val config: FrameMetricsConfig
 ) : FrameMetricsAnalyzer {
     private val coroutineScope = host.createMainScope()
     private val frameMetricsHandler = Handler(host.defaultLooper)
     private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
-    private val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregatorApi24)
     @Volatile private var defaultRefreshRate = 60.0f
 
     override fun init() {
@@ -62,6 +61,9 @@ internal class FrameMetricsAnalyzerApi24(
                     }
                     val listener = FrameMetricsListener(activity).attach()
                     frameMetricsListeners[it.activityKey] = listener
+                }
+                is ActivityEvent.Stopped -> {
+                    frameMetricsListeners[it.activityKey]?.forceMakeEnd()
                 }
                 is ActivityEvent.Destroyed -> {
                     frameMetricsListeners.remove(it.activityKey)?.detach()
@@ -96,6 +98,7 @@ internal class FrameMetricsAnalyzerApi24(
         private val activityRef = activity?.let(::WeakReference)
         private val activityKey = activity?.hashCode()?.toLong() ?: 0L
         private val activityName = activity?.javaClass?.simpleName ?: ""
+        private val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregatorApi24)
 
         @MainThread
         fun attach() = apply {
@@ -106,6 +109,11 @@ internal class FrameMetricsAnalyzerApi24(
         @MainThread
         fun detach() = apply {
             activityRef?.get()?.window?.removeOnFrameMetricsAvailableListener(this)
+            forceMakeEnd()
+        }
+
+        @MainThread
+        fun forceMakeEnd() {
             frameMetricsHandler.post { dispatchAggregators { it.makeEnd(ignoreIntervalMillis = true) } }
         }
 

@@ -38,7 +38,7 @@ internal interface FrameMetricsAnalyzer : Cancellable {
             host: Performance.Host,
             config: FrameMetricsConfig
         ) = if (Build.VERSION.SDK_INT >= 24) {
-            FrameMetricsAnalyzerApi24(config, host)
+            FrameMetricsAnalyzerApi24(host, config)
         } else {
             FrameMetricsAnalyzerApi16()
         }
