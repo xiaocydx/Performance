@@ -31,7 +31,7 @@ import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
 internal class ChoreographerFrameInfo {
     private val markInputStart = MarkInputStart()
     private val markAnimationStart = MarkAnimationStart()
-    private val markTraversalsStart = MarkTraversalsStart()
+    private val markTraversalStart = MarkTraversalStart()
     private val postMarkStartActions = PostMarkStartActions()
     private var isPostMarkStartActions = false
     private var isDoFrameMessage = false
@@ -42,7 +42,7 @@ internal class ChoreographerFrameInfo {
     var frameStartNanos = 0L; private set
     var inputStartNanos = 0L; private set
     var animationStartNanos = 0L; private set
-    var traversalsStartNanos = 0L; private set
+    var traversalStartNanos = 0L; private set
     var frameEndNanos = 0L; private set
     val callback: MainLooperCallback = DoFrameCallback()
 
@@ -76,8 +76,8 @@ internal class ChoreographerFrameInfo {
         animationStartNanos = System.nanoTime()
     }
 
-    private fun markTraversalsStart() {
-        traversalsStartNanos = System.nanoTime()
+    private fun markTraversalStart() {
+        traversalStartNanos = System.nanoTime()
     }
 
     private fun markFrameEnd() {
@@ -98,7 +98,6 @@ internal class ChoreographerFrameInfo {
     private inner class DoFrameCallback : MainLooperCallback {
         override fun start(type: Type, data: Any?) {
             if (type == Type.Message) markFrameStart()
-
         }
 
         override fun end(type: Type, data: Any?) {
@@ -112,7 +111,7 @@ internal class ChoreographerFrameInfo {
             val atFrontOfQueue = true
             fake.postInputCallback(atFrontOfQueue, markInputStart)
             fake.postAnimationCallback(atFrontOfQueue, markAnimationStart)
-            fake.postTraversalCallback(atFrontOfQueue, markTraversalsStart)
+            fake.postTraversalCallback(atFrontOfQueue, markTraversalStart)
         }
     }
 
@@ -124,7 +123,7 @@ internal class ChoreographerFrameInfo {
         override fun run() = markAnimationStart()
     }
 
-    private inner class MarkTraversalsStart : Runnable {
-        override fun run() = markTraversalsStart()
+    private inner class MarkTraversalStart : Runnable {
+        override fun run() = markTraversalStart()
     }
 }

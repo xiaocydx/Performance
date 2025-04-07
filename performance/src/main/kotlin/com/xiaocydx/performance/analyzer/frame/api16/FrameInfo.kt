@@ -38,8 +38,8 @@ internal class FrameInfo {
     fun merge(frameInfo: ChoreographerFrameInfo): Boolean = with(frameInfo) {
         if (preDrawStartNanos < frameStartNanos) return@with false
         inputNanos = (animationStartNanos - inputStartNanos).coerceAtLeast(0L)
-        animationNanos = (traversalsStartNanos - animationStartNanos).coerceAtLeast(0L)
-        layoutMeasureNanos = (preDrawStartNanos - traversalsStartNanos).coerceAtLeast(0L)
+        animationNanos = (traversalStartNanos - animationStartNanos).coerceAtLeast(0L)
+        layoutMeasureNanos = (preDrawStartNanos - traversalStartNanos).coerceAtLeast(0L)
         drawNanos = (frameEndNanos - preDrawStartNanos).coerceAtLeast(0L)
         totalNanos = (frameEndNanos - frameStartNanos).coerceAtLeast(0L)
         isFirstDrawFrame = !isFirstCompleted
