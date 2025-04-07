@@ -46,10 +46,7 @@ object Performance {
     private var isInitialized = false
 
     @MainThread
-    fun init(
-        config: Config,
-        application: Application
-    ) {
+    fun init(config: Config, application: Application) {
         assertMainThread()
         if (isInitialized) return
         isInitialized = true
@@ -60,14 +57,15 @@ object Performance {
         activityWatcher.init(application)
         ActivityResumedIdleAnalyzer(host).init()
 
-        val callback = CompositeMainLooperCallback()
-        callback.add(ANRAnalyzer().init())
-        callback.add(JankAnalyzer(host).init(threshold = 300L))
-        MainLooperWatcher.init(host, callback)
-
+        val callbacks = CompositeMainLooperCallback()
+        callbacks.add(ANRAnalyzer().init())
+        callbacks.add((JankAnalyzer(host).init(threshold = 300L)))
         if (config.frameMetrics.receivers.isNotEmpty()) {
-            FrameMetricsAnalyzer.create(host, config.frameMetrics).init()
+            val analyzer = FrameMetricsAnalyzer.create(host, config.frameMetrics)
+            analyzer.init()
+            analyzer.getCallback()?.let(callbacks::add)
         }
+        MainLooperWatcher.init(host, callbacks)
     }
 
     private class HostImpl : Host {

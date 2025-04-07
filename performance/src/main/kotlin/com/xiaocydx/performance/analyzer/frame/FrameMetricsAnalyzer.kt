@@ -17,10 +17,12 @@
 package com.xiaocydx.performance.analyzer.frame
 
 import android.os.Build
+import android.view.Window
 import com.xiaocydx.performance.Cancellable
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
+import com.xiaocydx.performance.watcher.looper.MainLooperCallback
 
 /**
  * @author xcc
@@ -32,6 +34,19 @@ internal interface FrameMetricsAnalyzer : Cancellable {
 
     override fun cancel()
 
+    fun getCallback(): MainLooperCallback? {
+        return null
+    }
+
+    fun Window.getRefreshRate(default: Float): Float {
+        var refreshRate = default
+        decorView.display?.let {
+            val displayRefreshRate = it.refreshRate
+            if (displayRefreshRate >= 30.0f) refreshRate = displayRefreshRate
+        }
+        return refreshRate
+    }
+
     companion object {
 
         fun create(
@@ -40,7 +55,7 @@ internal interface FrameMetricsAnalyzer : Cancellable {
         ) = if (Build.VERSION.SDK_INT >= 24) {
             FrameMetricsAnalyzerApi24(host, config)
         } else {
-            FrameMetricsAnalyzerApi16()
+            FrameMetricsAnalyzerApi16(host, config)
         }
     }
 }

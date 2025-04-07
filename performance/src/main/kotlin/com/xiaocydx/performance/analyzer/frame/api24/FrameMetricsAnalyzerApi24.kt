@@ -82,16 +82,6 @@ internal class FrameMetricsAnalyzerApi24(
         coroutineScope.cancel()
     }
 
-    @AnyThread
-    private fun Window.getRefreshRate(default: Float): Float {
-        var refreshRate = default
-        decorView.display?.let {
-            val displayRefreshRate = it.refreshRate
-            if (displayRefreshRate >= 30.0f) refreshRate = displayRefreshRate
-        }
-        return refreshRate
-    }
-
     private inner class FrameMetricsListener(
         activity: Activity?,
     ) : Window.OnFrameMetricsAvailableListener {
