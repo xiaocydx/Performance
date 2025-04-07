@@ -20,6 +20,7 @@ import android.os.SystemClock
 import android.view.FrameMetrics
 import androidx.annotation.RequiresApi
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate.Companion.NANOS_PER_SECOND
+import com.xiaocydx.performance.analyzer.frame.api16.FrameInfo
 import com.xiaocydx.performance.analyzer.frame.api24.totalNanos
 import com.xiaocydx.performance.analyzer.frame.store.DroppedFramesStore
 import kotlin.math.max
@@ -49,6 +50,15 @@ internal class FrameMetricsAggregator(
         startMillis = SystemClock.uptimeMillis()
         this.targetKey = targetKey
         this.targetName = targetName
+    }
+
+    fun accumulate(refreshRate: Float, frameInfo: FrameInfo) {
+        if (startMillis == 0L) return
+        val frameIntervalNanos = frameIntervalNanos(refreshRate)
+        accumulateTotalNanos(frameInfo.totalNanos.toFloat(), frameIntervalNanos)
+        accumulateRefreshRate(refreshRate)
+        accumulateRenderedFrames()
+        dropped.accumulate(frameInfo, frameIntervalNanos)
     }
 
     @RequiresApi(24)

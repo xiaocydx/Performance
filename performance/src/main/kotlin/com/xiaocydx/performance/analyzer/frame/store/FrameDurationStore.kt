@@ -41,6 +41,7 @@ import com.xiaocydx.performance.analyzer.frame.FrameDuration.Sync
 import com.xiaocydx.performance.analyzer.frame.FrameDuration.Total
 import com.xiaocydx.performance.analyzer.frame.FrameDuration.UnknownDelay
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate.Companion.NO_DURATION
+import com.xiaocydx.performance.analyzer.frame.api16.FrameInfo
 
 /**
  * @author xcc
@@ -49,6 +50,15 @@ import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate.Companion.N
 internal class FrameDurationStore {
     private val value = LongArray(ordinalToId.size)
     private var frames = 0
+
+    fun accumulate(frameInfo: FrameInfo) {
+        frames++
+        value[Input.ordinal] += frameInfo.inputNanos
+        value[Animation.ordinal] += frameInfo.animationNanos
+        value[LayoutMeasure.ordinal] += frameInfo.layoutMeasureNanos
+        value[Draw.ordinal] += frameInfo.drawNanos
+        value[Total.ordinal] += frameInfo.totalNanos
+    }
 
     @RequiresApi(24)
     fun accumulate(frameMetrics: FrameMetrics) {
@@ -108,6 +118,8 @@ internal class FrameDurationStore {
                 ordinalToId[Input.ordinal] = 0
                 ordinalToId[Animation.ordinal] = 1
                 ordinalToId[LayoutMeasure.ordinal] = 2
+                ordinalToId[Draw.ordinal] = 3
+                ordinalToId[Total.ordinal] = 4
             }
 
             if (Build.VERSION.SDK_INT >= 31) {

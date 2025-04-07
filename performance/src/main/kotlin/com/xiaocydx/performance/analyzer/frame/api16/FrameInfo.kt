@@ -21,28 +21,29 @@ package com.xiaocydx.performance.analyzer.frame.api16
  * @date 2025/4/7
  */
 internal class FrameInfo {
+    private var preDrawStartNanos = 0L
+    private var isFirstCompleted = false
+
+    var inputNanos = 0L; private set
+    var animationNanos = 0L; private set
+    var layoutMeasureNanos = 0L; private set
+    var drawNanos = 0L; private set
+    var totalNanos = 0L; private set
     var isFirstDrawFrame = false; private set
-    var frameStartNanos = 0L; private set
-    var inputStartNanos = 0L; private set
-    var animationStartNanos = 0L; private set
-    var traversalsStartNanos = 0L; private set
-    var preDrawStartNanos = 0L; private set
-    var drawStartNanos = 0L; private set
-    var frameEndNanos = 0L; private set
 
     fun markPreDrawStart() {
         preDrawStartNanos = System.nanoTime()
     }
 
-    fun markDrawStart() {
-        drawStartNanos = System.nanoTime()
-    }
-
-    fun sync(frameInfo: ChoreographerFrameInfo) {
-        frameStartNanos = frameInfo.frameStartNanos
-        inputStartNanos = frameInfo.inputStartNanos
-        animationStartNanos = frameInfo.animationStartNanos
-        traversalsStartNanos = frameInfo.traversalsStartNanos
-        frameEndNanos = frameInfo.frameEndNanos
+    fun merge(frameInfo: ChoreographerFrameInfo): Boolean = with(frameInfo) {
+        if (preDrawStartNanos < frameStartNanos) return@with false
+        inputNanos = (animationStartNanos - inputStartNanos).coerceAtLeast(0L)
+        animationNanos = (traversalsStartNanos - animationStartNanos).coerceAtLeast(0L)
+        layoutMeasureNanos = (preDrawStartNanos - traversalsStartNanos).coerceAtLeast(0L)
+        drawNanos = (frameEndNanos - preDrawStartNanos).coerceAtLeast(0L)
+        totalNanos = (frameEndNanos - frameStartNanos).coerceAtLeast(0L)
+        isFirstDrawFrame = !isFirstCompleted
+        isFirstCompleted = true
+        true
     }
 }

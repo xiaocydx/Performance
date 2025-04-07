@@ -37,13 +37,13 @@ import java.lang.ref.WeakReference
  * @date 2025/4/5
  */
 internal abstract class FrameMetricsAnalyzer(private val host: Performance.Host) : Cancellable {
-    private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
+    protected val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
     protected val coroutineScope = host.createMainScope()
     @Volatile protected var defaultRefreshRate = 60.0f; private set
 
     @CallSuper
     open fun init() {
-        // TODO: 对FrameMetricsListener补充isResumed
+        // TODO: 补充isStopped拦截
         val job = host.activityEvent.onEach {
             val activity = host.getActivity(it.activityKey)
             when (it) {

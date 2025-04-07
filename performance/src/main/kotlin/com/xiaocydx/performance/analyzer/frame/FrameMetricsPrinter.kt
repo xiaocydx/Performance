@@ -77,14 +77,12 @@ class FrameMetricsPrinter(
             json.put("avgFps", visitor.avgFps.roundToInt())
             json.put("avgRefreshRate", visitor.avgRefreshRate.roundToInt())
             json.put("droppedFrames", droppedFramesString(str, visitor))
-            if (Build.VERSION.SDK_INT >= 24) {
-                avgDropNames.forEach { json.remove(it) }
-                DroppedFrames.entries.forEachIndexed { i, drop ->
-                    val total = visitor.avgDroppedDurationOf(drop, FrameDuration.Total)
-                    if (total == 0L) return@forEachIndexed
-                    val str = avgDroppedDurationString(str, drop, visitor)
-                    json.put(avgDropNames[i], str)
-                }
+
+            avgDropNames.forEach { json.remove(it) }
+            DroppedFrames.entries.forEachIndexed { i, drop ->
+                val total = visitor.avgDroppedDurationOf(drop, FrameDuration.Total)
+                if (total == 0L) return@forEachIndexed
+                json.put(avgDropNames[i], avgDroppedDurationString(str, drop, visitor))
             }
 
             val outcome = json.toString(2)
@@ -126,8 +124,10 @@ class FrameMetricsPrinter(
         ): String {
             str.clear()
             str.append("{")
+            val sdk = Build.VERSION.SDK_INT
             val last = FrameDuration.entries.lastIndex
             FrameDuration.entries.forEachIndexed { i, id ->
+                if (sdk < id.api) return@forEachIndexed
                 val ns = visitor.avgDroppedDurationOf(drop, id)
                 val ms = ns / FrameMetricsAggregate.NANOS_PER_MILLIS
                 str.append(id.name.lowercase()).append(" = ").append(ms).append("ms")

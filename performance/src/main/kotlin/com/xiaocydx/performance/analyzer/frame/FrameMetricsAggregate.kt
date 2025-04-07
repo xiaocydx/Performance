@@ -141,8 +141,7 @@ enum class FrameDuration(val api: Int) {
 
     LayoutMeasure(api = 16),
 
-    @RequiresApi(24)
-    Draw(api = 24),
+    Draw(api = 16),
 
     @RequiresApi(24)
     Sync(api = 24),
@@ -153,8 +152,7 @@ enum class FrameDuration(val api: Int) {
     @RequiresApi(24)
     SwapBuffers(api = 24),
 
-    @RequiresApi(24)
-    Total(api = 24),
+    Total(api = 16),
 
     @RequiresApi(31)
     Gpu(api = 31)

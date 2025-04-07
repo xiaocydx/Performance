@@ -21,8 +21,11 @@ import android.view.ViewTreeObserver
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
+import com.xiaocydx.performance.log
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlin.system.measureTimeMillis
 
 /**
  * @author xcc
@@ -35,12 +38,19 @@ internal class FrameMetricsAnalyzerApi16(
     private val choreographerFrameInfo = ChoreographerFrameInfo()
 
     override fun init() {
-        val job = coroutineScope.launch {
+        coroutineScope.launch {
             choreographerFrameInfo.init()
-            choreographerFrameInfo.doOnFrameEnd { }
-        }
-        job.invokeOnCompletion {
-            choreographerFrameInfo.doOnFrameEnd(null)
+            choreographerFrameInfo.doOnFrameEnd {
+                frameMetricsListeners.forEach {
+                    val listener = it.value as FrameMetricsListenerImpl
+                    listener.onFrameMetricsAvailable()
+                }
+            }
+            try {
+                awaitCancellation()
+            } finally {
+                choreographerFrameInfo.doOnFrameEnd(null)
+            }
         }
         super.init()
     }
@@ -55,24 +65,23 @@ internal class FrameMetricsAnalyzerApi16(
 
     private inner class FrameMetricsListenerImpl(activity: Activity?) :
             FrameMetricsListener(activity, config),
-            ViewTreeObserver.OnPreDrawListener,
-            ViewTreeObserver.OnDrawListener {
+            ViewTreeObserver.OnPreDrawListener {
         private val frameInfo = FrameInfo()
 
         override fun attach() = apply {
             val window = activityRef?.get()?.window ?: return@apply
             window.decorView.viewTreeObserver.addOnPreDrawListener(this)
-            window.decorView.viewTreeObserver.addOnDrawListener(this)
         }
 
         override fun detach() = apply {
             val window = activityRef?.get()?.window ?: return@apply
             window.decorView.viewTreeObserver.removeOnPreDrawListener(this)
-            window.decorView.viewTreeObserver.removeOnDrawListener(this)
             forceMakeEnd()
         }
 
         override fun forceMakeEnd() = apply {
+            // TODO: 是否做调度？
+            dispatchAggregators { it.makeEnd(ignoreIntervalMillis = true) }
         }
 
         override fun onPreDraw(): Boolean {
@@ -80,8 +89,21 @@ internal class FrameMetricsAnalyzerApi16(
             return true
         }
 
-        override fun onDraw() {
-            frameInfo.markDrawStart()
+        fun onFrameMetricsAvailable() {
+            // TODO: 补充isStopped拦截
+            // TODO: 是否做调度？
+            if (!frameInfo.merge(choreographerFrameInfo)) return
+            val window = activityRef?.get()?.window
+            val refreshRate = window?.getRefreshRate(defaultRefreshRate) ?: defaultRefreshRate
+            val isFirstDrawFrame = frameInfo.isFirstDrawFrame
+            val timeMillis = measureTimeMillis {
+                dispatchAggregators { it.makeStart(activityKey, activityName, isFirstDrawFrame) }
+                dispatchAggregators { it.accumulate(refreshRate, frameInfo) }
+                dispatchAggregators { it.makeEnd(ignoreIntervalMillis = false) }
+            }
+            if (timeMillis > 1) {
+                log { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
+            }
         }
     }
 }

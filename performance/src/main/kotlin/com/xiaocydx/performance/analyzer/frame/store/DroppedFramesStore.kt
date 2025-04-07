@@ -26,6 +26,7 @@ import com.xiaocydx.performance.analyzer.frame.DroppedFrames.Middle
 import com.xiaocydx.performance.analyzer.frame.DroppedFrames.Normal
 import com.xiaocydx.performance.analyzer.frame.DroppedFrames.Threshold
 import com.xiaocydx.performance.analyzer.frame.FrameDuration
+import com.xiaocydx.performance.analyzer.frame.api16.FrameInfo
 import com.xiaocydx.performance.analyzer.frame.api24.totalNanos
 
 /**
@@ -47,6 +48,22 @@ internal class DroppedFramesStore(threshold: Threshold) {
         this.threshold[Middle.ordinal] = threshold.middle
         this.threshold[High.ordinal] = threshold.high
         this.threshold[Frozen.ordinal] = threshold.frozen
+    }
+
+    fun accumulate(frameInfo: FrameInfo, frameIntervalNanos: Float) {
+        val frames = (frameInfo.totalNanos / frameIntervalNanos).toInt()
+        if (frames < 1) return
+        var i = last
+        while (i > total) {
+            if (frames >= threshold[i]) {
+                value[i] += frames
+                durations[i].accumulate(frameInfo)
+                break
+            }
+            i--
+        }
+        value[total] += frames
+        durations[total].accumulate(frameInfo)
     }
 
     @RequiresApi(24)
