@@ -17,7 +17,6 @@
 package com.xiaocydx.performance.analyzer.frame
 
 import androidx.annotation.IntRange
-import androidx.annotation.WorkerThread
 
 /**
  * [FrameMetricsAggregate]的接收者
@@ -61,7 +60,6 @@ interface FrameMetricsReceiver {
      * [FrameMetricsPrinter]将[FrameMetricsAggregateVisitor]作为缓存使用，
      * 每次接收[aggregate]只copy数据，不创建对象。
      */
-    @WorkerThread
     fun onAvailable(aggregate: FrameMetricsAggregate)
 
     companion object {

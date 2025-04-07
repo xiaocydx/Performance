@@ -21,6 +21,7 @@ package com.xiaocydx.performance.analyzer.frame.api16
  * @date 2025/4/7
  */
 internal class FrameInfo {
+    var isFirstDrawFrame = false; private set
     var frameStartNanos = 0L; private set
     var inputStartNanos = 0L; private set
     var animationStartNanos = 0L; private set

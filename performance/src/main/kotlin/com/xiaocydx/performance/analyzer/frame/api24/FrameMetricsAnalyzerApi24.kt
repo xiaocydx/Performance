@@ -20,20 +20,13 @@ import android.app.Activity
 import android.os.Handler
 import android.view.FrameMetrics
 import android.view.Window
-import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
-import androidx.core.view.doOnAttach
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.log
-import com.xiaocydx.performance.watcher.activity.ActivityEvent
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import java.lang.ref.WeakReference
 import kotlin.system.measureTimeMillis
 
 /**
@@ -42,68 +35,33 @@ import kotlin.system.measureTimeMillis
  */
 @RequiresApi(24)
 internal class FrameMetricsAnalyzerApi24(
-    private val host: Performance.Host,
-    private val config: FrameMetricsConfig
-) : FrameMetricsAnalyzer {
-    private val coroutineScope = host.createMainScope()
+    host: Performance.Host,
+    private val config: FrameMetricsConfig,
+) : FrameMetricsAnalyzer(host) {
     private val frameMetricsHandler = Handler(host.defaultLooper)
-    private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
-    @Volatile private var defaultRefreshRate = 60.0f
 
-    override fun init() {
-        val job = host.activityEvent.onEach {
-            val activity = host.getActivity(it.activityKey)
-            when (it) {
-                is ActivityEvent.Created -> if (activity != null) {
-                    val window = activity.window
-                    window.decorView.doOnAttach {
-                        defaultRefreshRate = window.getRefreshRate(defaultRefreshRate)
-                    }
-                    val listener = FrameMetricsListener(activity).attach()
-                    frameMetricsListeners[it.activityKey] = listener
-                }
-                is ActivityEvent.Stopped -> {
-                    frameMetricsListeners[it.activityKey]?.forceMakeEnd()
-                }
-                is ActivityEvent.Destroyed -> {
-                    frameMetricsListeners.remove(it.activityKey)?.detach()
-                }
-                else -> return@onEach
-            }
-        }.launchIn(coroutineScope)
-
-        job.invokeOnCompletion {
-            frameMetricsListeners.forEach { it.value.detach() }
-            frameMetricsListeners.clear()
-        }
+    override fun createListener(activity: Activity?): FrameMetricsListener {
+        return FrameMetricsListenerImpl(activity)
     }
 
-    override fun cancel() {
-        coroutineScope.cancel()
-    }
-
-    private inner class FrameMetricsListener(
-        activity: Activity?,
-    ) : Window.OnFrameMetricsAvailableListener {
-        private val activityRef = activity?.let(::WeakReference)
-        private val activityKey = activity?.hashCode()?.toLong() ?: 0L
-        private val activityName = activity?.javaClass?.simpleName ?: ""
-        private val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregatorApi24)
+    private inner class FrameMetricsListenerImpl(activity: Activity?) :
+            FrameMetricsListener(activity, config),
+            Window.OnFrameMetricsAvailableListener {
 
         @MainThread
-        fun attach() = apply {
+        override fun attach() = apply {
             val window = activityRef?.get()?.window ?: return@apply
             window.addOnFrameMetricsAvailableListener(this, frameMetricsHandler)
         }
 
         @MainThread
-        fun detach() = apply {
+        override fun detach() = apply {
             activityRef?.get()?.window?.removeOnFrameMetricsAvailableListener(this)
             forceMakeEnd()
         }
 
         @MainThread
-        fun forceMakeEnd() {
+        override fun forceMakeEnd() = apply {
             frameMetricsHandler.post { dispatchAggregators { it.makeEnd(ignoreIntervalMillis = true) } }
         }
 
@@ -111,22 +69,18 @@ internal class FrameMetricsAnalyzerApi24(
         override fun onFrameMetricsAvailable(
             window: Window,
             frameMetrics: FrameMetrics,
-            dropCountSinceLastInvocation: Int
+            dropCountSinceLastInvocation: Int,
         ) {
             val refreshRate = window.getRefreshRate(defaultRefreshRate)
+            val isFirstDrawFrame = frameMetrics.isFirstDrawFrame
             val timeMillis = measureTimeMillis {
-                dispatchAggregators { it.makeStart(activityKey, activityName, frameMetrics) }
+                dispatchAggregators { it.makeStart(activityKey, activityName, isFirstDrawFrame) }
                 dispatchAggregators { it.accumulate(refreshRate, frameMetrics) }
                 dispatchAggregators { it.makeEnd(ignoreIntervalMillis = false) }
             }
             if (timeMillis > 1) {
                 log { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
             }
-        }
-
-        @WorkerThread
-        private inline fun dispatchAggregators(action: (FrameMetricsAggregatorApi24) -> Unit) {
-            for (i in frameMetricsAggregators.indices) action(frameMetricsAggregators[i])
         }
     }
 }

@@ -18,94 +18,61 @@ package com.xiaocydx.performance.analyzer.frame.api16
 
 import android.app.Activity
 import android.view.ViewTreeObserver
-import androidx.core.view.doOnAttach
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
-import com.xiaocydx.performance.watcher.activity.ActivityEvent
 import com.xiaocydx.performance.watcher.looper.MainLooperCallback
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.lang.ref.WeakReference
 
 /**
  * @author xcc
  * @date 2025/4/5
  */
 internal class FrameMetricsAnalyzerApi16(
-    private val host: Performance.Host,
-    private val config: FrameMetricsConfig
-) : FrameMetricsAnalyzer {
-    private val coroutineScope = host.createMainScope()
-    private val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
+    host: Performance.Host,
+    private val config: FrameMetricsConfig,
+) : FrameMetricsAnalyzer(host) {
     private val choreographerFrameInfo = ChoreographerFrameInfo()
-    @Volatile private var defaultRefreshRate = 60.0f
 
     override fun init() {
         val job = coroutineScope.launch {
             choreographerFrameInfo.init()
-            choreographerFrameInfo.doOnFrameEnd {
-                // TODO: 通知frameMetricsListeners
-            }
-            host.activityEvent.collect {
-                val activity = host.getActivity(it.activityKey)
-                when (it) {
-                    is ActivityEvent.Created -> if (activity != null) {
-                        val window = activity.window
-                        window.decorView.doOnAttach {
-                            defaultRefreshRate = window.getRefreshRate(defaultRefreshRate)
-                        }
-                        val listener = FrameMetricsListener(activity).attach()
-                        frameMetricsListeners[it.activityKey] = listener
-                    }
-                    is ActivityEvent.Stopped -> {
-                        frameMetricsListeners[it.activityKey]?.forceMakeEnd()
-                    }
-                    is ActivityEvent.Destroyed -> {
-                        frameMetricsListeners.remove(it.activityKey)?.detach()
-                    }
-                    else -> return@collect
-                }
-            }
+            choreographerFrameInfo.doOnFrameEnd { }
         }
-
         job.invokeOnCompletion {
-            // TODO: 移除frameMetricsListeners
             choreographerFrameInfo.doOnFrameEnd(null)
         }
+        super.init()
     }
 
-    override fun cancel() {
-        coroutineScope.cancel()
+    override fun createListener(activity: Activity?): FrameMetricsListener {
+        return FrameMetricsListenerImpl(activity)
     }
 
     override fun getCallback(): MainLooperCallback {
         return choreographerFrameInfo.callback
     }
 
-    private inner class FrameMetricsListener(
-        activity: Activity?,
-    ) : ViewTreeObserver.OnPreDrawListener, ViewTreeObserver.OnDrawListener {
-        private val activityRef = activity?.let(::WeakReference)
-        private val activityKey = activity?.hashCode()?.toLong() ?: 0L
-        private val activityName = activity?.javaClass?.simpleName ?: ""
+    private inner class FrameMetricsListenerImpl(activity: Activity?) :
+            FrameMetricsListener(activity, config),
+            ViewTreeObserver.OnPreDrawListener,
+            ViewTreeObserver.OnDrawListener {
         private val frameInfo = FrameInfo()
 
-        fun attach() = apply {
+        override fun attach() = apply {
             val window = activityRef?.get()?.window ?: return@apply
             window.decorView.viewTreeObserver.addOnPreDrawListener(this)
             window.decorView.viewTreeObserver.addOnDrawListener(this)
         }
 
-        fun detach() = apply {
+        override fun detach() = apply {
             val window = activityRef?.get()?.window ?: return@apply
             window.decorView.viewTreeObserver.removeOnPreDrawListener(this)
             window.decorView.viewTreeObserver.removeOnDrawListener(this)
             forceMakeEnd()
         }
 
-        fun forceMakeEnd() {
-
+        override fun forceMakeEnd() = apply {
         }
 
         override fun onPreDraw(): Boolean {

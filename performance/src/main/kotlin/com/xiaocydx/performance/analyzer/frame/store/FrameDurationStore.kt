@@ -59,19 +59,6 @@ internal class FrameDurationStore {
         }
     }
 
-    fun accumulate(
-        inputNanos: Long,
-        animationNanos: Long,
-        layoutMeasureNanos: Long,
-        drawNanos: Long
-    ) {
-        frames++
-        value[Input.ordinal] += inputNanos
-        value[Animation.ordinal] += animationNanos
-        value[LayoutMeasure.ordinal] += layoutMeasureNanos
-        value[Draw.ordinal] += drawNanos
-    }
-
     fun calculateAvg() {
         if (frames == 0) return
         value.forEachIndexed { i, duration ->
@@ -121,7 +108,6 @@ internal class FrameDurationStore {
                 ordinalToId[Input.ordinal] = 0
                 ordinalToId[Animation.ordinal] = 1
                 ordinalToId[LayoutMeasure.ordinal] = 2
-                ordinalToId[Draw.ordinal] = 3
             }
 
             if (Build.VERSION.SDK_INT >= 31) {

@@ -14,29 +14,22 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.frame.api24
+package com.xiaocydx.performance.analyzer.frame
 
 import android.os.SystemClock
 import android.view.FrameMetrics
 import androidx.annotation.RequiresApi
-import androidx.annotation.WorkerThread
-import com.xiaocydx.performance.analyzer.frame.DroppedFrames
-import com.xiaocydx.performance.analyzer.frame.FrameDuration
-import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate.Companion.NANOS_PER_SECOND
-import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregateVisitor
-import com.xiaocydx.performance.analyzer.frame.FrameMetricsReceiver
+import com.xiaocydx.performance.analyzer.frame.api24.totalNanos
 import com.xiaocydx.performance.analyzer.frame.store.DroppedFramesStore
 import kotlin.math.max
 
 /**
  * @author xcc
- * @date 2025/4/4
+ * @date 2025/4/7
  */
-@WorkerThread
-@RequiresApi(24)
-internal class FrameMetricsAggregatorApi24(
-    private val receiver: FrameMetricsReceiver
+internal class FrameMetricsAggregator(
+    private val receiver: FrameMetricsReceiver,
 ) : FrameMetricsAggregate {
     private val dropped = DroppedFramesStore(receiver.droppedFramesThreshold)
     private var startMillis = 0L
@@ -50,20 +43,21 @@ internal class FrameMetricsAggregatorApi24(
     override var avgFps = 0f; private set
     override var avgRefreshRate = 0f; private set
 
-    fun makeStart(targetKey: Long, targetName: String, frameMetrics: FrameMetrics) {
+    fun makeStart(targetKey: Long, targetName: String, isFirstDrawFrame: Boolean) {
         if (startMillis != 0L) return
-        if (receiver.skipFirstFrame && frameMetrics.isFirstDrawFrame) return
+        if (receiver.skipFirstFrame && isFirstDrawFrame) return
         startMillis = SystemClock.uptimeMillis()
         this.targetKey = targetKey
         this.targetName = targetName
     }
 
+    @RequiresApi(24)
     fun accumulate(refreshRate: Float, frameMetrics: FrameMetrics) {
         if (startMillis == 0L) return
-        val frameIntervalNanos = NANOS_PER_SECOND / refreshRate
-        totalNanos += max(frameMetrics.totalNanos.toFloat(), frameIntervalNanos)
-        refreshRates += refreshRate
-        renderedFrames++
+        val frameIntervalNanos = frameIntervalNanos(refreshRate)
+        accumulateTotalNanos(frameMetrics.totalNanos.toFloat(), frameIntervalNanos)
+        accumulateRefreshRate(refreshRate)
+        accumulateRenderedFrames()
         dropped.accumulate(frameMetrics, frameIntervalNanos)
     }
 
@@ -78,6 +72,22 @@ internal class FrameMetricsAggregatorApi24(
             receiver.onAvailable(aggregate = this)
         }
         reset()
+    }
+
+    private fun frameIntervalNanos(refreshRate: Float): Float {
+        return NANOS_PER_SECOND / refreshRate
+    }
+
+    private fun accumulateTotalNanos(totalNanos: Float, frameIntervalNanos: Float) {
+        this.totalNanos += max(totalNanos, frameIntervalNanos)
+    }
+
+    private fun accumulateRefreshRate(refreshRate: Float) {
+        refreshRates += refreshRate
+    }
+
+    private fun accumulateRenderedFrames() {
+        renderedFrames++
     }
 
     override fun droppedFramesOf(drop: DroppedFrames): Int {
