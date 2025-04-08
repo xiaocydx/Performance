@@ -108,7 +108,7 @@ internal class FrameMetricsAggregator(
         return dropped.avgDurationOf(drop, id)
     }
 
-    override fun accept(visitor: FrameMetricsAggregateVisitor) {
+    override fun accept(visitor: FrameMetricsVisitor) {
         visitor.targetKey = targetKey
         visitor.targetName = targetName
         visitor.intervalMillis = intervalMillis

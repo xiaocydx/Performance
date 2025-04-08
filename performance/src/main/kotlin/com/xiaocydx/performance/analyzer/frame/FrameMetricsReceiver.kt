@@ -53,12 +53,10 @@ interface FrameMetricsReceiver {
      * **注意**：
      * 1. 该函数不能执行耗时较长的逻辑（比如IO操作），这会导致[aggregate]不准确。
      * 2. 只能在该函数下使用[aggregate]，若需要在其他线程处理[aggregate]的数据，
-     * 避免第1点的影响，则使用[FrameMetricsAggregateVisitor] copy [aggregate]，
+     * 避免第1点的影响，则使用[FrameMetricsVisitor] copy [aggregate]的数据，
      * 或者调用[FrameMetricsAggregate.copy]。
      *
-     * [FrameMetricsAggregateVisitor]的使用可以参考[FrameMetricsPrinter]。
-     * [FrameMetricsPrinter]将[FrameMetricsAggregateVisitor]作为缓存使用，
-     * 每次接收[aggregate]只copy数据，不创建对象。
+     * [FrameMetricsVisitor]的使用可以参考[FrameMetricsPrinter]。
      */
     fun onAvailable(aggregate: FrameMetricsAggregate)
 

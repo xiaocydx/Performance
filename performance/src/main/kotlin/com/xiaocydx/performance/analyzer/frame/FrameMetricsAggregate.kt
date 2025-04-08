@@ -89,7 +89,7 @@ interface FrameMetricsAggregate {
     /**
      * [visitor]访问内部数据，完成copy
      */
-    fun accept(visitor: FrameMetricsAggregateVisitor)
+    fun accept(visitor: FrameMetricsVisitor)
 
     companion object {
         const val NO_DURATION = -1L
@@ -159,10 +159,10 @@ enum class FrameDuration(val api: Int) {
 }
 
 fun FrameMetricsAggregate.copy(): FrameMetricsAggregate {
-    return FrameMetricsAggregateVisitor().apply(::accept)
+    return FrameMetricsVisitor().apply(::accept)
 }
 
-class FrameMetricsAggregateVisitor : FrameMetricsAggregate {
+class FrameMetricsVisitor : FrameMetricsAggregate {
     private val droppedSize = DroppedFrames.entries.size
     internal val droppedFrames = IntArray(droppedSize)
     internal val droppedDuration = Array(droppedSize) { LongArray(FrameDuration.entries.size) }
@@ -182,7 +182,7 @@ class FrameMetricsAggregateVisitor : FrameMetricsAggregate {
         return droppedDuration[drop.ordinal][id.ordinal]
     }
 
-    override fun accept(visitor: FrameMetricsAggregateVisitor) {
+    override fun accept(visitor: FrameMetricsVisitor) {
         visitor.targetKey = targetKey
         visitor.targetName = targetName
         visitor.intervalMillis = intervalMillis

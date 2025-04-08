@@ -18,7 +18,6 @@ package com.xiaocydx.performance.analyzer.frame
 
 import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.util.Pools.SynchronizedPool
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsReceiver.Companion.DEFAULT_INTERVAL_MILLIS
 import kotlinx.coroutines.Dispatchers
@@ -36,14 +35,14 @@ class FrameMetricsPrinter(
     /**
      * 接收[FrameMetricsAggregate]的时间间隔
      */
-    override val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS
+    override val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS,
 ) : FrameMetricsReceiver {
     private val json = Json()
 
     override fun onAvailable(aggregate: FrameMetricsAggregate) {
         var visitor = visitorPool.acquire()
         if (visitor == null) {
-            visitor = FrameMetricsAggregateVisitor()
+            visitor = FrameMetricsVisitor()
             Log.e(TAG, "visitor = null, targetName = ${aggregate.targetName}")
         }
         aggregate.accept(visitor)
@@ -58,7 +57,7 @@ class FrameMetricsPrinter(
         private val dropNames = DroppedFrames.entries.map { it.name.lowercase() }
         private val avgDropNames = DroppedFrames.entries.map { "avgDroppedDuration-${it.name.lowercase()}" }
 
-        fun apply(visitor: FrameMetricsAggregateVisitor): String {
+        fun apply(visitor: FrameMetricsVisitor): String {
             var json = jsonPool.acquire()
             if (json == null) {
                 json = JSONObject()
@@ -91,10 +90,7 @@ class FrameMetricsPrinter(
             return outcome
         }
 
-        private fun droppedFramesString(
-            str: StringBuilder,
-            visitor: FrameMetricsAggregateVisitor
-        ): String {
+        private fun droppedFramesString(str: StringBuilder, visitor: FrameMetricsVisitor): String {
             str.clear()
             str.append("{")
             var total = 0
@@ -116,11 +112,10 @@ class FrameMetricsPrinter(
             return str.toString()
         }
 
-        @RequiresApi(24)
         private fun avgDroppedDurationString(
             str: StringBuilder,
             drop: DroppedFrames,
-            visitor: FrameMetricsAggregateVisitor
+            visitor: FrameMetricsVisitor
         ): String {
             str.clear()
             str.append("{")
@@ -141,7 +136,7 @@ class FrameMetricsPrinter(
     private companion object {
         const val TAG = "FrameMetricsPrinter"
         const val POOL_SIZE = 5
-        val visitorPool = SynchronizedPool<FrameMetricsAggregateVisitor>(POOL_SIZE)
+        val visitorPool = SynchronizedPool<FrameMetricsVisitor>(POOL_SIZE)
         val jsonPool = SynchronizedPool<JSONObject>(POOL_SIZE)
         val strPool = SynchronizedPool<StringBuilder>(POOL_SIZE)
     }
