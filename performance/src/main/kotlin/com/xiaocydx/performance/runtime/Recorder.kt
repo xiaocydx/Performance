@@ -146,6 +146,8 @@ internal value class Snapshot(val value: LongArray) {
         if (Record(value[first]).timeMs > Record(value[last]).timeMs) {
             first = findMinTimeMsIndex()
         }
+        if (first == last) return null
+
         var node: Node? = null
         val stack = mutableListOf<Any>()
         @Suppress("UNCHECKED_CAST")
