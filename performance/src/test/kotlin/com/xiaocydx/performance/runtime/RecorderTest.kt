@@ -19,6 +19,7 @@
 package com.xiaocydx.performance.runtime
 
 import com.google.common.truth.Truth.assertThat
+import com.xiaocydx.performance.runtime.Node.Companion.ROOT_ID
 import org.junit.Test
 
 /**
@@ -166,8 +167,9 @@ internal class RecorderTest {
 
     @Test
     fun buildTree() {
-        val recorder = Recorder(8)
+        val recorder = Recorder(10)
         val start = recorder.mark()
+        // 1(en) 2(en) 3(en) 3(ex) 4(en) 4(ex) 2(ex) 1(ex) 5(en) 5(ex)
         recorder.enter(id = 1)
         recorder.enter(id = 2)
         recorder.enter(id = 3)
@@ -176,10 +178,17 @@ internal class RecorderTest {
         recorder.exit(id = 4)
         recorder.exit(id = 2)
         recorder.exit(id = 1)
+        recorder.enter(id = 5)
+        recorder.exit(id = 5)
         val end = recorder.mark()
 
         val snapshot = recorder.snapshot(start, end)
-        val node1 = snapshot.buildTree()!!
+        val root = snapshot.buildTree()!!
+
+        assertThat(root.id).isEqualTo(ROOT_ID)
+        assertThat(root.children).hasSize(2)
+
+        val node1 = root.children.first()
         assertThat(node1.id).isEqualTo(1)
         assertThat(node1.children).hasSize(1)
 
@@ -193,6 +202,10 @@ internal class RecorderTest {
         assertThat(node3.children).isEmpty()
         assertThat(node4.id).isEqualTo(4)
         assertThat(node4.children).isEmpty()
+
+        val node5 = root.children.last()
+        assertThat(node5.id).isEqualTo(5)
+        assertThat(node5.children).isEmpty()
     }
 
     private fun A(recorder: Recorder) {

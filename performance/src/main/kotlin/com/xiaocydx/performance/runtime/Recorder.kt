@@ -19,6 +19,7 @@
 package com.xiaocydx.performance.runtime
 
 import androidx.annotation.VisibleForTesting
+import com.xiaocydx.performance.runtime.Node.Companion.ROOT_ID
 
 /**
  * @author xcc
@@ -139,6 +140,7 @@ internal value class Snapshot(val value: LongArray) {
     }
 
     @VisibleForTesting
+    @Suppress("UNCHECKED_CAST")
     fun buildTree(): Node? {
         if (value.size < 2) return null
         var first = 0
@@ -148,9 +150,8 @@ internal value class Snapshot(val value: LongArray) {
         }
         if (first == last) return null
 
-        var node: Node? = null
         val stack = mutableListOf<Any>()
-        @Suppress("UNCHECKED_CAST")
+        stack.add(mutableListOf<Node>())
         for (i in first..last) {
             val record = Record(value[i])
             if (record.isEnter) {
@@ -159,12 +160,16 @@ internal value class Snapshot(val value: LongArray) {
             } else {
                 val children = stack.removeLast() as MutableList<Node>
                 val start = stack.removeLast() as Record
-                node = Node(start.id, start.timeMs, record.timeMs, children)
-                val parent = stack.lastOrNull() as? MutableList<Node>
-                parent?.add(node)
+                val node = Node(start.id, start.timeMs, record.timeMs, children)
+                val parent = stack.last() as MutableList<Node>
+                parent.add(node)
             }
         }
-        return node
+
+        val children = stack.first() as MutableList<Node>
+        val startMs = children.first().startMs
+        val endMs = children.last().endMs
+        return Node(ROOT_ID, startMs, endMs, children)
     }
 
     private fun findMinTimeMsIndex(): Int {
@@ -188,4 +193,10 @@ internal data class Node(
     val startMs: Long,
     val endMs: Long,
     val children: List<Node>,
-)
+) {
+    val durationMs = endMs - startMs
+
+    companion object {
+        const val ROOT_ID = -1
+    }
+}
