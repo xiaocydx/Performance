@@ -20,6 +20,18 @@ package com.xiaocydx.performance.runtime
  * @author xcc
  * @date 2025/4/8
  */
-object History {
-    private val stackRecorder = StackRecorder(capacity = 1)
+internal object History {
+    private val recorder = Recorder(capacity = 100 * 10000)
+
+    fun mark(): Long {
+        return recorder.mark()
+    }
+
+    fun enter(id: Int) {
+        recorder.enter(id)
+    }
+
+    fun exit(id: Int) {
+        recorder.exit(id)
+    }
 }

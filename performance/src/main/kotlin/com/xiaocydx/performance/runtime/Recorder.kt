@@ -18,11 +18,13 @@
 
 package com.xiaocydx.performance.runtime
 
+import androidx.annotation.VisibleForTesting
+
 /**
  * @author xcc
  * @date 2025/4/8
  */
-internal class StackRecorder(private val capacity: Int) {
+internal class Recorder(private val capacity: Int) {
     private val buffer = LongArray(capacity)
     private var overflow = 0
     private var nextIndex = 0
@@ -132,7 +134,56 @@ internal value class Mark(val value: Long) {
 @JvmInline
 internal value class Snapshot(val value: LongArray) {
 
-    fun get(index: Int) = Record(value[index])
+    inline fun get(index: Int): Record {
+        return Record(value[index])
+    }
 
-    fun buildTree(): Unit = TODO()
+    @VisibleForTesting
+    fun buildTree(): Node? {
+        if (value.size < 2) return null
+        var first = 0
+        val last = value.lastIndex
+        if (Record(value[first]).timeMs > Record(value[last]).timeMs) {
+            first = findMinTimeMsIndex()
+        }
+        var node: Node? = null
+        val stack = mutableListOf<Any>()
+        @Suppress("UNCHECKED_CAST")
+        for (i in first..last) {
+            val record = Record(value[i])
+            if (record.isEnter) {
+                stack.add(record)
+                stack.add(mutableListOf<Node>())
+            } else {
+                val children = stack.removeLast() as MutableList<Node>
+                val start = stack.removeLast() as Record
+                node = Node(start.id, start.timeMs, record.timeMs, children)
+                val parent = stack.lastOrNull() as? MutableList<Node>
+                parent?.add(node)
+            }
+        }
+        return node
+    }
+
+    private fun findMinTimeMsIndex(): Int {
+        var left = 0
+        var right = value.lastIndex
+        while (left < right) {
+            val mid = left + (right - left) / 2
+            when {
+                value[left] == value[right] -> right--
+                value[mid] > value[right] -> left = mid + 1
+                else -> right = mid
+            }
+        }
+        return left
+    }
 }
+
+@VisibleForTesting
+internal data class Node(
+    val id: Int,
+    val startMs: Long,
+    val endMs: Long,
+    val children: List<Node>,
+)

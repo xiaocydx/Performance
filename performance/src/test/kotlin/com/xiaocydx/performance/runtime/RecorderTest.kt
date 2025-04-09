@@ -22,12 +22,12 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * [StackRecorder]的单元测试
+ * [Recorder]的单元测试
  *
  * @author xcc
  * @date 2025/4/8
  */
-internal class StackRecorderTest {
+internal class RecorderTest {
 
     @Test
     fun recordValue() {
@@ -64,7 +64,7 @@ internal class StackRecorderTest {
 
     @Test
     fun emptyMark() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         val start = recorder.mark()
         val end = recorder.mark()
         assertThat(Mark(start).index).isEqualTo(0)
@@ -75,7 +75,7 @@ internal class StackRecorderTest {
 
     @Test
     fun notOverflowMark() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         val start = recorder.mark()
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
@@ -89,7 +89,7 @@ internal class StackRecorderTest {
 
     @Test
     fun overflowMark() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         // B(en) B(ex) C(en) C(ex) B(en) B(ex)
         B(recorder)
         C(recorder)
@@ -108,7 +108,7 @@ internal class StackRecorderTest {
 
     @Test
     fun emptySnapshot() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         val start = recorder.mark()
         val end = recorder.mark()
         assertThat(recorder.snapshot(start, end).value).isEmpty()
@@ -116,7 +116,7 @@ internal class StackRecorderTest {
 
     @Test
     fun notOverflowSnapshot() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         val start = recorder.mark()
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
@@ -133,7 +133,7 @@ internal class StackRecorderTest {
 
     @Test
     fun overflowSnapshot() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         // B(en) B(ex) C(en) C(ex) B(en) B(ex)
         B(recorder)
         C(recorder)
@@ -153,7 +153,7 @@ internal class StackRecorderTest {
 
     @Test
     fun invalidSnapshot() {
-        val recorder = StackRecorder(CAPACITY)
+        val recorder = Recorder(CAPACITY)
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
 
@@ -164,19 +164,50 @@ internal class StackRecorderTest {
         assertThat(recorder.snapshot(start, end).value).isEmpty()
     }
 
-    private fun A(recorder: StackRecorder) {
+    @Test
+    fun buildTree() {
+        val recorder = Recorder(8)
+        val start = recorder.mark()
+        recorder.enter(id = 1)
+        recorder.enter(id = 2)
+        recorder.enter(id = 3)
+        recorder.exit(id = 3)
+        recorder.enter(id = 4)
+        recorder.exit(id = 4)
+        recorder.exit(id = 2)
+        recorder.exit(id = 1)
+        val end = recorder.mark()
+
+        val snapshot = recorder.snapshot(start, end)
+        val node1 = snapshot.buildTree()!!
+        assertThat(node1.id).isEqualTo(1)
+        assertThat(node1.children).hasSize(1)
+
+        val node2 = node1.children.first()
+        assertThat(node2.id).isEqualTo(2)
+        assertThat(node2.children).hasSize(2)
+
+        val node3 = node2.children.first()
+        val node4 = node2.children.last()
+        assertThat(node3.id).isEqualTo(3)
+        assertThat(node3.children).isEmpty()
+        assertThat(node4.id).isEqualTo(4)
+        assertThat(node4.children).isEmpty()
+    }
+
+    private fun A(recorder: Recorder) {
         recorder.enter(ID_A)
         B(recorder)
         C(recorder)
         recorder.exit(ID_A)
     }
 
-    private fun B(recorder: StackRecorder) {
+    private fun B(recorder: Recorder) {
         recorder.enter(ID_B)
         recorder.exit(ID_B)
     }
 
-    private fun C(recorder: StackRecorder) {
+    private fun C(recorder: Recorder) {
         recorder.enter(ID_C)
         recorder.exit(ID_C)
     }
