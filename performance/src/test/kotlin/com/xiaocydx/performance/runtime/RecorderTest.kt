@@ -19,7 +19,6 @@
 package com.xiaocydx.performance.runtime
 
 import com.google.common.truth.Truth.assertThat
-import com.xiaocydx.performance.runtime.Recorder.Record
 import org.junit.Test
 
 /**
@@ -31,21 +30,81 @@ import org.junit.Test
 internal class RecorderTest {
 
     @Test
-    fun empty() {
-        val recorder = Recorder(CAPACITY)
-        val mark = recorder.mark()
-        val snapshot = recorder.snapshot(mark)
-        assertThat(snapshot).isEmpty()
+    fun markValue() {
+        val value1 = Mark.value(overflow = 1, index = Int.MAX_VALUE)
+        assertThat(Mark(value1).overflow).isEqualTo(1)
+        assertThat(Mark(value1).index).isEqualTo(Int.MAX_VALUE)
+
+        val value2 = Mark.value(overflow = Int.MAX_VALUE, index = 1)
+        assertThat(Mark(value2).overflow).isEqualTo(Int.MAX_VALUE)
+        assertThat(Mark(value2).index).isEqualTo(1)
+
+        val value3 = Mark.value(overflow = Int.MAX_VALUE, index = Int.MAX_VALUE)
+        assertThat(Mark(value3).overflow).isEqualTo(Int.MAX_VALUE)
+        assertThat(Mark(value3).index).isEqualTo(Int.MAX_VALUE)
     }
 
     @Test
-    fun notOverflow() {
+    fun emptyMark() {
         val recorder = Recorder(CAPACITY)
-        val mark = recorder.mark()
+        val start = recorder.mark()
+        val end = recorder.mark()
+        assertThat(Mark(start).index).isEqualTo(0)
+        assertThat(Mark(start).overflow).isEqualTo(0)
+        assertThat(Mark(end).index).isEqualTo(0)
+        assertThat(Mark(end).overflow).isEqualTo(0)
+    }
+
+    @Test
+    fun notOverflowMark() {
+        val recorder = Recorder(CAPACITY)
+        val start = recorder.mark()
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
+        val end = recorder.mark()
 
-        val snapshot = recorder.snapshot(mark)
+        assertThat(Mark(start).index).isEqualTo(0)
+        assertThat(Mark(start).overflow).isEqualTo(0)
+        assertThat(Mark(end).index).isEqualTo(CAPACITY - 1)
+        assertThat(Mark(end).overflow).isEqualTo(0)
+    }
+
+    @Test
+    fun overflowMark() {
+        val recorder = Recorder(CAPACITY)
+        // B(en) B(ex) C(en) C(ex) B(en) B(ex)
+        B(recorder)
+        C(recorder)
+        B(recorder)
+
+        val start = recorder.mark()
+        // C'(en) C'(ex) C(en) C(ex) B(en) B(ex)
+        C(recorder)
+        val end = recorder.mark()
+
+        assertThat(Mark(start).index).isEqualTo(CAPACITY - 1)
+        assertThat(Mark(start).overflow).isEqualTo(0)
+        assertThat(Mark(end).index).isEqualTo(1)
+        assertThat(Mark(end).overflow).isEqualTo(1)
+    }
+
+    @Test
+    fun emptySnapshot() {
+        val recorder = Recorder(CAPACITY)
+        val start = recorder.mark()
+        val end = recorder.mark()
+        assertThat(recorder.snapshot(start, end).value).isEmpty()
+    }
+
+    @Test
+    fun notOverflowSnapshot() {
+        val recorder = Recorder(CAPACITY)
+        val start = recorder.mark()
+        // A(en) B(en) B(ex) C(en) C(ex) A(ex)
+        A(recorder)
+        val end = recorder.mark()
+
+        val snapshot = recorder.snapshot(start, end)
         snapshot.assertThat(index = 0, id = ID_A, isEnter = true)
         snapshot.assertThat(index = 1, id = ID_B, isEnter = true)
         snapshot.assertThat(index = 2, id = ID_B, isEnter = false)
@@ -55,35 +114,36 @@ internal class RecorderTest {
     }
 
     @Test
-    fun overflow() {
+    fun overflowSnapshot() {
         val recorder = Recorder(CAPACITY)
         // B(en) B(ex) C(en) C(ex) B(en) B(ex)
         B(recorder)
         C(recorder)
         B(recorder)
 
-        val mark = recorder.mark()
+        val start = recorder.mark()
         // C'(en) C'(ex) C(en) C(ex) B(en) B(ex)
         C(recorder)
+        val end = recorder.mark()
+
         // B(ex) C'(en) C'(ex)
-        val snapshot = recorder.snapshot(mark)
+        val snapshot = recorder.snapshot(start, end)
         snapshot.assertThat(index = 0, id = ID_B, isEnter = false)
         snapshot.assertThat(index = 1, id = ID_C, isEnter = true)
         snapshot.assertThat(index = 2, id = ID_C, isEnter = false)
     }
 
     @Test
-    fun invalidMark() {
+    fun invalidSnapshot() {
         val recorder = Recorder(CAPACITY)
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
 
-        val mark = recorder.mark()
-        assertThat(recorder.snapshot(mark)).hasLength(1)
-
+        val start = recorder.mark()
         // A'(en) B'(en) B'(ex) C'(en) C'(ex) A'(ex)
         A(recorder)
-        assertThat(recorder.snapshot(mark)).isEmpty()
+        val end = recorder.mark()
+        assertThat(recorder.snapshot(start, end).value).isEmpty()
     }
 
     private fun A(recorder: Recorder) {
@@ -103,9 +163,9 @@ internal class RecorderTest {
         recorder.exit(ID_C)
     }
 
-    private fun Array<Record>.assertThat(index: Int, id: Int, isEnter: Boolean) {
-        assertThat(get(index).id).isEqualTo(id)
-        assertThat(get(index).isEnter).isEqualTo(isEnter)
+    private fun Snapshot.assertThat(index: Int, id: Int, isEnter: Boolean) {
+        assertThat(value[index].id).isEqualTo(id)
+        assertThat(value[index].isEnter).isEqualTo(isEnter)
     }
 
     private companion object {

@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
+@file:Suppress("NOTHING_TO_INLINE")
+
 package com.xiaocydx.performance.runtime
 
 /**
- * // TODO: 2025/4/8 抽离出Record逻辑
- *
  * @author xcc
  * @date 2025/4/8
  */
 internal class Recorder(private val capacity: Int) {
     private val buffer = arrayOfNulls<Record>(capacity)
-    private var nextIndex = 0
     private var overflow = 0
+    private var nextIndex = 0
+    private var latestMark = 0L
 
     fun enter(id: Int, timeMs: Long = System.currentTimeMillis()) {
         record(id, timeMs, isEnter = true)
@@ -35,46 +36,76 @@ internal class Recorder(private val capacity: Int) {
         record(id, timeMs, isEnter = false)
     }
 
-    fun mark(): Mark {
-        return Mark(nextIndex - 1)
-    }
+    fun mark() = latestMark
 
-    @Suppress("UNCHECKED_CAST", "UnnecessaryVariable")
-    fun snapshot(mark: Mark): Array<Record> {
-        val start = mark.index.coerceAtLeast(0)
-        val end = nextIndex.coerceAtLeast(0)
-        return when {
-            overflow == 0 && end == 0 -> arrayOf()
-            overflow > 0 && (start + capacity < end + capacity * overflow) -> arrayOf()
-            start < end -> {
-                val size = end - start
-                val outcome = arrayOfNulls<Record>(size)
-                System.arraycopy(buffer, start, outcome, 0, size)
-                outcome as Array<Record>
-            }
-            else -> {
-                val firstSize = capacity - start
-                val secondSize = end
-                val outcome = arrayOfNulls<Record>(firstSize + secondSize)
-                System.arraycopy(buffer, start, outcome, 0, firstSize)
-                System.arraycopy(buffer, 0, outcome, firstSize, secondSize)
-                outcome as Array<Record>
-            }
+    fun snapshot(startMark: Long, endMark: Long): Snapshot {
+        val start = Mark(startMark)
+        val end = Mark(endMark)
+        val latest = Mark(latestMark)
+
+        val startReal = capacity * start.overflow + start.index
+        val endReal = capacity * end.overflow + end.index
+        val latestReal = capacity * latest.overflow + latest.index
+        if (startReal + capacity <= latestReal
+                || endReal + capacity <= latestReal
+                || startReal + capacity <= endReal) {
+            return Snapshot(emptyArray())
+        }
+
+        val outcome: Array<Record?>
+        if (start.index <= end.index) {
+            val size = end.index - start.index + 1
+            outcome = arrayOfNulls(size)
+            System.arraycopy(buffer, start.index, outcome, 0, size)
+        } else {
+            val firstSize = capacity - start.index
+            val secondSize = end.index + 1
+            outcome = arrayOfNulls(firstSize + secondSize)
+            System.arraycopy(buffer, start.index, outcome, 0, firstSize)
+            System.arraycopy(buffer, 0, outcome, firstSize, secondSize)
+        }
+
+        return if (outcome.isNotEmpty() && outcome[0] == null) {
+            Snapshot(emptyArray())
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            Snapshot(outcome as Array<Record>)
         }
     }
 
     private fun record(id: Int, timeMs: Long, isEnter: Boolean) {
         if (nextIndex == capacity) {
-            nextIndex = 0
             overflow++
+            nextIndex = 0
         }
-        buffer[nextIndex] = Record(id, timeMs, isEnter)
+        val currIndex = nextIndex
+        buffer[currIndex] = Record(id, timeMs, isEnter)
         nextIndex++
+        latestMark = Mark.value(overflow, currIndex)
     }
+}
 
-    // TODO: 有更多信息？
-    data class Mark(val index: Int)
+@JvmInline
+internal value class Mark(val value: Long) {
+    inline val overflow: Int
+        get() = (value ushr INT_BITS).toInt()
 
-    // TODO: 优化为一个Long
-    data class Record(val id: Int, val timeMs: Long, val isEnter: Boolean)
+    inline val index: Int
+        get() = (value and INT_MASK).toInt()
+
+    companion object {
+        const val INT_BITS = 32
+        const val INT_MASK = 0xFFFFFFFF
+
+        inline fun value(overflow: Int, index: Int): Long {
+            return (overflow.toLong() shl INT_BITS) or (index.toLong() and INT_MASK)
+        }
+    }
+}
+
+internal data class Record(val id: Int, val timeMs: Long, val isEnter: Boolean)
+
+@JvmInline
+internal value class Snapshot(val value: Array<Record>) {
+    fun buildTree() = Unit
 }
