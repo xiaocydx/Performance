@@ -21,5 +21,5 @@ package com.xiaocydx.performance.runtime
  * @date 2025/4/8
  */
 object History {
-    private val stackRecorder = Recorder(capacity = 1)
+    private val stackRecorder = StackRecorder(capacity = 1)
 }

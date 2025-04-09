@@ -22,12 +22,30 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * [Recorder]的单元测试
+ * [StackRecorder]的单元测试
  *
  * @author xcc
  * @date 2025/4/8
  */
-internal class RecorderTest {
+internal class StackRecorderTest {
+
+    @Test
+    fun recordValue() {
+        val timeMs1 = System.currentTimeMillis()
+        val value1 = Record.value(id = 1, timeMs = timeMs1, isEnter = true)
+        val timeMs2 = System.currentTimeMillis()
+        val value2 = Record.value(id = 1, timeMs = timeMs2, isEnter = false)
+
+        val record1 = Record(value1)
+        assertThat(record1.id).isEqualTo(1)
+        assertThat(record1.timeMs).isEqualTo(timeMs1)
+        assertThat(record1.isEnter).isTrue()
+
+        val record2 = Record(value2)
+        assertThat(record2.id).isEqualTo(1)
+        assertThat(record2.timeMs).isEqualTo(timeMs2)
+        assertThat(record2.isEnter).isFalse()
+    }
 
     @Test
     fun markValue() {
@@ -46,7 +64,7 @@ internal class RecorderTest {
 
     @Test
     fun emptyMark() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         val start = recorder.mark()
         val end = recorder.mark()
         assertThat(Mark(start).index).isEqualTo(0)
@@ -57,7 +75,7 @@ internal class RecorderTest {
 
     @Test
     fun notOverflowMark() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         val start = recorder.mark()
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
@@ -71,7 +89,7 @@ internal class RecorderTest {
 
     @Test
     fun overflowMark() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         // B(en) B(ex) C(en) C(ex) B(en) B(ex)
         B(recorder)
         C(recorder)
@@ -90,7 +108,7 @@ internal class RecorderTest {
 
     @Test
     fun emptySnapshot() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         val start = recorder.mark()
         val end = recorder.mark()
         assertThat(recorder.snapshot(start, end).value).isEmpty()
@@ -98,7 +116,7 @@ internal class RecorderTest {
 
     @Test
     fun notOverflowSnapshot() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         val start = recorder.mark()
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
@@ -115,7 +133,7 @@ internal class RecorderTest {
 
     @Test
     fun overflowSnapshot() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         // B(en) B(ex) C(en) C(ex) B(en) B(ex)
         B(recorder)
         C(recorder)
@@ -135,7 +153,7 @@ internal class RecorderTest {
 
     @Test
     fun invalidSnapshot() {
-        val recorder = Recorder(CAPACITY)
+        val recorder = StackRecorder(CAPACITY)
         // A(en) B(en) B(ex) C(en) C(ex) A(ex)
         A(recorder)
 
@@ -146,26 +164,26 @@ internal class RecorderTest {
         assertThat(recorder.snapshot(start, end).value).isEmpty()
     }
 
-    private fun A(recorder: Recorder) {
+    private fun A(recorder: StackRecorder) {
         recorder.enter(ID_A)
         B(recorder)
         C(recorder)
         recorder.exit(ID_A)
     }
 
-    private fun B(recorder: Recorder) {
+    private fun B(recorder: StackRecorder) {
         recorder.enter(ID_B)
         recorder.exit(ID_B)
     }
 
-    private fun C(recorder: Recorder) {
+    private fun C(recorder: StackRecorder) {
         recorder.enter(ID_C)
         recorder.exit(ID_C)
     }
 
     private fun Snapshot.assertThat(index: Int, id: Int, isEnter: Boolean) {
-        assertThat(value[index].id).isEqualTo(id)
-        assertThat(value[index].isEnter).isEqualTo(isEnter)
+        assertThat(get(index).id).isEqualTo(id)
+        assertThat(get(index).isEnter).isEqualTo(isEnter)
     }
 
     private companion object {
