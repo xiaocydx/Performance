@@ -1,5 +1,4 @@
 pluginManagement {
-    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -20,9 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Performance"
-include(":app")
-include(":performance")
-include(":performance-fake")
-include(":performance-stub")
+rootProject.name = "build-logic"
 include(":performance-plugin")
+project(":performance-plugin").projectDir = File(rootProject.projectDir.parent, "performance-plugin")
