@@ -31,11 +31,11 @@ internal class Recorder(private val capacity: Int) {
     private var nextIndex = 0
     private var latestMark = 0L
 
-    fun enter(id: Int, timeMs: Long = System.currentTimeMillis()) {
+    fun enter(id: Int, timeMs: Long = currentMs()) {
         record(id, timeMs, isEnter = true)
     }
 
-    fun exit(id: Int, timeMs: Long = System.currentTimeMillis()) {
+    fun exit(id: Int, timeMs: Long = currentMs()) {
         record(id, timeMs, isEnter = false)
     }
 
@@ -114,6 +114,10 @@ internal value class Record(val value: Long) {
     }
 }
 
+internal inline fun currentMs(): Long {
+    return System.currentTimeMillis()
+}
+
 @JvmInline
 internal value class Mark(val value: Long) {
     inline val overflow: Int
@@ -141,49 +145,46 @@ internal value class Snapshot(val value: LongArray) {
 
     @VisibleForTesting
     @Suppress("UNCHECKED_CAST")
-    fun buildTree(): Node? {
-        if (value.size < 2) return null
-        var first = 0
-        val last = value.lastIndex
-        if (Record(value[first]).timeMs > Record(value[last]).timeMs) {
-            first = findMinTimeMsIndex()
-        }
-        if (first == last) return null
+    fun buildTree(candidateMs: Long = currentMs()): Node {
+        val root = Node(ROOT_ID, candidateMs, candidateMs, isComplete = false, emptyList())
+        if (value.isEmpty()) return root
+
+        val first = Record(value.first())
+        val last = Record(value.last())
+        if (!first.isEnter) return root
+        if (value.size > 1 && first.timeMs > last.timeMs) return root
 
         val stack = mutableListOf<Any>()
         stack.add(mutableListOf<Node>())
-        for (i in first..last) {
-            val record = Record(value[i])
+        value.forEach {
+            val record = Record(it)
             if (record.isEnter) {
                 stack.add(record)
                 stack.add(mutableListOf<Node>())
             } else {
-                val children = stack.removeLast() as MutableList<Node>
+                val children = stack.removeLast() as List<Node>
                 val start = stack.removeLast() as Record
-                val node = Node(start.id, start.timeMs, record.timeMs, children)
+                val node = Node(start.id, start.timeMs, record.timeMs, isComplete = true, children)
                 val parent = stack.last() as MutableList<Node>
                 parent.add(node)
             }
         }
 
-        val children = stack.first() as MutableList<Node>
-        val startMs = children.first().startMs
-        val endMs = children.last().endMs
-        return Node(ROOT_ID, startMs, endMs, children)
-    }
-
-    private fun findMinTimeMsIndex(): Int {
-        var left = 0
-        var right = value.lastIndex
-        while (left < right) {
-            val mid = left + (right - left) / 2
-            when {
-                value[left] == value[right] -> right--
-                value[mid] > value[right] -> left = mid + 1
-                else -> right = mid
-            }
+        while (stack.size > 1) {
+            val children = stack.removeLast() as List<Node>
+            val start = stack.removeLast() as Record
+            val node = Node(start.id, start.timeMs, candidateMs, isComplete = false, children)
+            val parent = stack.last() as MutableList<Node>
+            parent.add(node)
         }
-        return left
+
+        val children = stack.first() as List<Node>
+        return root.copy(
+            startMs = children.first().startMs,
+            endMs = children.last().endMs,
+            isComplete = children.last().isComplete,
+            children = children
+        )
     }
 }
 
@@ -192,6 +193,7 @@ internal data class Node(
     val id: Int,
     val startMs: Long,
     val endMs: Long,
+    val isComplete: Boolean,
     val children: List<Node>,
 ) {
     val durationMs = endMs - startMs

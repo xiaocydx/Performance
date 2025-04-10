@@ -166,46 +166,60 @@ internal class RecorderTest {
     }
 
     @Test
-    fun buildTree() {
-        val recorder = Recorder(10)
+    fun buildTreeComplete() {
+        val recorder = Recorder(8)
         val start = recorder.mark()
-        // 1(en) 2(en) 3(en) 3(ex) 4(en) 4(ex) 2(ex) 1(ex) 5(en) 5(ex)
+        // 1(en) 2(en) 3(en) 3(ex) 2(ex) 1(ex) 4(en) 4(ex)
+        recorder.enter(id = 1)
+        recorder.enter(id = 2)
+        recorder.enter(id = 3)
+        recorder.exit(id = 3)
+        recorder.exit(id = 2)
+        recorder.exit(id = 1)
+        recorder.enter(id = 4)
+        recorder.exit(id = 4)
+        val end = recorder.mark()
+
+        // node.isComplete = true，表示调用完整
+        val snapshot = recorder.snapshot(start, end)
+        val root = snapshot.buildTree()
+        root.assertThat(id = ROOT_ID, isComplete = true, childrenSize = 2)
+        val node1 = root.children.first()
+        node1.assertThat(id = 1, isComplete = true, childrenSize = 1)
+        val node2 = node1.children.first()
+        node2.assertThat(id = 2, isComplete = true, childrenSize = 1)
+        val node3 = node2.children.first()
+        node3.assertThat(id = 3, isComplete = true, childrenSize = 0)
+        val node4 = root.children.last()
+        node4.assertThat(id = 4, isComplete = true, childrenSize = 0)
+    }
+
+    @Test
+    fun buildTreeIncomplete() {
+        val recorder = Recorder(8)
+        val start = recorder.mark()
+        // 1(en) 2(en) 3(en) 3(ex) 4(en)
         recorder.enter(id = 1)
         recorder.enter(id = 2)
         recorder.enter(id = 3)
         recorder.exit(id = 3)
         recorder.enter(id = 4)
-        recorder.exit(id = 4)
-        recorder.exit(id = 2)
-        recorder.exit(id = 1)
-        recorder.enter(id = 5)
-        recorder.exit(id = 5)
         val end = recorder.mark()
 
+        // node.isComplete = false，表示调用不完整
+        // 1(en) 2(en) 3(en) 3(ex) 4(en) | 4(ex) 2(ex) 1(ex)
+        // | 后面是用candidateMs补全的记录
         val snapshot = recorder.snapshot(start, end)
-        val root = snapshot.buildTree()!!
-
-        assertThat(root.id).isEqualTo(ROOT_ID)
-        assertThat(root.children).hasSize(2)
-
+        val root = snapshot.buildTree(candidateMs = currentMs())
+        root.assertThat(id = ROOT_ID, isComplete = false, childrenSize = 1)
         val node1 = root.children.first()
-        assertThat(node1.id).isEqualTo(1)
-        assertThat(node1.children).hasSize(1)
-
+        node1.assertThat(id = 1, isComplete = false, childrenSize = 1)
         val node2 = node1.children.first()
-        assertThat(node2.id).isEqualTo(2)
-        assertThat(node2.children).hasSize(2)
-
+        node2.assertThat(id = 2, isComplete = false, childrenSize = 2)
         val node3 = node2.children.first()
+        node3.assertThat(id = 3, isComplete = true, childrenSize = 0)
         val node4 = node2.children.last()
-        assertThat(node3.id).isEqualTo(3)
-        assertThat(node3.children).isEmpty()
-        assertThat(node4.id).isEqualTo(4)
-        assertThat(node4.children).isEmpty()
-
-        val node5 = root.children.last()
-        assertThat(node5.id).isEqualTo(5)
-        assertThat(node5.children).isEmpty()
+        node4.assertThat(id = 4, isComplete = false, childrenSize = 0)
     }
 
     private fun A(recorder: Recorder) {
@@ -228,6 +242,12 @@ internal class RecorderTest {
     private fun Snapshot.assertThat(index: Int, id: Int, isEnter: Boolean) {
         assertThat(get(index).id).isEqualTo(id)
         assertThat(get(index).isEnter).isEqualTo(isEnter)
+    }
+
+    private fun Node.assertThat(id: Int, isComplete: Boolean, childrenSize: Int) {
+        assertThat(id).isEqualTo(id)
+        assertThat(isComplete).isEqualTo(isComplete)
+        assertThat(children).hasSize(childrenSize)
     }
 
     private companion object {
