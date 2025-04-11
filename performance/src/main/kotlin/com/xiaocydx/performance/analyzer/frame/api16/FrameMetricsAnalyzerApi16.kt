@@ -22,7 +22,7 @@ import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.log
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlin.system.measureTimeMillis

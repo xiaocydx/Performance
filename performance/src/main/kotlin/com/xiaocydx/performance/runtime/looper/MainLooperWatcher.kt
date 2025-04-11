@@ -1,4 +1,4 @@
-package com.xiaocydx.performance.watcher.looper
+package com.xiaocydx.performance.runtime.looper
 
 import android.os.Build
 import android.os.Looper
@@ -6,7 +6,7 @@ import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.log
-import com.xiaocydx.performance.watcher.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine

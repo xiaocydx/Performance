@@ -18,9 +18,9 @@ package com.xiaocydx.performance.analyzer.stable
 
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
-import com.xiaocydx.performance.Cancellable
+import com.xiaocydx.performance.analyzer.Cancellable
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.watcher.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch

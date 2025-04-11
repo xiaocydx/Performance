@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance
+package com.xiaocydx.performance.runtime
 
 import android.os.Build
 import org.lsposed.hiddenapibypass.HiddenApiBypass

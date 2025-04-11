@@ -14,24 +14,13 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.gc
+package com.xiaocydx.performance.analyzer
 
 /**
  * @author xcc
- * @date 2025/4/1
+ * @date 2025/4/4
  */
-internal class ReferenceQueueDaemon : Runnable {
+internal interface Cancellable {
 
-    override fun run() {
-        while (true) {
-            val reference = Cleaner.queue.remove() as Cleaner
-            reference.clean()
-        }
-    }
-
-    fun start() {
-        val thread = Thread(this, "PerformanceReferenceQueueDaemon")
-        thread.isDaemon = true
-        thread.start()
-    }
+    fun cancel()
 }

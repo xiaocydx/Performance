@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.gc
+package com.xiaocydx.performance.runtime.gc
 
 import java.lang.ref.PhantomReference
 import java.lang.ref.ReferenceQueue

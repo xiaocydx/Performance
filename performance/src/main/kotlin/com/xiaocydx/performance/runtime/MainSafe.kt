@@ -16,22 +16,11 @@
 
 package com.xiaocydx.performance.runtime
 
-/**
- * @author xcc
- * @date 2025/4/8
- */
-internal object History {
-    private val recorder = Recorder(capacity = 100 * 10000)
+import android.os.Looper
 
-    fun mark(): Long {
-        return recorder.mark()
-    }
+internal val isMainThread: Boolean
+    get() = Looper.getMainLooper().isCurrentThread
 
-    fun enter(id: Int) {
-        recorder.enter(id)
-    }
-
-    fun exit(id: Int) {
-        recorder.exit(id)
-    }
+internal fun assertMainThread() {
+    assert(isMainThread) { "只能在主线程中调用当前函数" }
 }

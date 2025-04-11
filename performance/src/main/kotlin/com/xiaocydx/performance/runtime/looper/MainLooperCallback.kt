@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.watcher.looper
+package com.xiaocydx.performance.runtime.looper
 
 import android.os.Looper
 import android.os.Message
 import android.os.MessageQueue.IdleHandler
 import android.view.MotionEvent
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * 主线程[Looper]的处理回调

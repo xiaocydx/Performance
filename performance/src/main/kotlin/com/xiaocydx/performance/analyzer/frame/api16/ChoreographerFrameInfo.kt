@@ -18,10 +18,10 @@ package com.xiaocydx.performance.analyzer.frame.api16
 
 import android.view.Choreographer
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.assertMainThread
+import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.fake.FakeChoreographer
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc

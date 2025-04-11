@@ -21,12 +21,12 @@ import android.os.Build
 import android.view.Window
 import androidx.annotation.CallSuper
 import androidx.core.view.doOnAttach
-import com.xiaocydx.performance.Cancellable
+import com.xiaocydx.performance.analyzer.Cancellable
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
-import com.xiaocydx.performance.watcher.activity.ActivityEvent
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback
+import com.xiaocydx.performance.runtime.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach

@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.watcher.activity
+package com.xiaocydx.performance.runtime.activity
 
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.assertMainThread
+import com.xiaocydx.performance.runtime.assertMainThread
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 

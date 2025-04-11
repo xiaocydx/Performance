@@ -14,13 +14,27 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance
+package com.xiaocydx.performance.runtime.gc
 
-import android.os.Looper
+/**
+ * @author xcc
+ * @date 2025/3/19
+ */
+internal object GCTrigger {
 
-internal val isMainThread: Boolean
-    get() = Looper.getMainLooper().isCurrentThread
+    fun runGC() {
+        // AOSP FinalizationTest:
+        // https://android.googlesource.com/platform/libcore/+/master/support/src/test/java/libcore/
+        Runtime.getRuntime().gc()
+        enqueueReferences()
+        System.runFinalization()
+    }
 
-internal fun assertMainThread() {
-    assert(isMainThread) { "只能在主线程中调用当前函数" }
+    private fun enqueueReferences() {
+        try {
+            Thread.sleep(100)
+        } catch (e: InterruptedException) {
+            throw AssertionError(e)
+        }
+    }
 }

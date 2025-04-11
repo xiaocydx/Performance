@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.watcher.looper
+package com.xiaocydx.performance.runtime.looper
 
 import android.view.MotionEvent
 import android.view.Window
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc

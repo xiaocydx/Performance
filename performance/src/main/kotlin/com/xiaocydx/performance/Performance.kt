@@ -26,11 +26,12 @@ import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
 import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
-import com.xiaocydx.performance.gc.ReferenceQueueDaemon
-import com.xiaocydx.performance.watcher.activity.ActivityEvent
-import com.xiaocydx.performance.watcher.activity.ActivityWatcher
-import com.xiaocydx.performance.watcher.looper.CompositeMainLooperCallback
-import com.xiaocydx.performance.watcher.looper.MainLooperWatcher
+import com.xiaocydx.performance.runtime.assertMainThread
+import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
+import com.xiaocydx.performance.runtime.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.activity.ActivityWatcher
+import com.xiaocydx.performance.runtime.looper.CompositeMainLooperCallback
+import com.xiaocydx.performance.runtime.looper.MainLooperWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

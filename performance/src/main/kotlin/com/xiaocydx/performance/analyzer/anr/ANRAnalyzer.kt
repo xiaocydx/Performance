@@ -16,8 +16,8 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc

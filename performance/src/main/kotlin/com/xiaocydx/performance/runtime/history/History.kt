@@ -14,13 +14,24 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance
+package com.xiaocydx.performance.runtime.history
 
 /**
  * @author xcc
- * @date 2025/4/4
+ * @date 2025/4/8
  */
-internal interface Cancellable {
+internal object History {
+    private val recorder = Recorder(capacity = 100 * 10000)
 
-    fun cancel()
+    fun mark(): Long {
+        return recorder.mark()
+    }
+
+    fun enter(id: Int) {
+        recorder.enter(id)
+    }
+
+    fun exit(id: Int) {
+        recorder.exit(id)
+    }
 }

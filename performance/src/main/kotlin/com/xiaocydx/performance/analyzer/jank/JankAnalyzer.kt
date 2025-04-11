@@ -20,8 +20,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc

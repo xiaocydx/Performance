@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.watcher.looper
+package com.xiaocydx.performance.runtime.looper
 
 import android.os.Looper
 import android.os.MessageQueue
 import android.os.MessageQueue.IdleHandler
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.Reflection
-import com.xiaocydx.performance.gc.Cleaner
-import com.xiaocydx.performance.watcher.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.Reflection
+import com.xiaocydx.performance.runtime.gc.Cleaner
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc
