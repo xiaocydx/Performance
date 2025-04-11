@@ -16,12 +16,25 @@
 
 package com.xiaocydx.performance.plugin
 
+import com.android.build.api.instrumentation.FramesComputationMode
+import com.android.build.api.instrumentation.InstrumentationScope
+import com.android.build.api.variant.AndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 
-class PerformancePlugin : Plugin<Project> {
+internal class PerformancePlugin : Plugin<Project> {
 
-    override fun apply(target: Project) {
-        println("PerformancePlugin target.name = ${target.name}")
+    override fun apply(project: Project) {
+        // TODO: 补充AGP插件的检查
+        println("PerformancePlugin project.name = ${project.name}")
+        val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
+        androidExt.onVariants { variant ->
+            variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COPY_FRAMES)
+            variant.instrumentation.transformClassesWith(
+                classVisitorFactoryImplClass = PerformanceClassVisitorFactory::class.java,
+                scope = InstrumentationScope.ALL,
+                instrumentationParamsConfig = {}
+            )
+        }
     }
 }

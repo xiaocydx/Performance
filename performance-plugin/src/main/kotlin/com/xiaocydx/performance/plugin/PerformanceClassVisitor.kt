@@ -23,24 +23,20 @@ import org.objectweb.asm.MethodVisitor
  * @author xcc
  * @date 2025/4/10
  */
-class PerformanceClassVisitor(
+internal class PerformanceClassVisitor(
     api: Int,
-    classVisitor: ClassVisitor?
-) : ClassVisitor(api, classVisitor) {
+    nextClassVisitor: ClassVisitor,
+    private val className: String,
+) : ClassVisitor(api, nextClassVisitor) {
 
-    private var className = ""
-
-    override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
-        super.visit(version, access, name, signature, superName, interfaces)
-        className = name ?: ""
-    }
-
-    override fun visitMethod(access: Int, name: String?, descriptor: String?, signature: String?, exceptions: Array<out String>?): MethodVisitor {
+    override fun visitMethod(
+        access: Int,
+        name: String?,
+        descriptor: String?,
+        signature: String?,
+        exceptions: Array<out String>?,
+    ): MethodVisitor {
         val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
-        if (className.endsWith("Activity") && name == "onResume") {
-            return PerformanceMethodVisitor(api, methodVisitor, access, name, descriptor, className)
-        }
-
-        return methodVisitor
+        return PerformanceMethodVisitor(api, methodVisitor, access, name, descriptor, className)
     }
 }

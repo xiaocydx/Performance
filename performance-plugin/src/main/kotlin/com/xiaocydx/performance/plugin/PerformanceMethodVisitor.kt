@@ -23,20 +23,35 @@ import org.objectweb.asm.commons.AdviceAdapter
  * @author xcc
  * @date 2025/4/10
  */
-class PerformanceMethodVisitor(
+internal class PerformanceMethodVisitor(
     api: Int,
     methodVisitor: MethodVisitor?,
     access: Int,
     name: String?,
     descriptor: String?,
-    private val className: String
+    private val className: String,
 ) : AdviceAdapter(api, methodVisitor, access, name, descriptor) {
 
     override fun onMethodEnter() {
-        super.onMethodEnter()
-        mv.visitLdcInsn("${className}.${name} before")
-        mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;")
-        mv.visitInsn(SWAP)
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/Object;)V", false)
+        // TODO: 实现id的分配
+        // TODO: 空函数不处理
+        val id = name.hashCode()
+        mv.visitLdcInsn(id)
+        mv.visitMethodInsn(INVOKESTATIC, HISTORY, ENTER, DESCRIPTOR, false)
+    }
+
+    override fun onMethodExit(opcode: Int) {
+        // TODO: 实现id的分配
+        // TODO: 空函数不处理
+        val id = name.hashCode()
+        mv.visitLdcInsn(id)
+        mv.visitMethodInsn(INVOKESTATIC, HISTORY, EXIT, DESCRIPTOR, false)
+    }
+
+    private companion object {
+        const val HISTORY = "com/xiaocydx/performance/runtime/history/History"
+        const val ENTER = "enter"
+        const val EXIT = "exit"
+        const val DESCRIPTOR = "(I)V"
     }
 }
