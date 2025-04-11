@@ -16,6 +16,10 @@
 
 package com.xiaocydx.performance.runtime.history
 
+import android.os.SystemClock
+import com.xiaocydx.performance.runtime.history.Record.Companion.ID_MAX
+import com.xiaocydx.performance.runtime.history.Record.Companion.ID_SLICE
+
 /**
  * @author xcc
  * @date 2025/4/8
@@ -23,15 +27,33 @@ package com.xiaocydx.performance.runtime.history
 internal object History {
     private val recorder = Recorder(capacity = 100 * 10000)
 
-    fun mark(): Long {
+    @JvmStatic
+    fun enter(id: Int) {
+        if (id >= ID_MAX) return
+        recorder.enter(id, currentMs())
+    }
+
+    @JvmStatic
+    fun exit(id: Int) {
+        if (id >= ID_MAX) return
+        recorder.exit(id, currentMs())
+    }
+
+    fun createStartMark(): Long {
+        enter(id = ID_SLICE)
         return recorder.mark()
     }
 
-    fun enter(id: Int) {
-        recorder.enter(id)
+    fun createEndMark(): Long {
+        exit(id = ID_SLICE)
+        return recorder.mark()
     }
 
-    fun exit(id: Int) {
-        recorder.exit(id)
+    fun snapshot(startMark: Long, endMark: Long): Snapshot {
+        return recorder.snapshot(startMark, endMark)
+    }
+
+    private inline fun currentMs(): Long {
+        return SystemClock.uptimeMillis()
     }
 }

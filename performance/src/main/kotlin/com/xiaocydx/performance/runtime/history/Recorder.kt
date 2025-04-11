@@ -91,24 +91,26 @@ internal class Recorder(private val capacity: Int) {
 internal value class Record(val value: Long) {
 
     inline val id: Int
-        get() = ((value ushr ID_SHL_BITS) and ID_MASK).toInt()
+        get() = ((value ushr SHL_BITS_ID) and MASK_ID).toInt()
 
     inline val timeMs: Long
-        get() = value and TIME_MS_MASK
+        get() = value and MASK_TIME_MS
 
     inline val isEnter: Boolean
-        get() = (value ushr ENTER_SHL_BITS) == 1L
+        get() = (value ushr SHL_BITS_ENTER) == 1L
 
     companion object {
-        const val ENTER_SHL_BITS = 63
-        const val ID_SHL_BITS = 43
-        const val ID_MASK = 0xFFFFFL
-        const val TIME_MS_MASK = 0x7FFFFFFFFFFL
+        const val SHL_BITS_ENTER = 63
+        const val SHL_BITS_ID = 43
+        const val MASK_ID = 0xFFFFFL
+        const val MASK_TIME_MS = 0x7FFFFFFFFFFL
+        const val ID_MAX = 0xFFFFF
+        const val ID_SLICE = ID_MAX - 1
 
         inline fun value(id: Int, timeMs: Long, isEnter: Boolean): Long {
-            var value = if (isEnter) 1L shl ENTER_SHL_BITS else 0L
-            value = value or (id.toLong() shl ID_SHL_BITS) // 函数数量不超过20位
-            value = value or (timeMs and TIME_MS_MASK) // ms时间不超过43位
+            var value = if (isEnter) 1L shl SHL_BITS_ENTER else 0L
+            value = value or (id.toLong() shl SHL_BITS_ID) // 函数数量不超过20位
+            value = value or (timeMs and MASK_TIME_MS) // ms时间不超过43位
             return value
         }
     }
