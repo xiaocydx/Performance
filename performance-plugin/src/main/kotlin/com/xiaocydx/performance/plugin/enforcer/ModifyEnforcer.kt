@@ -16,14 +16,16 @@
 
 package com.xiaocydx.performance.plugin.enforcer
 
-import com.xiaocydx.performance.plugin.PerformanceClassVisitor
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
-import groovyjarjarasm.asm.Opcodes.ASM9
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.ListProperty
 import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.commons.AdviceAdapter
 import java.io.File
 
 /**
@@ -41,26 +43,18 @@ internal class ModifyEnforcer(
         collectResult: CollectResult
     ) {
         output.write(inputJars)
-
         directories.get().forEach { directory ->
             println("handling " + directory.asFile.absolutePath)
-
             directory.asFile.walk().forEach action@{ file ->
-                if (!file.isFile) return@action
-
+                if (!file.isNeedClassFile()) return@action
                 val name = name(relativePath(directory, file))
                 println("Adding from directory $name")
-                if (!filter(file)) {
-                    output.write(name, file)
-                    return@action
-                }
-
                 addTask(dispatcher.submit {
                     val bytes = file.inputStream().use {
                         val classReader = ClassReader(it)
                         val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
-                        val classVisitor = PerformanceClassVisitor(ASM9, classWriter)
-                        classReader.accept(classVisitor, ClassReader.SKIP_FRAMES)
+                        val classVisitor = ModifyClassVisitor(ASM_API, classWriter, collectResult)
+                        classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES)
                         classWriter.toByteArray()
                     }
                     output.write(name, bytes)
@@ -70,16 +64,76 @@ internal class ModifyEnforcer(
         awaitTasks()
     }
 
-    private fun filter(file: File): Boolean {
-        // TODO: 补充更多过滤
-        return file.name.endsWith("PerformanceTest.class")
-    }
-
     private fun relativePath(directory: Directory, file: File): String {
         return directory.asFile.toURI().relativize(file.toURI()).path
     }
 
     private fun name(relativePath: String): String {
         return relativePath.replace(File.separatorChar, '/')
+    }
+
+    private class ModifyClassVisitor(
+        api: Int,
+        classVisitor: ClassVisitor,
+        private val collectResult: CollectResult
+    ) : ClassVisitor(api, classVisitor) {
+        private var className = ""
+        private var isSkip = false
+
+        override fun visit(
+            version: Int,
+            access: Int,
+            name: String?,
+            signature: String?,
+            superName: String?,
+            interfaces: Array<out String>?
+        ) {
+            super.visit(version, access, name, signature, superName, interfaces)
+            // TODO: 跟collect统一跳过Class的条件
+            className = name ?: ""
+            isSkip = access and Opcodes.ACC_INTERFACE != 0 || access and Opcodes.ACC_ABSTRACT != 0
+        }
+
+        override fun visitMethod(
+            access: Int,
+            name: String,
+            descriptor: String?,
+            signature: String?,
+            exceptions: Array<out String>?,
+        ): MethodVisitor {
+            val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
+            val methodInfo = collectResult.handled[MethodInfo.key(className, name)]
+            return when {
+                isSkip || methodInfo == null -> methodVisitor
+                else -> ModifyMethodVisitor(api, methodVisitor, access, name, descriptor, methodInfo)
+            }
+        }
+    }
+
+    internal class ModifyMethodVisitor(
+        api: Int,
+        methodVisitor: MethodVisitor?,
+        access: Int,
+        name: String?,
+        descriptor: String?,
+        private val methodInfo: MethodInfo
+    ) : AdviceAdapter(api, methodVisitor, access, name, descriptor) {
+
+        override fun onMethodEnter() {
+            mv.visitLdcInsn(methodInfo.id)
+            mv.visitMethodInsn(INVOKESTATIC, HISTORY, ENTER, DESCRIPTOR, false)
+        }
+
+        override fun onMethodExit(opcode: Int) {
+            mv.visitLdcInsn(methodInfo.id)
+            mv.visitMethodInsn(INVOKESTATIC, HISTORY, EXIT, DESCRIPTOR, false)
+        }
+
+        private companion object {
+            const val HISTORY = "com/xiaocydx/performance/runtime/history/History"
+            const val ENTER = "enter"
+            const val EXIT = "exit"
+            const val DESCRIPTOR = "(I)V"
+        }
     }
 }
