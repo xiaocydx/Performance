@@ -16,14 +16,13 @@
 
 @file:Suppress("CanBeParameter")
 
-package com.xiaocydx.performance.plugin.handler
+package com.xiaocydx.performance.plugin.enforcer
 
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import org.gradle.api.file.RegularFile
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import java.io.File
-import java.util.concurrent.Future
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -32,15 +31,14 @@ import java.util.jar.JarOutputStream
  * @author xcc
  * @date 2025/4/13
  */
-internal class OutputHandler(
+internal class OutputEnforcer(
     private val dispatcher: Dispatcher,
     private val output: RegularFileProperty
-) {
+) : Enforcer() {
     private val jarOutput = JarOutputStream(output.get().asFile.outputStream().buffered())
-    private val tasks = mutableListOf<Future<*>>()
 
     fun write(name: String, file: File) {
-        tasks.add(dispatcher.submit {
+        addTask(dispatcher.submit {
             jarOutput.putNextEntry(JarEntry(name))
             file.inputStream().use { it.copyTo(jarOutput) }
             jarOutput.closeEntry()
@@ -48,7 +46,7 @@ internal class OutputHandler(
     }
 
     fun write(name: String, bytes: ByteArray) {
-        tasks.add(dispatcher.submit {
+        addTask(dispatcher.submit {
             jarOutput.putNextEntry(JarEntry(name))
             jarOutput.write(bytes)
             jarOutput.closeEntry()
@@ -56,7 +54,7 @@ internal class OutputHandler(
     }
 
     fun write(inputJars: ListProperty<RegularFile>) {
-        tasks.add(dispatcher.submit {
+        addTask(dispatcher.submit {
             inputJars.get().forEach { file ->
                 println("handling " + file.asFile.absolutePath)
                 val jarFile = JarFile(file.asFile)
@@ -73,9 +71,8 @@ internal class OutputHandler(
         })
     }
 
-    fun awaitComplete() {
-        tasks.forEach { it.get() }
-        tasks.clear()
+    fun await() {
+        awaitTasks()
         jarOutput.close()
     }
 }

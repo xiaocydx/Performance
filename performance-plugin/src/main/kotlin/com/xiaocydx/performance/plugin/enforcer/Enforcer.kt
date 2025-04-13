@@ -14,16 +14,32 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin.mapping
+package com.xiaocydx.performance.plugin.enforcer
 
-import com.xiaocydx.performance.plugin.mapping.MappingMethod.Companion.INITIAL_ID
+import com.xiaocydx.performance.plugin.enforcer.MethodInfo.Companion.INITIAL_ID
+import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author xcc
  * @date 2025/4/13
  */
-internal data class MappingMethod(
+internal abstract class Enforcer {
+    private val tasks = mutableListOf<Future<*>>()
+
+    protected fun addTask(task: Future<*>) {
+        tasks.add(task)
+    }
+
+    protected fun awaitTasks() {
+        tasks.forEach { it.await() }
+        tasks.clear()
+    }
+}
+
+internal fun <R> Future<R>.await() = get()
+
+internal data class MethodInfo(
     val id: Int,
     val accessFlag: Int,
     val className: String,
@@ -39,13 +55,13 @@ internal data class MappingMethod(
         const val INITIAL_ID = 0
         val charset = Charsets.UTF_8
 
-        fun fromOutput(output: String): MappingMethod {
+        fun fromOutput(output: String): MethodInfo {
             val property = output.split(DELIMITER)
             val id = property[0].toInt()
             val accessFlag = property[1].toInt()
             val className = property[2]
             val methodName = property[3]
-            return MappingMethod(id, accessFlag, className, methodName)
+            return MethodInfo(id, accessFlag, className, methodName)
         }
     }
 }

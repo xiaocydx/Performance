@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin.handler
+package com.xiaocydx.performance.plugin.enforcer
 
 import com.xiaocydx.performance.plugin.PerformanceClassVisitor
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
@@ -25,36 +25,37 @@ import org.gradle.api.provider.ListProperty
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import java.io.File
-import java.util.concurrent.Future
 
 /**
  * @author xcc
  * @date 2025/4/13
  */
-internal class ModifyHandler(
+internal class ModifyEnforcer(
     private val dispatcher: Dispatcher,
-    private val outputHandler: OutputHandler,
-) {
-    private val tasks = mutableListOf<Future<*>>()
+    private val output: OutputEnforcer,
+) : Enforcer() {
 
-    fun submitJars(inputJars: ListProperty<RegularFile>) {
-        outputHandler.write(inputJars)
-    }
+    fun await(
+        inputJars: ListProperty<RegularFile>,
+        directories: ListProperty<Directory>,
+        collectResult: CollectResult
+    ) {
+        output.write(inputJars)
 
-    fun submitDirectories(directories: ListProperty<Directory>) {
         directories.get().forEach { directory ->
             println("handling " + directory.asFile.absolutePath)
-            directory.asFile.walk().forEach { file ->
-                if (!file.isFile) return@forEach
+
+            directory.asFile.walk().forEach action@{ file ->
+                if (!file.isFile) return@action
 
                 val name = name(relativePath(directory, file))
                 println("Adding from directory $name")
                 if (!filter(file)) {
-                    outputHandler.write(name, file)
-                    return@forEach
+                    output.write(name, file)
+                    return@action
                 }
 
-                val task = dispatcher.submit {
+                addTask(dispatcher.submit {
                     val bytes = file.inputStream().use {
                         val classReader = ClassReader(it)
                         val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
@@ -62,16 +63,11 @@ internal class ModifyHandler(
                         classReader.accept(classVisitor, ClassReader.SKIP_FRAMES)
                         classWriter.toByteArray()
                     }
-                    outputHandler.write(name, bytes)
-                }
-                tasks.add(task)
+                    output.write(name, bytes)
+                })
             }
         }
-    }
-
-    fun awaitComplete() {
-        tasks.forEach { it.get() }
-        tasks.clear()
+        awaitTasks()
     }
 
     private fun filter(file: File): Boolean {
