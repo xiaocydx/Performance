@@ -37,10 +37,10 @@ internal class PerformancePlugin : Plugin<Project> {
                 .forScope(ScopedArtifacts.Scope.PROJECT)
                 .use(taskProvider)
                 .toTransform(
-                    ScopedArtifact.CLASSES,
-                    PerformanceTask::allJars,
-                    PerformanceTask::allDirectories,
-                    PerformanceTask::output
+                    type = ScopedArtifact.CLASSES,
+                    inputJars = PerformanceTask::inputJars,
+                    inputDirectories = PerformanceTask::inputDirectories,
+                    into = PerformanceTask::output
                 )
         }
     }

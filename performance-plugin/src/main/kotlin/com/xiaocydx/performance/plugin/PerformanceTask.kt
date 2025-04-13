@@ -16,10 +16,12 @@
 
 package com.xiaocydx.performance.plugin
 
+import com.xiaocydx.performance.plugin.dispatcher.NopDispatcher
+import com.xiaocydx.performance.plugin.handler.ModifyHandler
+import com.xiaocydx.performance.plugin.handler.OutputHandler
 import com.xiaocydx.performance.plugin.mapping.MappingMethod
 import com.xiaocydx.performance.plugin.mapping.MappingReader
 import com.xiaocydx.performance.plugin.mapping.MappingWriter
-import groovyjarjarasm.asm.Opcodes.ASM9
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
@@ -28,14 +30,7 @@ import org.gradle.api.provider.ListProperty
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
-import org.objectweb.asm.ClassReader
-import org.objectweb.asm.ClassWriter
-import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.util.jar.JarEntry
-import java.util.jar.JarFile
-import java.util.jar.JarOutputStream
+import kotlin.system.measureTimeMillis
 
 /**
  * @author xcc
@@ -44,64 +39,33 @@ import java.util.jar.JarOutputStream
 internal abstract class PerformanceTask : DefaultTask() {
 
     @get:InputFiles
-    abstract val allJars: ListProperty<RegularFile>
+    abstract val inputJars: ListProperty<RegularFile>
 
     @get:InputFiles
-    abstract val allDirectories: ListProperty<Directory>
+    abstract val inputDirectories: ListProperty<Directory>
 
     @get:OutputFile
     abstract val output: RegularFileProperty
 
     @TaskAction
     fun taskAction() {
-        val jarOutput = JarOutputStream(BufferedOutputStream(FileOutputStream(
-            output.get().asFile
-        )))
-        allJars.get().forEach { file ->
-            println("handling " + file.asFile.absolutePath)
-            val jarFile = JarFile(file.asFile)
-            jarFile.entries().iterator().forEach { jarEntry ->
-                println("Adding from jar ${jarEntry.name}")
-                jarOutput.putNextEntry(JarEntry(jarEntry.name))
-                jarFile.getInputStream(jarEntry).use {
-                    it.copyTo(jarOutput)
-                }
-                jarOutput.closeEntry()
-            }
-            jarFile.close()
+        val time = measureTimeMillis {
+            val consumerDispatcher = NopDispatcher
+            val producerDispatcher = NopDispatcher
+
+            val outputHandler = OutputHandler(consumerDispatcher, output)
+            val modifyHandler = ModifyHandler(producerDispatcher, outputHandler)
+
+            modifyHandler.submitJars(inputJars)
+            modifyHandler.submitDirectories(inputDirectories)
+
+            modifyHandler.awaitComplete()
+            outputHandler.awaitComplete()
+
+            consumerDispatcher.shutdownNow()
+            producerDispatcher.shutdownNow()
         }
-        allDirectories.get().forEach { directory ->
-            println("handling " + directory.asFile.absolutePath)
-            directory.asFile.walk().forEach { file ->
-                if (file.isFile) {
-                    if (file.name.endsWith("PerformanceTest.class")) {
-                        val bytes = file.inputStream().use {
-                            val classReader = ClassReader(it)
-                            val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
-                            val classVisitor = PerformanceClassVisitor(ASM9, classWriter)
-                            classReader.accept(classVisitor, ClassReader.SKIP_FRAMES)
-                            classWriter.toByteArray()
-                        }
-                        val relativePath = directory.asFile.toURI().relativize(file.toURI())
-                            .getPath()
-                        println("Adding from directory ${relativePath.replace(File.separatorChar, '/')}")
-                        jarOutput.putNextEntry(JarEntry(relativePath.replace(File.separatorChar, '/')))
-                        jarOutput.write(bytes)
-                        jarOutput.closeEntry()
-                    } else {
-                        val relativePath = directory.asFile.toURI().relativize(file.toURI())
-                            .getPath()
-                        println("Adding from directory ${relativePath.replace(File.separatorChar, '/')}")
-                        jarOutput.putNextEntry(JarEntry(relativePath.replace(File.separatorChar, '/')))
-                        file.inputStream().use { inputStream ->
-                            inputStream.copyTo(jarOutput)
-                        }
-                        jarOutput.closeEntry()
-                    }
-                }
-            }
-        }
-        jarOutput.close()
+        println("PerformanceTask -> time = $time ms")
     }
 
     private fun read() {
