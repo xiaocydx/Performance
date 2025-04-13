@@ -25,9 +25,8 @@ import org.objectweb.asm.MethodVisitor
  */
 internal class PerformanceClassVisitor(
     api: Int,
-    nextClassVisitor: ClassVisitor,
-    private val className: String,
-) : ClassVisitor(api, nextClassVisitor) {
+    classVisitor: ClassVisitor,
+) : ClassVisitor(api, classVisitor) {
 
     override fun visitMethod(
         access: Int,
@@ -37,6 +36,6 @@ internal class PerformanceClassVisitor(
         exceptions: Array<out String>?,
     ): MethodVisitor {
         val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
-        return PerformanceMethodVisitor(api, methodVisitor, access, name, descriptor, className)
+        return PerformanceMethodVisitor(api, methodVisitor, access, name, descriptor)
     }
 }

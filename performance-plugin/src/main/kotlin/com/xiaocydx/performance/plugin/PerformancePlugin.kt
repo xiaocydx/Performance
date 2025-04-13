@@ -16,9 +16,9 @@
 
 package com.xiaocydx.performance.plugin
 
-import com.android.build.api.instrumentation.FramesComputationMode
-import com.android.build.api.instrumentation.InstrumentationScope
+import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.variant.AndroidComponentsExtension
+import com.android.build.api.variant.ScopedArtifacts
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 
@@ -29,12 +29,19 @@ internal class PerformancePlugin : Plugin<Project> {
         println("PerformancePlugin project.name = ${project.name}")
         val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidExt.onVariants { variant ->
-            variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COPY_FRAMES)
-            variant.instrumentation.transformClassesWith(
-                classVisitorFactoryImplClass = PerformanceClassVisitorFactory::class.java,
-                scope = InstrumentationScope.ALL,
-                instrumentationParamsConfig = {}
+            val taskProvider = project.tasks.register(
+                "${variant.name}Performance",
+                PerformanceTask::class.java
             )
+            variant.artifacts
+                .forScope(ScopedArtifacts.Scope.PROJECT)
+                .use(taskProvider)
+                .toTransform(
+                    ScopedArtifact.CLASSES,
+                    PerformanceTask::allJars,
+                    PerformanceTask::allDirectories,
+                    PerformanceTask::output
+                )
         }
     }
 }

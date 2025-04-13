@@ -29,7 +29,6 @@ internal class PerformanceMethodVisitor(
     access: Int,
     name: String?,
     descriptor: String?,
-    private val className: String,
 ) : AdviceAdapter(api, methodVisitor, access, name, descriptor) {
 
     override fun onMethodEnter() {
