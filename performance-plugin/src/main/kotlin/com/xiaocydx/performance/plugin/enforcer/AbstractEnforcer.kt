@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+
 package com.xiaocydx.performance.plugin.enforcer
 
 import com.xiaocydx.performance.plugin.enforcer.MethodInfo.Companion.INITIAL_ID
@@ -26,24 +28,41 @@ import java.util.concurrent.atomic.AtomicInteger
  * @author xcc
  * @date 2025/4/13
  */
-internal abstract class Enforcer {
-    private val tasks = mutableListOf<Future<*>>()
+internal abstract class AbstractEnforcer {
 
     protected fun File.isNeedClassFile(): Boolean {
         if (!isFile) return false
-        val name = name
+        val name = name ?: ""
         if (!name.endsWith(".class")) return false
-        UN_NEED_CLASS.forEach { if ( name.contains(it)) return false }
+        UN_NEED_CLASS.forEach { if (name.contains(it)) return false }
         return true
     }
 
-    protected fun addTask(task: Future<*>) {
-        tasks.add(task)
-    }
+    protected class TaskCountDownLatch {
+        private val count = AtomicInteger()
+        private val lock = this as Object
 
-    protected fun awaitTasks() {
-        tasks.forEach { it.await() }
-        tasks.clear()
+        fun increment() {
+            count.incrementAndGet()
+        }
+
+        fun decrement() {
+            val count = count.decrementAndGet()
+            require(count >= 0) { "计数异常" }
+            if (count == 0) {
+                synchronized(lock) {
+                    lock.notifyAll()
+                }
+            }
+        }
+
+        fun await() {
+            synchronized(lock) {
+                while (count.get() > 0) {
+                    lock.wait()
+                }
+            }
+        }
     }
 
     private companion object {
@@ -59,7 +78,7 @@ internal data class MethodInfo(
     val id: Int,
     val access: Int,
     val className: String,
-    val methodName: String
+    val methodName: String,
 ) {
 
     fun toKey(): String {

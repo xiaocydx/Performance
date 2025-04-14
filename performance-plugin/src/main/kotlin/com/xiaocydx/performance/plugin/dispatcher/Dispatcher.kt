@@ -25,7 +25,9 @@ import java.util.concurrent.Future
  */
 internal interface Dispatcher {
 
-    fun<R> submit(task: Callable<R>): Future<R>
+    fun execute(task: Runnable)
+
+    fun <R> submit(task: Callable<R>): Future<R>
 
     fun shutdownNow()
 }

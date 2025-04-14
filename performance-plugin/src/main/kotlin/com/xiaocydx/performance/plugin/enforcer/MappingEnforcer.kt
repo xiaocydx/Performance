@@ -28,31 +28,30 @@ internal class MappingEnforcer(
     private val dispatcher: Dispatcher,
     ignoredMethodFile: String,
     handledMethodFile: String,
-) : Enforcer() {
+) : AbstractEnforcer() {
     private val charset = MethodInfo.charset
     private val ignoredMethodFile = File(ignoredMethodFile)
     private val handledMethodFile = File(handledMethodFile)
 
-    fun submitRead(): Future<ReadResult> {
+    fun submitRead(): Future<MappingResult.Read> {
         return dispatcher.submit {
             val previousHandled = read(handledMethodFile)
             val idGenerator = when {
                 previousHandled.isEmpty() -> IdGenerator()
                 else -> IdGenerator(initial = previousHandled.maxOf { it.id })
             }
-            ReadResult(idGenerator, previousHandled)
+            MappingResult.Read(idGenerator, previousHandled)
         }
     }
 
-    fun submitWrite(result: CollectResult): Future<WriteResult> {
+    fun submitWrite(result: CollectResult): Future<MappingResult.Write> {
         return dispatcher.submit {
-            val ignored = result.ignored.values.toMutableList()
+            val ignored = result.ignored.values.toList()
             val handled = result.handled.values.toMutableList()
-            ignored.sortBy { it.id }
             handled.sortBy { it.id }
             write(ignoredMethodFile, ignored)
             write(handledMethodFile, handled)
-            WriteResult(ignored, handled)
+            MappingResult.Write(ignored, handled)
         }
     }
 
@@ -70,14 +69,16 @@ internal class MappingEnforcer(
             list.forEach { writer.println(it.toOutput()) }
         }
     }
+}
 
-    data class ReadResult(
+internal sealed class MappingResult {
+    data class Read(
         val idGenerator: IdGenerator,
-        val previousHandled: List<MethodInfo>
-    )
+        val previousHandled: List<MethodInfo>,
+    ) : MappingResult()
 
-    data class WriteResult(
+    data class Write(
         val currentIgnored: List<MethodInfo>,
-        val currentHandled: List<MethodInfo>
-    )
+        val currentHandled: List<MethodInfo>,
+    ) : MappingResult()
 }

@@ -26,6 +26,10 @@ import java.util.concurrent.FutureTask
  */
 internal class SyncDispatcher : Dispatcher {
 
+    override fun execute(task: Runnable) {
+        synchronized(this) { task.run() }
+    }
+
     override fun <R> submit(task: Callable<R>): Future<R> {
         val future = FutureTask(task)
         synchronized(this) { future.run() }

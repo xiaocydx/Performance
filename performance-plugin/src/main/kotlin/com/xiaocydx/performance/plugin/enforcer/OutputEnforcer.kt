@@ -22,7 +22,6 @@ import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import org.gradle.api.file.RegularFile
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
-import java.io.File
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -33,28 +32,24 @@ import java.util.jar.JarOutputStream
  */
 internal class OutputEnforcer(
     private val dispatcher: Dispatcher,
-    private val output: RegularFileProperty
-) : Enforcer() {
+    private val output: RegularFileProperty,
+) : AbstractEnforcer() {
     private val jarOutput = JarOutputStream(output.get().asFile.outputStream().buffered())
-
-    fun write(name: String, file: File) {
-        addTask(dispatcher.submit {
-            jarOutput.putNextEntry(JarEntry(name))
-            file.inputStream().use { it.copyTo(jarOutput) }
-            jarOutput.closeEntry()
-        })
-    }
+    private val taskCount = TaskCountDownLatch()
 
     fun write(name: String, bytes: ByteArray) {
-        addTask(dispatcher.submit {
+        taskCount.increment()
+        dispatcher.execute {
             jarOutput.putNextEntry(JarEntry(name))
             jarOutput.write(bytes)
             jarOutput.closeEntry()
-        })
+            taskCount.decrement()
+        }
     }
 
     fun write(inputJars: ListProperty<RegularFile>) {
-        addTask(dispatcher.submit {
+        taskCount.increment()
+        dispatcher.execute {
             inputJars.get().forEach { file ->
                 println("handling " + file.asFile.absolutePath)
                 val jarFile = JarFile(file.asFile)
@@ -68,11 +63,12 @@ internal class OutputEnforcer(
                 }
                 jarFile.close()
             }
-        })
+            taskCount.decrement()
+        }
     }
 
     fun await() {
-        awaitTasks()
+        taskCount.await()
         jarOutput.close()
     }
 }

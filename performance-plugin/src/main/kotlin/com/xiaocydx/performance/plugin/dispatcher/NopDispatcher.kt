@@ -26,6 +26,10 @@ import java.util.concurrent.FutureTask
  */
 internal object NopDispatcher : Dispatcher {
 
+    override fun execute(task: Runnable) {
+        task.run()
+    }
+
     override fun <R> submit(task: Callable<R>): Future<R> {
         val future = FutureTask(task)
         future.run()

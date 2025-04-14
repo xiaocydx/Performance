@@ -35,21 +35,24 @@ import java.io.File
 internal class ModifyEnforcer(
     private val dispatcher: Dispatcher,
     private val output: OutputEnforcer,
-) : Enforcer() {
+) : AbstractEnforcer() {
 
     fun await(
         inputJars: ListProperty<RegularFile>,
         directories: ListProperty<Directory>,
-        collectResult: CollectResult
+        collectResult: CollectResult,
     ) {
         output.write(inputJars)
+
+        val taskCount = TaskCountDownLatch()
         directories.get().forEach { directory ->
             println("handling " + directory.asFile.absolutePath)
             directory.asFile.walk().forEach action@{ file ->
                 if (!file.isNeedClassFile()) return@action
                 val name = name(relativePath(directory, file))
                 println("Adding from directory $name")
-                addTask(dispatcher.submit {
+                taskCount.increment()
+                dispatcher.execute {
                     val bytes = file.inputStream().use {
                         val classReader = ClassReader(it)
                         val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
@@ -58,10 +61,11 @@ internal class ModifyEnforcer(
                         classWriter.toByteArray()
                     }
                     output.write(name, bytes)
-                })
+                    taskCount.decrement()
+                }
             }
         }
-        awaitTasks()
+        taskCount.await()
     }
 
     private fun relativePath(directory: Directory, file: File): String {
@@ -75,7 +79,7 @@ internal class ModifyEnforcer(
     private class ModifyClassVisitor(
         api: Int,
         classVisitor: ClassVisitor,
-        private val collectResult: CollectResult
+        private val collectResult: CollectResult,
     ) : ClassVisitor(api, classVisitor) {
         private var className = ""
         private var isSkip = false
@@ -86,7 +90,7 @@ internal class ModifyEnforcer(
             name: String?,
             signature: String?,
             superName: String?,
-            interfaces: Array<out String>?
+            interfaces: Array<out String>?,
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
             // TODO: 跟collect统一跳过Class的条件
@@ -116,7 +120,7 @@ internal class ModifyEnforcer(
         access: Int,
         name: String?,
         descriptor: String?,
-        private val methodInfo: MethodInfo
+        private val methodInfo: MethodInfo,
     ) : AdviceAdapter(api, methodVisitor, access, name, descriptor) {
 
         override fun onMethodEnter() {

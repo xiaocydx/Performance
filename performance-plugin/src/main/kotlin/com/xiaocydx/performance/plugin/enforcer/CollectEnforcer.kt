@@ -35,8 +35,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 internal class CollectEnforcer(
     private val dispatcher: Dispatcher,
-    private val idGenerator: IdGenerator
-) : Enforcer() {
+    private val idGenerator: IdGenerator,
+) : AbstractEnforcer() {
     private val ignored = ConcurrentHashMap<String, MethodInfo>()
     private val handled = ConcurrentHashMap<String, MethodInfo>()
 
@@ -45,30 +45,29 @@ internal class CollectEnforcer(
         directories: ListProperty<Directory>,
     ): CollectResult {
         // TODO: 对Jar解包，遍历，通过ASM判断是否处理
+        val taskCount = TaskCountDownLatch()
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
                 if (!file.isNeedClassFile()) return@action
-                addTask(dispatcher.submit {
+                taskCount.increment()
+                dispatcher.execute {
                     file.inputStream().use {
                         val classReader = ClassReader(it)
                         val classWriter = ClassWriter(ClassWriter.COMPUTE_MAXS)
                         val classVisitor = CollectClassVisitor(ASM_API, classWriter)
-                        try {
-                            classReader.accept(classVisitor, 0)
-                        } catch (e: Exception) {
-                            throw e
-                        }
+                        classReader.accept(classVisitor, 0)
                     }
-                })
+                    taskCount.decrement()
+                }
             }
         }
-        awaitTasks()
+        taskCount.await()
         return CollectResult(ignored, handled)
     }
 
     private inner class CollectClassVisitor(
         api: Int,
-        classVisitor: ClassVisitor
+        classVisitor: ClassVisitor,
     ) : ClassVisitor(api, classVisitor) {
         private var className = ""
         private var isSkip = false
@@ -78,7 +77,7 @@ internal class CollectEnforcer(
             access: Int, name: String?,
             signature: String?,
             superName: String?,
-            interfaces: Array<out String>?
+            interfaces: Array<out String>?,
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
             // TODO: 跟Modify统一跳过Class的条件
@@ -91,7 +90,7 @@ internal class CollectEnforcer(
             name: String?,
             descriptor: String?,
             signature: String?,
-            exceptions: Array<out String>?
+            exceptions: Array<out String>?,
         ): MethodVisitor = if (isSkip) {
             super.visitMethod(access, name, descriptor, signature, exceptions)
         } else {
@@ -182,5 +181,5 @@ internal class CollectEnforcer(
 
 internal data class CollectResult(
     val ignored: Map<String, MethodInfo>,
-    val handled: Map<String, MethodInfo>
+    val handled: Map<String, MethodInfo>,
 )

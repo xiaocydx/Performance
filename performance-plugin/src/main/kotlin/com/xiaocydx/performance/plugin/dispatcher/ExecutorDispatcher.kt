@@ -27,6 +27,10 @@ import java.util.concurrent.Future
 internal class ExecutorDispatcher(threads: Int) : Dispatcher {
     private val executor = Executors.newFixedThreadPool(threads.coerceAtLeast(1))
 
+    override fun execute(task: Runnable) {
+        executor.execute(task)
+    }
+
     override fun <R> submit(task: Callable<R>): Future<R> {
         return executor.submit(task)
     }
