@@ -38,7 +38,7 @@ import org.gradle.api.tasks.TaskAction
  * @author xcc
  * @date 2025/4/11
  */
-internal abstract class PerformanceTask : DefaultTask() {
+internal abstract class PerformanceHistoryTask : DefaultTask() {
 
     @get:InputFiles
     abstract val inputJars: ListProperty<RegularFile>
@@ -51,6 +51,7 @@ internal abstract class PerformanceTask : DefaultTask() {
 
     @TaskAction
     fun taskAction() {
+        val historyExt = PerformanceExtension.getHistory(project)
         val isNop = true
         val producerDispatcher: Dispatcher
         val consumerDispatcher: SerialDispatcher
@@ -66,8 +67,12 @@ internal abstract class PerformanceTask : DefaultTask() {
         var startTime = System.currentTimeMillis()
         val mappingEnforcer = MappingEnforcer(
             dispatcher = producerDispatcher,
-            ignoredMethodFile = "${project.rootDir}/outputs/ignoredMethodMapping.text",
-            handledMethodFile = "${project.rootDir}/outputs/handledMethodMapping.text"
+            ignoredMethodFile = historyExt.ignoredMethodFile.ifEmpty {
+                "${project.rootDir}/outputs/ignoredMethodMapping.text"
+            },
+            handledMethodFile = historyExt.handledMethodFile.ifEmpty {
+                "${project.rootDir}/outputs/handledMethodMapping.text"
+            }
         )
         // TODO: 实现增量才需要read
         // mappingEnforcer.submitRead()

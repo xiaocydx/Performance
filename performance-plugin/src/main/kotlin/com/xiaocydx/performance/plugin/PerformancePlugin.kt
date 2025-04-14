@@ -19,28 +19,35 @@ package com.xiaocydx.performance.plugin
 import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.ScopedArtifacts
+import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 
 internal class PerformancePlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
-        // TODO: 补充AGP插件的检查
-        println("PerformancePlugin project.name = ${project.name}")
+        if (!project.plugins.hasPlugin("com.android.application")) {
+            throw GradleException("Performance Plugin, Android Application plugin required.")
+        }
+        PerformanceExtension.inject(project)
+
         val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidExt.onVariants { variant ->
+            val historyExt = PerformanceExtension.getHistory(project)
+            if (!historyExt.isEnabled) return@onVariants
+
             val taskProvider = project.tasks.register(
                 "${variant.name}Performance",
-                PerformanceTask::class.java
+                PerformanceHistoryTask::class.java
             )
             variant.artifacts
                 .forScope(ScopedArtifacts.Scope.PROJECT)
                 .use(taskProvider)
                 .toTransform(
                     type = ScopedArtifact.CLASSES,
-                    inputJars = PerformanceTask::inputJars,
-                    inputDirectories = PerformanceTask::inputDirectories,
-                    into = PerformanceTask::output
+                    inputJars = PerformanceHistoryTask::inputJars,
+                    inputDirectories = PerformanceHistoryTask::inputDirectories,
+                    into = PerformanceHistoryTask::output
                 )
         }
     }
