@@ -66,7 +66,7 @@ internal class ModifyEnforcer(
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
                 val name = outputName(directory, file)
-                if (!file.isFile || !file.isModifiableClass()) {
+                if (!file.isModifiableClass()) {
                     output.write(name, file)
                     return@action
                 }

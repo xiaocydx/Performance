@@ -65,7 +65,7 @@ internal class CollectEnforcer(
 
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
-                if (!file.isFile || !file.isModifiableClass()) return@action
+                if (!file.isModifiableClass()) return@action
                 dispatcher.execute(tasks) {
                     val time = measureTimeMillis { collect(file.inputStream()) }
                     println("Collect from directory ${outputName(directory, file)} ${time}ms")

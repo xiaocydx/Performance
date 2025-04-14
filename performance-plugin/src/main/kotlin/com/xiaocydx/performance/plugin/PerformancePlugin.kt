@@ -41,7 +41,7 @@ internal class PerformancePlugin : Plugin<Project> {
                 PerformanceHistoryTask::class.java
             )
             variant.artifacts
-                .forScope(ScopedArtifacts.Scope.PROJECT)
+                .forScope(ScopedArtifacts.Scope.ALL)
                 .use(taskProvider)
                 .toTransform(
                     type = ScopedArtifact.CLASSES,

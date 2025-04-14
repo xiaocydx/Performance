@@ -45,7 +45,7 @@ internal class OutputEnforcer(
     }
 
     fun write(name: String, file: File) {
-        if (!file.isFile) return
+        if (!file.isWritableClass()) return
         dispatcher.execute(tasks) {
             jarOutput.putNextEntry(JarEntry(name))
             file.inputStream().use { it.copyTo(jarOutput) }
@@ -54,6 +54,7 @@ internal class OutputEnforcer(
     }
 
     fun write(jarFile: JarFile, jarEntry: JarEntry) {
+        if (!jarEntry.isWritableClass()) return
         dispatcher.execute(tasks) {
             jarOutput.putNextEntry(JarEntry(jarEntry.name))
             jarFile.getInputStream(jarEntry).use { it.copyTo(jarOutput) }

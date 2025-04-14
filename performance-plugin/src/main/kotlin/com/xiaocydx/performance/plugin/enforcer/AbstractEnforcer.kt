@@ -35,6 +35,7 @@ import java.util.jar.JarEntry
 internal abstract class AbstractEnforcer {
 
     protected fun File.isModifiableClass(): Boolean {
+        if (!isFile) return false
         val name = name ?: ""
         if (!name.endsWith(".class")) return false
         UN_NEED_CLASS.forEach { if (name.contains(it)) return false }
@@ -42,10 +43,19 @@ internal abstract class AbstractEnforcer {
     }
 
     protected fun JarEntry.isModifiableClass(): Boolean {
+        if (isDirectory) return false
         val name = name ?: ""
         if (!name.endsWith(".class")) return false
         UN_NEED_CLASS.forEach { if (name.contains(it)) return false }
         return true
+    }
+
+    protected fun File.isWritableClass(): Boolean {
+        return isFile
+    }
+
+    protected fun JarEntry.isWritableClass(): Boolean {
+        return name.endsWith(".class") && !name.contains(MODULE_INFO_CLASS)
     }
 
     protected fun ClassVisitor.isModifiableClass(access: Int): Boolean {
@@ -99,7 +109,8 @@ internal abstract class AbstractEnforcer {
     }
 
     protected companion object {
-        private val UN_NEED_CLASS = listOf("R.class", "R$", "Manifest", "BuildConfig")
+        private const val MODULE_INFO_CLASS = "module-info.class"
+        private val UN_NEED_CLASS = listOf(MODULE_INFO_CLASS, "R.class", "R$", "Manifest", "BuildConfig")
         const val ASM_API = Opcodes.ASM9
     }
 }
