@@ -24,9 +24,10 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
-import org.objectweb.asm.Opcodes
 import org.objectweb.asm.commons.AdviceAdapter
-import java.io.File
+import java.io.InputStream
+import java.util.jar.JarFile
+import kotlin.system.measureTimeMillis
 
 /**
  * @author xcc
@@ -42,47 +43,63 @@ internal class ModifyEnforcer(
         directories: ListProperty<Directory>,
         collectResult: CollectResult,
     ) {
-        output.write(inputJars)
+        val tasks = TaskCountDownLatch()
 
-        val taskCount = TaskCountDownLatch()
-        directories.get().forEach { directory ->
-            println("handling " + directory.asFile.absolutePath)
-            directory.asFile.walk().forEach action@{ file ->
-                if (!file.isNeedClassFile()) return@action
-                val name = name(relativePath(directory, file))
-                println("Adding from directory $name")
-                taskCount.increment()
-                dispatcher.execute {
-                    val bytes = file.inputStream().use {
-                        val classReader = ClassReader(it)
-                        val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
-                        val classVisitor = ModifyClassVisitor(ASM_API, classWriter, collectResult)
-                        classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES)
-                        classWriter.toByteArray()
+        inputJars.get().forEach { jar ->
+            dispatcher.execute(tasks) {
+                val jarFile = JarFile(jar.asFile)
+                jarFile.entries().iterator().forEach action@{ entry ->
+                    if (!entry.isModifiableClass()) {
+                        output.write(jarFile, entry)
+                        return@action
                     }
-                    output.write(name, bytes)
-                    taskCount.decrement()
+                    val time = measureTimeMillis {
+                        val bytes = modify(jarFile.getInputStream(entry), collectResult)
+                        output.write(entry.name, bytes)
+                    }
+                    println("Modify from jar ${entry.name} ${time}ms")
+                }
+                output.close(jarFile)
+            }
+        }
+
+        directories.get().forEach { directory ->
+            directory.asFile.walk().forEach action@{ file ->
+                val name = outputName(directory, file)
+                if (!file.isFile || !file.isModifiableClass()) {
+                    output.write(name, file)
+                    return@action
+                }
+                dispatcher.execute(tasks) {
+                    val time = measureTimeMillis {
+                        val bytes = modify(file.inputStream(), collectResult)
+                        output.write(name, bytes)
+                    }
+                    println("Modify from directory $name ${time}ms")
                 }
             }
         }
-        taskCount.await()
+
+        tasks.await()
     }
 
-    private fun relativePath(directory: Directory, file: File): String {
-        return directory.asFile.toURI().relativize(file.toURI()).path
+    private fun modify(inputStream: InputStream, collectResult: CollectResult): ByteArray {
+        return inputStream.use {
+            val classReader = ClassReader(it)
+            val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
+            val classVisitor = ModifyClassVisitor(ASM_API, classWriter, collectResult)
+            classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES)
+            classWriter.toByteArray()
+        }
     }
 
-    private fun name(relativePath: String): String {
-        return relativePath.replace(File.separatorChar, '/')
-    }
-
-    private class ModifyClassVisitor(
+    private inner class ModifyClassVisitor(
         api: Int,
         classVisitor: ClassVisitor,
         private val collectResult: CollectResult,
     ) : ClassVisitor(api, classVisitor) {
         private var className = ""
-        private var isSkip = false
+        private var isModifiable = false
 
         override fun visit(
             version: Int,
@@ -93,9 +110,8 @@ internal class ModifyEnforcer(
             interfaces: Array<out String>?,
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
-            // TODO: 跟collect统一跳过Class的条件
             className = name ?: ""
-            isSkip = access and Opcodes.ACC_INTERFACE != 0 || access and Opcodes.ACC_ABSTRACT != 0
+            isModifiable = isModifiableClass(access)
         }
 
         override fun visitMethod(
@@ -108,13 +124,13 @@ internal class ModifyEnforcer(
             val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
             val methodInfo = collectResult.handled[MethodInfo.key(className, name)]
             return when {
-                isSkip || methodInfo == null -> methodVisitor
+                !isModifiable || methodInfo == null -> methodVisitor
                 else -> ModifyMethodVisitor(api, methodVisitor, access, name, descriptor, methodInfo)
             }
         }
     }
 
-    internal class ModifyMethodVisitor(
+    private inner class ModifyMethodVisitor(
         api: Int,
         methodVisitor: MethodVisitor?,
         access: Int,
@@ -132,12 +148,12 @@ internal class ModifyEnforcer(
             mv.visitLdcInsn(methodInfo.id)
             mv.visitMethodInsn(INVOKESTATIC, HISTORY, EXIT, DESCRIPTOR, false)
         }
+    }
 
-        private companion object {
-            const val HISTORY = "com/xiaocydx/performance/runtime/history/History"
-            const val ENTER = "enter"
-            const val EXIT = "exit"
-            const val DESCRIPTOR = "(I)V"
-        }
+    private companion object {
+        const val HISTORY = "com/xiaocydx/performance/runtime/history/History"
+        const val ENTER = "enter"
+        const val EXIT = "exit"
+        const val DESCRIPTOR = "(I)V"
     }
 }

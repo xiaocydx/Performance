@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
-@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+@file:Suppress("UnusedReceiverParameter", "PLATFORM_CLASS_MAPPED_TO_KOTLIN")
 
 package com.xiaocydx.performance.plugin.enforcer
 
+import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.enforcer.MethodInfo.Companion.INITIAL_ID
-import groovyjarjarasm.asm.Opcodes
+import org.gradle.api.file.Directory
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.Opcodes
 import java.io.File
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.jar.JarEntry
 
 /**
  * @author xcc
@@ -30,12 +34,41 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal abstract class AbstractEnforcer {
 
-    protected fun File.isNeedClassFile(): Boolean {
-        if (!isFile) return false
+    protected fun File.isModifiableClass(): Boolean {
         val name = name ?: ""
         if (!name.endsWith(".class")) return false
         UN_NEED_CLASS.forEach { if (name.contains(it)) return false }
         return true
+    }
+
+    protected fun JarEntry.isModifiableClass(): Boolean {
+        val name = name ?: ""
+        if (!name.endsWith(".class")) return false
+        UN_NEED_CLASS.forEach { if (name.contains(it)) return false }
+        return true
+    }
+
+    protected fun ClassVisitor.isModifiableClass(access: Int): Boolean {
+        return access and Opcodes.ACC_INTERFACE == 0 && access and Opcodes.ACC_ABSTRACT == 0
+    }
+
+    protected fun outputName(directory: Directory, file: File): String {
+        return relativePath(directory, file).replace(File.separatorChar, '/')
+    }
+
+    protected fun relativePath(directory: Directory, file: File): String {
+        return directory.asFile.toURI().relativize(file.toURI()).path
+    }
+
+    protected inline fun Dispatcher.execute(
+        tasks: TaskCountDownLatch,
+        crossinline task: () -> Unit,
+    ) {
+        tasks.increment()
+        execute {
+            task()
+            tasks.decrement()
+        }
     }
 
     protected class TaskCountDownLatch {
@@ -65,12 +98,11 @@ internal abstract class AbstractEnforcer {
         }
     }
 
-    private companion object {
-        val UN_NEED_CLASS = arrayOf("R.class", "R$", "Manifest", "BuildConfig")
+    protected companion object {
+        private val UN_NEED_CLASS = arrayOf("R.class", "R$", "Manifest", "BuildConfig")
+        const val ASM_API = Opcodes.ASM9
     }
 }
-
-internal const val ASM_API = Opcodes.ASM9
 
 internal fun <R> Future<R>.await() = get()
 

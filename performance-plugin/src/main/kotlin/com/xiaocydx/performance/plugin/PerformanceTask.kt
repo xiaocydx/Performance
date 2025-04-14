@@ -16,7 +16,9 @@
 
 package com.xiaocydx.performance.plugin
 
-import com.xiaocydx.performance.plugin.dispatcher.NopDispatcher
+import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
+import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
+import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import com.xiaocydx.performance.plugin.enforcer.CollectEnforcer
 import com.xiaocydx.performance.plugin.enforcer.IdGenerator
 import com.xiaocydx.performance.plugin.enforcer.MappingEnforcer
@@ -49,8 +51,16 @@ internal abstract class PerformanceTask : DefaultTask() {
 
     @TaskAction
     fun taskAction() {
-        val consumerDispatcher = NopDispatcher
-        val producerDispatcher = NopDispatcher
+        val isNop = true
+        val producerDispatcher: Dispatcher
+        val consumerDispatcher: SerialDispatcher
+        if (isNop) {
+            producerDispatcher = SerialDispatcher.nop()
+            consumerDispatcher = SerialDispatcher.nop()
+        } else {
+            producerDispatcher = ExecutorDispatcher(threads = 16)
+            consumerDispatcher = SerialDispatcher.single()
+        }
 
         // Step1: ReadMapping
         var startTime = System.currentTimeMillis()

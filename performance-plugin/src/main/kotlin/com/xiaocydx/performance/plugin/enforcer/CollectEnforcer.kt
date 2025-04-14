@@ -27,7 +27,10 @@ import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.MethodNode
+import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.jar.JarFile
+import kotlin.system.measureTimeMillis
 
 /**
  * @author xcc
@@ -44,25 +47,41 @@ internal class CollectEnforcer(
         inputJars: ListProperty<RegularFile>,
         directories: ListProperty<Directory>,
     ): CollectResult {
-        // TODO: 对Jar解包，遍历，通过ASM判断是否处理
-        val taskCount = TaskCountDownLatch()
+        val tasks = TaskCountDownLatch()
+
+        inputJars.get().forEach { jar ->
+            dispatcher.execute(tasks) {
+                val jarFile = JarFile(jar.asFile)
+                jarFile.entries().iterator().forEach action@{ entry ->
+                    if (!entry.isModifiableClass()) return@action
+                    val time = measureTimeMillis { collect(jarFile.getInputStream(entry)) }
+                    println("Collect from jar ${entry.name} ${time}ms")
+                }
+                jarFile.close()
+            }
+        }
+
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
-                if (!file.isNeedClassFile()) return@action
-                taskCount.increment()
-                dispatcher.execute {
-                    file.inputStream().use {
-                        val classReader = ClassReader(it)
-                        val classWriter = ClassWriter(ClassWriter.COMPUTE_MAXS)
-                        val classVisitor = CollectClassVisitor(ASM_API, classWriter)
-                        classReader.accept(classVisitor, 0)
-                    }
-                    taskCount.decrement()
+                if (!file.isFile || !file.isModifiableClass()) return@action
+                dispatcher.execute(tasks) {
+                    val time = measureTimeMillis { collect(file.inputStream()) }
+                    println("Collect from directory ${outputName(directory, file)} ${time}ms")
                 }
             }
         }
-        taskCount.await()
+
+        tasks.await()
         return CollectResult(ignored, handled)
+    }
+
+    private fun collect(inputStream: InputStream) {
+        inputStream.use {
+            val classReader = ClassReader(it)
+            val classWriter = ClassWriter(ClassWriter.COMPUTE_MAXS)
+            val classVisitor = CollectClassVisitor(ASM_API, classWriter)
+            classReader.accept(classVisitor, 0)
+        }
     }
 
     private inner class CollectClassVisitor(
@@ -70,7 +89,7 @@ internal class CollectEnforcer(
         classVisitor: ClassVisitor,
     ) : ClassVisitor(api, classVisitor) {
         private var className = ""
-        private var isSkip = false
+        private var isModifiable = false
 
         override fun visit(
             version: Int,
@@ -80,9 +99,8 @@ internal class CollectEnforcer(
             interfaces: Array<out String>?,
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
-            // TODO: 跟Modify统一跳过Class的条件
             className = name ?: ""
-            isSkip = access and Opcodes.ACC_INTERFACE != 0 || access and Opcodes.ACC_ABSTRACT != 0
+            isModifiable = isModifiableClass(access)
         }
 
         override fun visitMethod(
@@ -91,7 +109,7 @@ internal class CollectEnforcer(
             descriptor: String?,
             signature: String?,
             exceptions: Array<out String>?,
-        ): MethodVisitor = if (isSkip) {
+        ): MethodVisitor = if (!isModifiable) {
             super.visitMethod(access, name, descriptor, signature, exceptions)
         } else {
             CollectMethodNode(ASM_API, access, name, descriptor, signature, exceptions, className)

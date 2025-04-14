@@ -24,7 +24,16 @@ import java.util.concurrent.FutureTask
  * @author xcc
  * @date 2025/4/13
  */
-internal object NopDispatcher : Dispatcher {
+internal interface SerialDispatcher : Dispatcher {
+
+    companion object {
+        fun nop(): SerialDispatcher = NopDispatcher()
+        fun single(): SerialDispatcher = SingleDispatcher()
+        fun sync(): SerialDispatcher = SyncDispatcher()
+    }
+}
+
+private class NopDispatcher : SerialDispatcher {
 
     override fun execute(task: Runnable) {
         task.run()
@@ -33,6 +42,37 @@ internal object NopDispatcher : Dispatcher {
     override fun <R> submit(task: Callable<R>): Future<R> {
         val future = FutureTask(task)
         future.run()
+        return future
+    }
+
+    override fun shutdownNow() = Unit
+}
+
+private class SingleDispatcher : SerialDispatcher {
+    private val delegate = ExecutorDispatcher(threads = 1)
+
+    override fun execute(task: Runnable) {
+        delegate.execute(task)
+    }
+
+    override fun <R> submit(task: Callable<R>): Future<R> {
+        return delegate.submit(task)
+    }
+
+    override fun shutdownNow() {
+        delegate.shutdownNow()
+    }
+}
+
+private class SyncDispatcher : SerialDispatcher {
+
+    override fun execute(task: Runnable) {
+        synchronized(this) { task.run() }
+    }
+
+    override fun <R> submit(task: Callable<R>): Future<R> {
+        val future = FutureTask(task)
+        synchronized(this) { future.run() }
         return future
     }
 

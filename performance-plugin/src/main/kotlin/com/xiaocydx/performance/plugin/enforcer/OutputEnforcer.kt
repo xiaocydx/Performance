@@ -18,10 +18,9 @@
 
 package com.xiaocydx.performance.plugin.enforcer
 
-import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
-import org.gradle.api.file.RegularFile
+import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.provider.ListProperty
+import java.io.File
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -31,44 +30,43 @@ import java.util.jar.JarOutputStream
  * @date 2025/4/13
  */
 internal class OutputEnforcer(
-    private val dispatcher: Dispatcher,
+    private val dispatcher: SerialDispatcher,
     private val output: RegularFileProperty,
 ) : AbstractEnforcer() {
     private val jarOutput = JarOutputStream(output.get().asFile.outputStream().buffered())
-    private val taskCount = TaskCountDownLatch()
+    private val tasks = TaskCountDownLatch()
 
     fun write(name: String, bytes: ByteArray) {
-        taskCount.increment()
-        dispatcher.execute {
+        dispatcher.execute(tasks) {
             jarOutput.putNextEntry(JarEntry(name))
             jarOutput.write(bytes)
             jarOutput.closeEntry()
-            taskCount.decrement()
         }
     }
 
-    fun write(inputJars: ListProperty<RegularFile>) {
-        taskCount.increment()
-        dispatcher.execute {
-            inputJars.get().forEach { file ->
-                println("handling " + file.asFile.absolutePath)
-                val jarFile = JarFile(file.asFile)
-                jarFile.entries().iterator().forEach { jarEntry ->
-                    println("Adding from jar ${jarEntry.name}")
-                    jarOutput.putNextEntry(JarEntry(jarEntry.name))
-                    jarFile.getInputStream(jarEntry).use {
-                        it.copyTo(jarOutput)
-                    }
-                    jarOutput.closeEntry()
-                }
-                jarFile.close()
-            }
-            taskCount.decrement()
+    fun write(name: String, file: File) {
+        if (!file.isFile) return
+        dispatcher.execute(tasks) {
+            jarOutput.putNextEntry(JarEntry(name))
+            file.inputStream().use { it.copyTo(jarOutput) }
+            jarOutput.closeEntry()
         }
+    }
+
+    fun write(jarFile: JarFile, jarEntry: JarEntry) {
+        dispatcher.execute(tasks) {
+            jarOutput.putNextEntry(JarEntry(jarEntry.name))
+            jarFile.getInputStream(jarEntry).use { it.copyTo(jarOutput) }
+            jarOutput.closeEntry()
+        }
+    }
+
+    fun close(jarFile: JarFile) {
+        dispatcher.execute(tasks) { jarFile.close() }
     }
 
     fun await() {
-        taskCount.await()
+        tasks.await()
         jarOutput.close()
     }
 }
