@@ -9,5 +9,5 @@ java {
 }
 
 dependencies {
-    implementation(project(":performance-stub"))
+    compileOnly(project(":performance-stub"))
 }
