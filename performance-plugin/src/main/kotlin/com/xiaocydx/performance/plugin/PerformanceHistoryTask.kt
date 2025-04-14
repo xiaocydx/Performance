@@ -67,6 +67,7 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
         var startTime = System.currentTimeMillis()
         val mappingEnforcer = MappingEnforcer(
             dispatcher = producerDispatcher,
+            keepMethodFile = historyExt.keepMethodFile,
             ignoredMethodFile = historyExt.ignoredMethodFile.ifEmpty {
                 "${project.rootDir}/outputs/ignoredMethodMapping.text"
             },
@@ -74,14 +75,12 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
                 "${project.rootDir}/outputs/handledMethodMapping.text"
             }
         )
-        // TODO: 实现增量才需要read
-        // mappingEnforcer.submitRead()
-        val idGenerator = IdGenerator()
+        val readResult = mappingEnforcer.read()
         printTime(startTime, step = "ReadMapping")
 
         // Step2: CollectMethod
         startTime = System.currentTimeMillis()
-        val collectEnforcer = CollectEnforcer(producerDispatcher, idGenerator)
+        val collectEnforcer = CollectEnforcer(producerDispatcher, readResult)
         val collectResult = collectEnforcer.await(inputJars, inputDirectories)
         printTime(startTime, step = "CollectMethod")
 

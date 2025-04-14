@@ -99,7 +99,7 @@ internal abstract class AbstractEnforcer {
     }
 
     protected companion object {
-        private val UN_NEED_CLASS = arrayOf("R.class", "R$", "Manifest", "BuildConfig")
+        private val UN_NEED_CLASS = listOf("R.class", "R$", "Manifest", "BuildConfig")
         const val ASM_API = Opcodes.ASM9
     }
 }

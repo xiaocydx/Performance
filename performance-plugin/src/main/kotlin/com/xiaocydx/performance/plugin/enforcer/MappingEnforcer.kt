@@ -26,22 +26,26 @@ import java.util.concurrent.Future
  */
 internal class MappingEnforcer(
     private val dispatcher: Dispatcher,
+    keepMethodFile: String,
     ignoredMethodFile: String,
     handledMethodFile: String,
 ) : AbstractEnforcer() {
     private val charset = MethodInfo.charset
+    private val keepMethodFile = File(keepMethodFile)
     private val ignoredMethodFile = File(ignoredMethodFile)
     private val handledMethodFile = File(handledMethodFile)
 
-    fun submitRead(): Future<MappingResult.Read> {
-        return dispatcher.submit {
-            val previousHandled = read(handledMethodFile)
-            val idGenerator = when {
-                previousHandled.isEmpty() -> IdGenerator()
-                else -> IdGenerator(initial = previousHandled.maxOf { it.id })
-            }
-            MappingResult.Read(idGenerator, previousHandled)
-        }
+    fun read(): MappingResult.Read {
+        val keepChecker = readKeep(keepMethodFile)
+        // TODO: 实现增量才需要previousHandled
+        // val previousHandled = readMapping(handledMethodFile)
+        // val idGenerator = when {
+        //     previousHandled.isEmpty() -> IdGenerator()
+        //     else -> IdGenerator(initial = previousHandled.maxOf { it.id })
+        // }
+        val previousHandled = emptyList<MethodInfo>()
+        val idGenerator = IdGenerator()
+        return MappingResult.Read(idGenerator, keepChecker, previousHandled)
     }
 
     fun submitWrite(result: CollectResult): Future<MappingResult.Write> {
@@ -49,13 +53,34 @@ internal class MappingEnforcer(
             val ignored = result.ignored.values.toList()
             val handled = result.handled.values.toMutableList()
             handled.sortBy { it.id }
-            write(ignoredMethodFile, ignored)
-            write(handledMethodFile, handled)
+            writeMapping(ignoredMethodFile, ignored)
+            writeMapping(handledMethodFile, handled)
             MappingResult.Write(ignored, handled)
         }
     }
 
-    private fun read(file: File): List<MethodInfo> {
+    private fun readKeep(file: File): KeepChecker {
+        val classSet = mutableSetOf<String>()
+        val packageSet = mutableSetOf<String>()
+        packageSet.addAll(DEFAULT_KEEP_PACKAGE)
+        if (file.exists()) {
+            file.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    when {
+                        line.startsWith(KEEP_CLASS_PREFIX) -> {
+                            classSet.add(line.replace(KEEP_CLASS_PREFIX, ""))
+                        }
+                        line.startsWith(KEEP_PACKAGE_PREFIX) -> {
+                            packageSet.add(line.replace(KEEP_PACKAGE_PREFIX, ""))
+                        }
+                    }
+                }
+            }
+        }
+        return KeepChecker(classSet, packageSet)
+    }
+
+    private fun readMapping(file: File): List<MethodInfo> {
         if (!file.exists()) return emptyList()
         val outcome = file.bufferedReader(charset).useLines { lines ->
             lines.map { MethodInfo.fromOutput(it) }.toList()
@@ -63,17 +88,24 @@ internal class MappingEnforcer(
         return outcome
     }
 
-    private fun write(file: File, list: List<MethodInfo>) {
+    private fun writeMapping(file: File, list: List<MethodInfo>) {
         file.parentFile.takeIf { !it.exists() }?.mkdirs()
         file.printWriter(charset).use { writer ->
             list.forEach { writer.println(it.toOutput()) }
         }
+    }
+
+    private companion object {
+        const val KEEP_CLASS_PREFIX = "-keepclass "
+        const val KEEP_PACKAGE_PREFIX = "-keeppackage "
+        val DEFAULT_KEEP_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
     }
 }
 
 internal sealed class MappingResult {
     data class Read(
         val idGenerator: IdGenerator,
+        val keepChecker: KeepChecker,
         val previousHandled: List<MethodInfo>,
     ) : MappingResult()
 
@@ -81,4 +113,19 @@ internal sealed class MappingResult {
         val currentIgnored: List<MethodInfo>,
         val currentHandled: List<MethodInfo>,
     ) : MappingResult()
+}
+
+internal class KeepChecker(
+    private val classSet: Set<String>,
+    private val packageSet: Set<String>,
+) {
+
+    fun isKeepClass(className: String): Boolean {
+        if (classSet.contains(className)) return true
+        val last = className.lastIndexOf('/')
+        val end = (last + 1).coerceAtMost(className.length)
+        val packageName = className.substring(0, end)
+        packageSet.forEach { if (packageName.startsWith(it)) return true }
+        return false
+    }
 }

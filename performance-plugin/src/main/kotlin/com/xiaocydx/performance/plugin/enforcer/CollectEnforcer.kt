@@ -38,10 +38,12 @@ import kotlin.system.measureTimeMillis
  */
 internal class CollectEnforcer(
     private val dispatcher: Dispatcher,
-    private val idGenerator: IdGenerator,
+    readResult: MappingResult.Read,
 ) : AbstractEnforcer() {
     private val ignored = ConcurrentHashMap<String, MethodInfo>()
     private val handled = ConcurrentHashMap<String, MethodInfo>()
+    private val idGenerator = readResult.idGenerator
+    private val keepChecker = readResult.keepChecker
 
     fun await(
         inputJars: ListProperty<RegularFile>,
@@ -129,9 +131,9 @@ internal class CollectEnforcer(
         override fun visitEnd() {
             super.visitEnd()
             val methodKey = MethodInfo.key(className, name)
-            // TODO: 替换为过滤条件
-            val isTestClass = className.endsWith("PerformanceTest")
-            if (!isTestClass || isEmptyMethod() || isGetSetMethod() || isSingleMethod()) {
+            if (isEmptyMethod()
+                    || isGetSetMethod() || isSingleMethod()
+                    || keepChecker.isKeepClass(className)) {
                 ignored[methodKey] = MethodInfo(
                     id = INITIAL_ID, access = access,
                     className = className, methodName = name
