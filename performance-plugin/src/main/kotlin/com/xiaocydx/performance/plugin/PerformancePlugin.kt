@@ -37,7 +37,7 @@ internal class PerformancePlugin : Plugin<Project> {
             if (!historyExt.isEnabled) return@onVariants
 
             val taskProvider = project.tasks.register(
-                "${variant.name}Performance",
+                "${variant.name}PerformanceHistory",
                 PerformanceHistoryTask::class.java
             )
             variant.artifacts

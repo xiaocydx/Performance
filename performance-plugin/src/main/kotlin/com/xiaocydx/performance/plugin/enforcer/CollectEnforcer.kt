@@ -95,20 +95,21 @@ internal class CollectEnforcer(
 
         override fun visit(
             version: Int,
-            access: Int, name: String?,
+            access: Int,
+            name: String,
             signature: String?,
             superName: String?,
             interfaces: Array<out String>?,
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
-            className = name ?: ""
+            className = name
             isModifiable = isModifiableClass(access)
         }
 
         override fun visitMethod(
             access: Int,
-            name: String?,
-            descriptor: String?,
+            name: String,
+            descriptor: String,
             signature: String?,
             exceptions: Array<out String>?,
         ): MethodVisitor = if (!isModifiable) {
@@ -121,8 +122,8 @@ internal class CollectEnforcer(
     private inner class CollectMethodNode(
         api: Int,
         access: Int,
-        name: String?,
-        descriptor: String?,
+        name: String,
+        descriptor: String,
         signature: String?,
         exceptions: Array<out String>?,
         private val className: String,
@@ -130,18 +131,18 @@ internal class CollectEnforcer(
 
         override fun visitEnd() {
             super.visitEnd()
-            val methodKey = MethodInfo.key(className, name)
+            val methodKey = MethodInfo.key(className, name, desc)
             if (isEmptyMethod()
                     || isGetSetMethod() || isSingleMethod()
                     || keepChecker.isKeepClass(className)) {
                 ignored[methodKey] = MethodInfo(
                     id = INITIAL_ID, access = access,
-                    className = className, methodName = name
+                    className = className, methodName = name, desc = desc
                 )
             } else {
                 handled[methodKey] = MethodInfo(
                     id = idGenerator.generate(), access = access,
-                    className = className, methodName = name
+                    className = className, methodName = name, desc = desc
                 )
             }
         }

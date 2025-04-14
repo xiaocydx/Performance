@@ -104,25 +104,25 @@ internal class ModifyEnforcer(
         override fun visit(
             version: Int,
             access: Int,
-            name: String?,
+            name: String,
             signature: String?,
             superName: String?,
             interfaces: Array<out String>?,
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
-            className = name ?: ""
+            className = name
             isModifiable = isModifiableClass(access)
         }
 
         override fun visitMethod(
             access: Int,
             name: String,
-            descriptor: String?,
+            descriptor: String,
             signature: String?,
             exceptions: Array<out String>?,
         ): MethodVisitor {
             val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
-            val methodInfo = collectResult.handled[MethodInfo.key(className, name)]
+            val methodInfo = collectResult.handled[MethodInfo.key(className, name, descriptor)]
             return when {
                 !isModifiable || methodInfo == null -> methodVisitor
                 else -> ModifyMethodVisitor(api, methodVisitor, access, name, descriptor, methodInfo)

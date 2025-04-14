@@ -111,14 +111,16 @@ internal data class MethodInfo(
     val access: Int,
     val className: String,
     val methodName: String,
+    val desc: String,
 ) {
 
     fun toKey(): String {
-        return key(className, methodName)
+        return key(className, methodName, desc)
     }
 
     fun toOutput(): String {
-        return "${id}${DELIMITER}${access}${DELIMITER}${className}${DELIMITER}$methodName"
+        return "${id}${DELIMITER}${access}${DELIMITER}" +
+                "${className}${DELIMITER}$methodName${DELIMITER}${desc}"
     }
 
     companion object {
@@ -126,8 +128,8 @@ internal data class MethodInfo(
         const val INITIAL_ID = 0
         val charset = Charsets.UTF_8
 
-        fun key(className: String, methodName: String): String {
-            return "${className}.$methodName"
+        fun key(className: String, methodName: String, desc: String): String {
+            return "${className}${DELIMITER}${methodName}${DELIMITER}$desc"
         }
 
         fun fromOutput(output: String): MethodInfo {
@@ -136,7 +138,8 @@ internal data class MethodInfo(
             val access = property[1].toInt()
             val className = property[2]
             val name = property[3]
-            return MethodInfo(id, access, className, name)
+            val desc = property[4]
+            return MethodInfo(id, access, className, name, desc)
         }
     }
 }
