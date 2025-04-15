@@ -50,54 +50,49 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
 
     @TaskAction
     fun taskAction() {
-        val historyExt = PerformanceExtension.getHistory(project)
+        val ext = PerformanceExtension.getHistory(project)
         val isNop = true
-        val producerDispatcher: Dispatcher
-        val consumerDispatcher: SerialDispatcher
+        val producer: Dispatcher
+        val consumer: SerialDispatcher
         if (isNop) {
-            producerDispatcher = SerialDispatcher.nop()
-            consumerDispatcher = SerialDispatcher.nop()
+            producer = SerialDispatcher.nop()
+            consumer = SerialDispatcher.nop()
         } else {
-            producerDispatcher = ExecutorDispatcher(threads = 16)
-            consumerDispatcher = SerialDispatcher.single()
+            producer = ExecutorDispatcher(threads = 16)
+            consumer = SerialDispatcher.single()
         }
 
         // Step1: ReadMapping
         var startTime = System.currentTimeMillis()
+        val rootDir = project.rootDir.absolutePath
         val mappingEnforcer = MappingEnforcer(
-            dispatcher = producerDispatcher,
-            keepMethodFile = historyExt.keepMethodFile,
-            ignoredClassFile = historyExt.ignoredClassFile.ifEmpty {
-                "${project.rootDir}/outputs/ignoredClassList.text"
-            },
-            ignoredMethodFile = historyExt.ignoredMethodFile.ifEmpty {
-                "${project.rootDir}/outputs/ignoredMethodList.text"
-            },
-            mappingMethodFile = historyExt.mappingMethodFile.ifEmpty {
-                "${project.rootDir}/outputs/mappingMethodList.text"
-            }
+            dispatcher = producer,
+            keepMethodFile = ext.keepMethodFile,
+            ignoredClassFile = ext.ignoredClassFile.ifEmpty { "${rootDir}/outputs/ignoredClassList.text" },
+            ignoredMethodFile = ext.ignoredMethodFile.ifEmpty { "${rootDir}/outputs/ignoredMethodList.text" },
+            mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${rootDir}/outputs/mappingMethodList.text" }
         )
         val (inspector, idGenerator, _) = mappingEnforcer.read()
         printTime(startTime, step = "ReadMapping")
 
         // Step2: CollectMethod
         startTime = System.currentTimeMillis()
-        val collectEnforcer = CollectEnforcer(producerDispatcher, idGenerator, inspector)
+        val collectEnforcer = CollectEnforcer(producer, idGenerator, inspector)
         val collectResult = collectEnforcer.await(inputJars, inputDirectories)
         printTime(startTime, step = "CollectMethod")
 
         // Step3: ModifyMethod
         startTime = System.currentTimeMillis()
         val writeMapping = mappingEnforcer.submitWrite(collectResult)
-        val outputEnforcer = OutputEnforcer(consumerDispatcher, output, inspector)
-        val modifyEnforcer = ModifyEnforcer(producerDispatcher, outputEnforcer, inspector)
+        val outputEnforcer = OutputEnforcer(consumer, output, inspector)
+        val modifyEnforcer = ModifyEnforcer(producer, outputEnforcer, inspector, ext.isTraceEnabled)
         modifyEnforcer.await(inputJars, inputDirectories, collectResult)
         outputEnforcer.await()
         writeMapping.await()
         printTime(startTime, step = "ModifyMethod")
 
-        consumerDispatcher.shutdownNow()
-        producerDispatcher.shutdownNow()
+        consumer.shutdownNow()
+        producer.shutdownNow()
     }
 
     private fun printTime(startTime: Long, step: String) {

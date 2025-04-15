@@ -34,7 +34,7 @@ internal class PerformancePlugin : Plugin<Project> {
         val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidExt.onVariants { variant ->
             val historyExt = PerformanceExtension.getHistory(project)
-            if (!historyExt.isEnabled) return@onVariants
+            if (!historyExt.isTraceEnabled && !historyExt.isRecordEnabled) return@onVariants
 
             val taskProvider = project.tasks.register(
                 "${variant.name}PerformanceHistory",

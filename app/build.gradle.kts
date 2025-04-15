@@ -48,7 +48,8 @@ dependencies {
 performance {
     history {
         val dir = project(":performance-convert").projectDir
-        isEnabled = true
+        isTraceEnabled = true
+        isRecordEnabled = true
         keepMethodFile = "${dir}/inputs/keepMethodList.text"
         ignoredClassFile = "${dir}/outputs/ignored/ignoredClassList.text"
         ignoredMethodFile = "${dir}/outputs/ignored/ignoredMethodList.text"

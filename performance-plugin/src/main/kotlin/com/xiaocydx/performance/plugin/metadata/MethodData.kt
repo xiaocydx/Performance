@@ -28,7 +28,7 @@ internal data class MethodData(
     val className: String,
     val methodName: String,
     val desc: String,
-): Metadata {
+) : Metadata {
 
     override fun toKey(): String {
         return key(className, methodName, desc)

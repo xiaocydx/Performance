@@ -39,6 +39,7 @@ internal class ModifyEnforcer(
     private val dispatcher: Dispatcher,
     private val output: OutputEnforcer,
     private val inspector: Inspector,
+    private val isTraceEnabled: Boolean,
 ) : AbstractEnforcer() {
 
     fun await(
@@ -144,22 +145,36 @@ internal class ModifyEnforcer(
         descriptor: String?,
         private val methodData: MethodData,
     ) : AdviceAdapter(ASM_API, methodVisitor, access, name, descriptor) {
+        private val prettyName: String
+
+        init {
+            if (isTraceEnabled) {
+                val className = methodData.className.replace("/", ".")
+                prettyName = "${className}.${methodData.methodName}"
+            } else {
+                prettyName = ""
+            }
+        }
 
         override fun onMethodEnter() {
+            if (isTraceEnabled) {
+                mv.visitLdcInsn(prettyName)
+                mv.visitMethodInsn(INVOKESTATIC, HISTORY, "beginTrace", "(Ljava/lang/String;)V", false)
+            }
             mv.visitLdcInsn(methodData.id)
-            mv.visitMethodInsn(INVOKESTATIC, HISTORY, ENTER, DESCRIPTOR, false)
+            mv.visitMethodInsn(INVOKESTATIC, HISTORY, "enter", "(I)V", false)
         }
 
         override fun onMethodExit(opcode: Int) {
             mv.visitLdcInsn(methodData.id)
-            mv.visitMethodInsn(INVOKESTATIC, HISTORY, EXIT, DESCRIPTOR, false)
+            mv.visitMethodInsn(INVOKESTATIC, HISTORY, "exit", "(I)V", false)
+            if (isTraceEnabled) {
+                mv.visitMethodInsn(INVOKESTATIC, HISTORY, "endTrace", "()V", false)
+            }
         }
     }
 
     private companion object {
         const val HISTORY = "com/xiaocydx/performance/runtime/history/History"
-        const val ENTER = "enter"
-        const val EXIT = "exit"
-        const val DESCRIPTOR = "(I)V"
     }
 }

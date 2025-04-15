@@ -18,9 +18,15 @@ package com.xiaocydx.performance.runtime
 
 import android.os.Looper
 
+/**
+ * 便捷属性，仅在调用不频繁的函数中使用
+ */
 internal val isMainThread: Boolean
-    get() = Looper.getMainLooper().isCurrentThread
+    get() = Looper.getMainLooper().thread == Thread.currentThread()
 
+/**
+ * 便捷函数，仅在调用不频繁的函数中使用
+ */
 internal fun assertMainThread() {
     assert(isMainThread) { "只能在主线程中调用当前函数" }
 }
