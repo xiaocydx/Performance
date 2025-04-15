@@ -20,7 +20,6 @@ import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import com.xiaocydx.performance.plugin.enforcer.CollectEnforcer
-import com.xiaocydx.performance.plugin.enforcer.IdGenerator
 import com.xiaocydx.performance.plugin.enforcer.MappingEnforcer
 import com.xiaocydx.performance.plugin.enforcer.ModifyEnforcer
 import com.xiaocydx.performance.plugin.enforcer.OutputEnforcer
@@ -68,27 +67,30 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
         val mappingEnforcer = MappingEnforcer(
             dispatcher = producerDispatcher,
             keepMethodFile = historyExt.keepMethodFile,
-            ignoredMethodFile = historyExt.ignoredMethodFile.ifEmpty {
-                "${project.rootDir}/outputs/ignoredMethodMapping.text"
+            ignoredClassFile = historyExt.ignoredClassFile.ifEmpty {
+                "${project.rootDir}/outputs/ignoredClassList.text"
             },
-            handledMethodFile = historyExt.handledMethodFile.ifEmpty {
-                "${project.rootDir}/outputs/handledMethodMapping.text"
+            ignoredMethodFile = historyExt.ignoredMethodFile.ifEmpty {
+                "${project.rootDir}/outputs/ignoredMethodList.text"
+            },
+            mappingMethodFile = historyExt.mappingMethodFile.ifEmpty {
+                "${project.rootDir}/outputs/mappingMethodList.text"
             }
         )
-        val readResult = mappingEnforcer.read()
+        val (inspector, idGenerator, _) = mappingEnforcer.read()
         printTime(startTime, step = "ReadMapping")
 
         // Step2: CollectMethod
         startTime = System.currentTimeMillis()
-        val collectEnforcer = CollectEnforcer(producerDispatcher, readResult)
+        val collectEnforcer = CollectEnforcer(producerDispatcher, idGenerator, inspector)
         val collectResult = collectEnforcer.await(inputJars, inputDirectories)
         printTime(startTime, step = "CollectMethod")
 
         // Step3: ModifyMethod
         startTime = System.currentTimeMillis()
         val writeMapping = mappingEnforcer.submitWrite(collectResult)
-        val outputEnforcer = OutputEnforcer(consumerDispatcher, output)
-        val modifyEnforcer = ModifyEnforcer(producerDispatcher, outputEnforcer)
+        val outputEnforcer = OutputEnforcer(consumerDispatcher, output, inspector)
+        val modifyEnforcer = ModifyEnforcer(producerDispatcher, outputEnforcer, inspector)
         modifyEnforcer.await(inputJars, inputDirectories, collectResult)
         outputEnforcer.await()
         writeMapping.await()

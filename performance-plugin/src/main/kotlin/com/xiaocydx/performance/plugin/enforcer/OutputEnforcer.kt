@@ -19,6 +19,7 @@
 package com.xiaocydx.performance.plugin.enforcer
 
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
+import com.xiaocydx.performance.plugin.metadata.Inspector
 import org.gradle.api.file.RegularFileProperty
 import java.io.File
 import java.util.jar.JarEntry
@@ -32,6 +33,7 @@ import java.util.jar.JarOutputStream
 internal class OutputEnforcer(
     private val dispatcher: SerialDispatcher,
     private val output: RegularFileProperty,
+    private val inspector: Inspector,
 ) : AbstractEnforcer() {
     private val jarOutput = JarOutputStream(output.get().asFile.outputStream().buffered())
     private val tasks = TaskCountDownLatch()
@@ -45,7 +47,7 @@ internal class OutputEnforcer(
     }
 
     fun write(name: String, file: File) {
-        if (!file.isWritableClass()) return
+        if (!inspector.isWritable(file)) return
         dispatcher.execute(tasks) {
             jarOutput.putNextEntry(JarEntry(name))
             file.inputStream().use { it.copyTo(jarOutput) }
@@ -54,7 +56,7 @@ internal class OutputEnforcer(
     }
 
     fun write(jarFile: JarFile, jarEntry: JarEntry) {
-        if (!jarEntry.isWritableClass()) return
+        if (!inspector.isWritable(jarEntry)) return
         dispatcher.execute(tasks) {
             jarOutput.putNextEntry(JarEntry(jarEntry.name))
             jarFile.getInputStream(jarEntry).use { it.copyTo(jarOutput) }

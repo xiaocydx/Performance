@@ -17,6 +17,8 @@
 package com.xiaocydx.performance.plugin.enforcer
 
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
+import com.xiaocydx.performance.plugin.metadata.Inspector
+import com.xiaocydx.performance.plugin.metadata.MethodData
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.ListProperty
@@ -36,6 +38,7 @@ import kotlin.system.measureTimeMillis
 internal class ModifyEnforcer(
     private val dispatcher: Dispatcher,
     private val output: OutputEnforcer,
+    private val inspector: Inspector,
 ) : AbstractEnforcer() {
 
     fun await(
@@ -49,15 +52,18 @@ internal class ModifyEnforcer(
             dispatcher.execute(tasks) {
                 val jarFile = JarFile(jar.asFile)
                 jarFile.entries().iterator().forEach action@{ entry ->
-                    if (!entry.isModifiableClass()) {
+                    if (!inspector.isClass(entry)) return@action
+                    val className = inspector.className(entry)
+                    val outputName = entry.name
+                    if (collectResult.isIgnoredClass(className)) {
                         output.write(jarFile, entry)
                         return@action
                     }
                     val time = measureTimeMillis {
                         val bytes = modify(jarFile.getInputStream(entry), collectResult)
-                        output.write(entry.name, bytes)
+                        output.write(outputName, bytes)
                     }
-                    println("Modify from jar ${entry.name} ${time}ms")
+                    println("Modify from jar $outputName ${time}ms")
                 }
                 output.close(jarFile)
             }
@@ -65,17 +71,19 @@ internal class ModifyEnforcer(
 
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
-                val name = outputName(directory, file)
-                if (!file.isModifiableClass()) {
-                    output.write(name, file)
+                if (!inspector.isClass(file)) return@action
+                val className = inspector.className(directory, file)
+                val outputName = inspector.outputName(directory, file)
+                if (collectResult.isIgnoredClass(className)) {
+                    output.write(outputName, file)
                     return@action
                 }
                 dispatcher.execute(tasks) {
                     val time = measureTimeMillis {
                         val bytes = modify(file.inputStream(), collectResult)
-                        output.write(name, bytes)
+                        output.write(outputName, bytes)
                     }
-                    println("Modify from directory $name ${time}ms")
+                    println("Modify from directory $outputName ${time}ms")
                 }
             }
         }
@@ -87,17 +95,16 @@ internal class ModifyEnforcer(
         return inputStream.use {
             val classReader = ClassReader(it)
             val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
-            val classVisitor = ModifyClassVisitor(ASM_API, classWriter, collectResult)
+            val classVisitor = ModifyClassVisitor(classWriter, collectResult)
             classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES)
             classWriter.toByteArray()
         }
     }
 
     private inner class ModifyClassVisitor(
-        api: Int,
         classVisitor: ClassVisitor,
         private val collectResult: CollectResult,
-    ) : ClassVisitor(api, classVisitor) {
+    ) : ClassVisitor(ASM_API, classVisitor) {
         private var className = ""
         private var isModifiable = false
 
@@ -111,7 +118,7 @@ internal class ModifyEnforcer(
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
             className = name
-            isModifiable = isModifiableClass(access)
+            isModifiable = inspector.isModifiable(access)
         }
 
         override fun visitMethod(
@@ -122,30 +129,29 @@ internal class ModifyEnforcer(
             exceptions: Array<out String>?,
         ): MethodVisitor {
             val methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
-            val methodInfo = collectResult.handled[MethodInfo.key(className, name, descriptor)]
+            val methodData = collectResult.mappingMethod[MethodData.key(className, name, descriptor)]
             return when {
-                !isModifiable || methodInfo == null -> methodVisitor
-                else -> ModifyMethodVisitor(api, methodVisitor, access, name, descriptor, methodInfo)
+                !isModifiable || methodData == null -> methodVisitor
+                else -> ModifyMethodVisitor(methodVisitor, access, name, descriptor, methodData)
             }
         }
     }
 
     private inner class ModifyMethodVisitor(
-        api: Int,
         methodVisitor: MethodVisitor?,
         access: Int,
         name: String?,
         descriptor: String?,
-        private val methodInfo: MethodInfo,
-    ) : AdviceAdapter(api, methodVisitor, access, name, descriptor) {
+        private val methodData: MethodData,
+    ) : AdviceAdapter(ASM_API, methodVisitor, access, name, descriptor) {
 
         override fun onMethodEnter() {
-            mv.visitLdcInsn(methodInfo.id)
+            mv.visitLdcInsn(methodData.id)
             mv.visitMethodInsn(INVOKESTATIC, HISTORY, ENTER, DESCRIPTOR, false)
         }
 
         override fun onMethodExit(opcode: Int) {
-            mv.visitLdcInsn(methodInfo.id)
+            mv.visitLdcInsn(methodData.id)
             mv.visitMethodInsn(INVOKESTATIC, HISTORY, EXIT, DESCRIPTOR, false)
         }
     }

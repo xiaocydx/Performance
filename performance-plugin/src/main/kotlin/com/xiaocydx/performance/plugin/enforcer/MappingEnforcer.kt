@@ -17,6 +17,11 @@
 package com.xiaocydx.performance.plugin.enforcer
 
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
+import com.xiaocydx.performance.plugin.metadata.Inspector
+import com.xiaocydx.performance.plugin.metadata.ClassData
+import com.xiaocydx.performance.plugin.metadata.IdGenerator
+import com.xiaocydx.performance.plugin.metadata.Metadata
+import com.xiaocydx.performance.plugin.metadata.MethodData
 import java.io.File
 import java.util.concurrent.Future
 
@@ -27,105 +32,66 @@ import java.util.concurrent.Future
 internal class MappingEnforcer(
     private val dispatcher: Dispatcher,
     keepMethodFile: String,
+    ignoredClassFile: String,
     ignoredMethodFile: String,
-    handledMethodFile: String,
+    mappingMethodFile: String,
 ) : AbstractEnforcer() {
-    private val charset = MethodInfo.charset
     private val keepMethodFile = File(keepMethodFile)
+    private val ignoredClassFile = File(ignoredClassFile)
     private val ignoredMethodFile = File(ignoredMethodFile)
-    private val handledMethodFile = File(handledMethodFile)
+    private val mappingMethodFile = File(mappingMethodFile)
 
     fun read(): MappingResult.Read {
-        val keepChecker = readKeep(keepMethodFile)
-        // TODO: 实现增量才需要previousHandled
-        // val previousHandled = readMapping(handledMethodFile)
+        // TODO: 实现增量才需要mappingMethod
+        // val mappingMethod = readMethod(mappingMethodFile)
         // val idGenerator = when {
-        //     previousHandled.isEmpty() -> IdGenerator()
-        //     else -> IdGenerator(initial = previousHandled.maxOf { it.id })
+        //     mappingMethod.isEmpty() -> IdGenerator()
+        //     else -> IdGenerator(initial = mappingMethod.maxOf { it.id })
         // }
-        val previousHandled = emptyList<MethodInfo>()
+        val inspector = Inspector.create(keepMethodFile)
         val idGenerator = IdGenerator()
-        return MappingResult.Read(idGenerator, keepChecker, previousHandled)
+        val mappingMethod = emptyList<MethodData>()
+        return MappingResult.Read(inspector, idGenerator, mappingMethod)
     }
 
     fun submitWrite(result: CollectResult): Future<MappingResult.Write> {
         return dispatcher.submit {
-            val ignored = result.ignored.values.toList()
-            val handled = result.handled.values.toMutableList()
-            handled.sortBy { it.id }
-            writeMapping(ignoredMethodFile, ignored)
-            writeMapping(handledMethodFile, handled)
-            MappingResult.Write(ignored, handled)
+            val ignoredClass = result.ignoredClass.values.toList()
+            val ignoredMethod = result.ignoredMethod.values.toList()
+            val mappingMethod = result.mappingMethod.values.sortedBy { it.id }
+            write(ignoredClassFile, ignoredClass)
+            write(ignoredMethodFile, ignoredMethod)
+            write(mappingMethodFile, mappingMethod)
+            MappingResult.Write(ignoredClass, ignoredMethod, mappingMethod)
         }
     }
 
-    private fun readKeep(file: File): KeepChecker {
-        val classSet = mutableSetOf<String>()
-        val packageSet = mutableSetOf<String>()
-        packageSet.addAll(DEFAULT_KEEP_PACKAGE)
-        if (file.exists()) {
-            file.bufferedReader().useLines { lines ->
-                lines.forEach { line ->
-                    when {
-                        line.startsWith(KEEP_CLASS_PREFIX) -> {
-                            classSet.add(line.replace(KEEP_CLASS_PREFIX, ""))
-                        }
-                        line.startsWith(KEEP_PACKAGE_PREFIX) -> {
-                            packageSet.add(line.replace(KEEP_PACKAGE_PREFIX, ""))
-                        }
-                    }
-                }
-            }
-        }
-        return KeepChecker(classSet, packageSet)
-    }
-
-    private fun readMapping(file: File): List<MethodInfo> {
+    private fun readMethod(file: File): List<MethodData> {
         if (!file.exists()) return emptyList()
-        val outcome = file.bufferedReader(charset).useLines { lines ->
-            lines.map { MethodInfo.fromOutput(it) }.toList()
+        val outcome = file.bufferedReader(Metadata.charset).useLines { lines ->
+            lines.map { MethodData.fromOutput(it) }.toList()
         }
         return outcome
     }
 
-    private fun writeMapping(file: File, list: List<MethodInfo>) {
+    private fun write(file: File, list: List<Metadata>) {
         file.parentFile.takeIf { !it.exists() }?.mkdirs()
-        file.printWriter(charset).use { writer ->
+        file.printWriter(Metadata.charset).use { writer ->
             list.forEach { writer.println(it.toOutput()) }
         }
-    }
-
-    private companion object {
-        const val KEEP_CLASS_PREFIX = "-keepclass "
-        const val KEEP_PACKAGE_PREFIX = "-keeppackage "
-        val DEFAULT_KEEP_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
     }
 }
 
 internal sealed class MappingResult {
     data class Read(
+        val inspector: Inspector,
         val idGenerator: IdGenerator,
-        val keepChecker: KeepChecker,
-        val previousHandled: List<MethodInfo>,
+        val mappingMethod: List<MethodData>,
     ) : MappingResult()
 
     data class Write(
-        val currentIgnored: List<MethodInfo>,
-        val currentHandled: List<MethodInfo>,
+        val ignoredClass: List<ClassData>,
+        val ignoredMethod: List<MethodData>,
+        val mappingMethod: List<MethodData>,
     ) : MappingResult()
-}
-
-internal class KeepChecker(
-    private val classSet: Set<String>,
-    private val packageSet: Set<String>,
-) {
-
-    fun isKeepClass(className: String): Boolean {
-        if (classSet.contains(className)) return true
-        val last = className.lastIndexOf('/')
-        val end = (last + 1).coerceAtMost(className.length)
-        val packageName = className.substring(0, end)
-        packageSet.forEach { if (packageName.startsWith(it)) return true }
-        return false
-    }
 }
