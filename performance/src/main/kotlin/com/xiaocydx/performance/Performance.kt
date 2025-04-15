@@ -22,9 +22,10 @@ import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
+import com.xiaocydx.performance.analyzer.block.BlockAnalyzer
+import com.xiaocydx.performance.analyzer.block.BlockConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
-import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
 import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
@@ -48,7 +49,7 @@ object Performance {
     private var isInitialized = false
 
     @MainThread
-    fun init(config: Config, application: Application) {
+    fun init(application: Application, config: Config) {
         assertMainThread()
         if (isInitialized) return
         isInitialized = true
@@ -59,9 +60,11 @@ object Performance {
         ActivityResumedIdleAnalyzer(host).init()
 
         ANRAnalyzer(host).init()
-        JankAnalyzer(host).init(threshold = 300L)
-        if (config.frameMetrics.receivers.isNotEmpty()) {
-            FrameMetricsAnalyzer.create(host, config.frameMetrics).init()
+        if (config.blockConfig.receivers.isNotEmpty()) {
+            BlockAnalyzer(host, config.blockConfig).init()
+        }
+        if (config.frameConfig.receivers.isNotEmpty()) {
+            FrameMetricsAnalyzer.create(host, config.frameConfig).init()
         }
 
         host.callbacks.immutable()
@@ -127,9 +130,13 @@ object Performance {
         fun removeCallback(callback: MainLooperCallback)
     }
 
-    data class Config(val frameMetrics: FrameMetricsConfig = FrameMetricsConfig()) {
+    data class Config(
+        val blockConfig: BlockConfig = BlockConfig(),
+        val frameConfig: FrameMetricsConfig = FrameMetricsConfig(),
+    ) {
         internal fun checkProperty() {
-            frameMetrics.checkProperty()
+            blockConfig.checkProperty()
+            frameConfig.checkProperty()
         }
     }
 }

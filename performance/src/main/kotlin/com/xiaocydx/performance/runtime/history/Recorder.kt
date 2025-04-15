@@ -138,16 +138,21 @@ internal value class Mark(val value: Long) {
     }
 }
 
-@JvmInline
-internal value class Snapshot(val value: LongArray) {
+class Snapshot internal constructor(internal val value: LongArray) {
 
-    inline fun get(index: Int): Record {
+    val size = value.size
+
+    fun valueAt(index: Int): Long {
+        return value[index]
+    }
+
+    internal fun get(index: Int): Record {
         return Record(value[index])
     }
 
     @VisibleForTesting
     @Suppress("UNCHECKED_CAST")
-    fun buildTree(candidateMs: Long = currentMs()): Node {
+    internal fun buildTree(candidateMs: Long = currentMs()): Node {
         val root = Node(ROOT_ID, candidateMs, candidateMs, isComplete = false, emptyList())
         if (value.isEmpty()) return root
 
