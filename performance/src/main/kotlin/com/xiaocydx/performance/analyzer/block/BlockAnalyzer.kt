@@ -19,10 +19,12 @@ package com.xiaocydx.performance.analyzer.block
 import android.os.Handler
 import android.os.SystemClock
 import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -32,13 +34,13 @@ import kotlinx.coroutines.launch
 internal class BlockAnalyzer(
     private val host: Performance.Host,
     private val config: BlockConfig,
-) : MainLooperCallback {
+) : Analyzer, MainLooperCallback {
     private val coroutineScope = host.createMainScope()
     private val handler = Handler(host.dumpLooper)
     private var startMs = 0L
     private var startMark = 0L
 
-    fun init() {
+    override fun init() {
         coroutineScope.launch {
             host.addCallback(this@BlockAnalyzer)
             try {
@@ -47,6 +49,10 @@ internal class BlockAnalyzer(
                 host.removeCallback(this@BlockAnalyzer)
             }
         }
+    }
+
+    override fun cancel() {
+        coroutineScope.cancel()
     }
 
     override fun start(type: Type, data: Any?) {

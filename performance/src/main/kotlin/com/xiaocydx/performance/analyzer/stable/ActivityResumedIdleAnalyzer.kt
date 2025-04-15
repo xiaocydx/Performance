@@ -18,8 +18,8 @@ package com.xiaocydx.performance.analyzer.stable
 
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
-import com.xiaocydx.performance.analyzer.Cancellable
 import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -32,10 +32,10 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) : Cancellable {
+internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) : Analyzer {
     private val coroutineScope = host.createMainScope()
 
-    fun init() {
+    override fun init() {
         coroutineScope.launch {
             var checkKey = 0
             var checkJob: Job? = null

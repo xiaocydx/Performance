@@ -21,7 +21,6 @@ import android.app.Application
 import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
-import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
@@ -59,7 +58,7 @@ object Performance {
         activityWatcher.init(application)
         ActivityResumedIdleAnalyzer(host).init()
 
-        ANRAnalyzer(host).init()
+        // ANRAnalyzer(host).init()
         if (config.blockConfig.receivers.isNotEmpty()) {
             BlockAnalyzer(host, config.blockConfig).init()
         }

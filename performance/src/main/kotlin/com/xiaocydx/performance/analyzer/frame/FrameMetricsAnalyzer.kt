@@ -22,7 +22,7 @@ import android.view.Window
 import androidx.annotation.CallSuper
 import androidx.core.view.doOnAttach
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.analyzer.Cancellable
+import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
@@ -35,13 +35,13 @@ import java.lang.ref.WeakReference
  * @author xcc
  * @date 2025/4/5
  */
-internal abstract class FrameMetricsAnalyzer(private val host: Performance.Host) : Cancellable {
+internal abstract class FrameMetricsAnalyzer(private val host: Performance.Host) : Analyzer {
     protected val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
     protected val coroutineScope = host.createMainScope()
     @Volatile protected var defaultRefreshRate = 60.0f; private set
 
     @CallSuper
-    open fun init() {
+    override fun init() {
         // TODO: 补充isStopped拦截
         val job = coroutineScope.launch {
             getCallback()?.let(host::addCallback)

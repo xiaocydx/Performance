@@ -20,7 +20,9 @@ package com.xiaocydx.performance.analyzer
  * @author xcc
  * @date 2025/4/4
  */
-internal interface Cancellable {
+internal interface Analyzer {
+
+    fun init()
 
     fun cancel()
 }

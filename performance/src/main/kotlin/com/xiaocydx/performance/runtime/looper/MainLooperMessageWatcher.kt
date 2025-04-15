@@ -22,9 +22,9 @@ import android.util.Printer
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
-import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.fake.FakeLooperObserver
 import com.xiaocydx.performance.fake.toReal
+import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.runtime.gc.Cleaner
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
