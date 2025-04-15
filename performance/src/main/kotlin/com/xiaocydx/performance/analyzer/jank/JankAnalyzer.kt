@@ -30,8 +30,9 @@ import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 internal class JankAnalyzer(private val host: Performance.Host) : MainLooperCallback {
     private val dumpRunner = DumpRunner()
 
-    fun init(threshold: Long) = apply {
+    fun init(threshold: Long) {
         require(threshold > 0)
+        host.addCallback(this)
         dumpRunner.setThreshold(threshold)
     }
 

@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
+import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
@@ -23,9 +24,10 @@ import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
  * @author xcc
  * @date 2025/3/27
  */
-internal class ANRAnalyzer : MainLooperCallback {
+internal class ANRAnalyzer(private val host: Performance.Host) : MainLooperCallback {
 
-    fun init() = apply {
+    fun init() {
+        host.addCallback(this)
     }
 
     override fun start(type: Type, data: Any?) {

@@ -21,6 +21,7 @@ import android.os.Message
 import android.os.MessageQueue.IdleHandler
 import android.view.MotionEvent
 import androidx.annotation.MainThread
+import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
@@ -58,11 +59,31 @@ internal interface MainLooperCallback {
     }
 }
 
+@MainThread
 internal class CompositeMainLooperCallback : MainLooperCallback {
-    private val callbacks = ArrayList<MainLooperCallback>()
+    private var callbacks = mutableListOf<MainLooperCallback>()
+    private var isImmutable = false
+
+    fun immutable() {
+        isImmutable = true
+    }
 
     fun add(callback: MainLooperCallback) {
-        callbacks.add(callback)
+        assertMainThread()
+        if (isImmutable) {
+            callbacks = (callbacks + callback).toMutableList()
+        } else {
+            callbacks.add(callback)
+        }
+    }
+
+    fun remove(callback: MainLooperCallback) {
+        assertMainThread()
+        if (isImmutable) {
+            callbacks = (callbacks - callback).toMutableList()
+        } else {
+            callbacks.remove(callback)
+        }
     }
 
     override fun start(type: Type, data: Any?) {
@@ -79,7 +100,7 @@ internal class CompositeMainLooperCallback : MainLooperCallback {
 }
 
 internal class NotReentrantMainLooperCallback(
-    private val delegate: MainLooperCallback
+    private val delegate: MainLooperCallback,
 ) : MainLooperCallback {
     private var current: Type? = null
 

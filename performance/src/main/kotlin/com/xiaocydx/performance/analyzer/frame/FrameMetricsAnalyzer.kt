@@ -21,15 +21,14 @@ import android.os.Build
 import android.view.Window
 import androidx.annotation.CallSuper
 import androidx.core.view.doOnAttach
-import com.xiaocydx.performance.analyzer.Cancellable
 import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.analyzer.Cancellable
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 
 /**
@@ -44,28 +43,32 @@ internal abstract class FrameMetricsAnalyzer(private val host: Performance.Host)
     @CallSuper
     open fun init() {
         // TODO: 补充isStopped拦截
-        val job = host.activityEvent.onEach {
-            val activity = host.getActivity(it.activityKey)
-            when (it) {
-                is ActivityEvent.Created -> if (activity != null) {
-                    val window = activity.window
-                    window.decorView.doOnAttach {
-                        defaultRefreshRate = window.getRefreshRate(defaultRefreshRate)
+        val job = coroutineScope.launch {
+            getCallback()?.let(host::addCallback)
+            host.activityEvent.collect {
+                val activity = host.getActivity(it.activityKey)
+                when (it) {
+                    is ActivityEvent.Created -> if (activity != null) {
+                        val window = activity.window
+                        window.decorView.doOnAttach {
+                            defaultRefreshRate = window.getRefreshRate(defaultRefreshRate)
+                        }
+                        val listener = createListener(activity).attach()
+                        frameMetricsListeners[it.activityKey] = listener
                     }
-                    val listener = createListener(activity).attach()
-                    frameMetricsListeners[it.activityKey] = listener
+                    is ActivityEvent.Stopped -> {
+                        frameMetricsListeners[it.activityKey]?.forceMakeEnd()
+                    }
+                    is ActivityEvent.Destroyed -> {
+                        frameMetricsListeners.remove(it.activityKey)?.detach()
+                    }
+                    else -> return@collect
                 }
-                is ActivityEvent.Stopped -> {
-                    frameMetricsListeners[it.activityKey]?.forceMakeEnd()
-                }
-                is ActivityEvent.Destroyed -> {
-                    frameMetricsListeners.remove(it.activityKey)?.detach()
-                }
-                else -> return@onEach
             }
-        }.launchIn(coroutineScope)
+        }
 
         job.invokeOnCompletion {
+            getCallback()?.let(host::removeCallback)
             frameMetricsListeners.forEach { it.value.detach() }
             frameMetricsListeners.clear()
         }
@@ -75,7 +78,7 @@ internal abstract class FrameMetricsAnalyzer(private val host: Performance.Host)
         coroutineScope.cancel()
     }
 
-    open fun getCallback(): MainLooperCallback? = null
+    protected open fun getCallback(): MainLooperCallback? = null
 
     protected abstract fun createListener(activity: Activity?): FrameMetricsListener
 

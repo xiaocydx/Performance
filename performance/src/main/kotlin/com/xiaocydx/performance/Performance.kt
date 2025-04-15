@@ -26,11 +26,12 @@ import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.jank.JankAnalyzer
 import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
-import com.xiaocydx.performance.runtime.assertMainThread
-import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
+import com.xiaocydx.performance.runtime.assertMainThread
+import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.looper.CompositeMainLooperCallback
+import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,25 +55,24 @@ object Performance {
         config.checkProperty()
 
         ReferenceQueueDaemon().start()
-
         activityWatcher.init(application)
         ActivityResumedIdleAnalyzer(host).init()
 
-        val callbacks = CompositeMainLooperCallback()
-        callbacks.add(ANRAnalyzer().init())
-        callbacks.add((JankAnalyzer(host).init(threshold = 300L)))
+        ANRAnalyzer(host).init()
+        JankAnalyzer(host).init(threshold = 300L)
         if (config.frameMetrics.receivers.isNotEmpty()) {
-            val analyzer = FrameMetricsAnalyzer.create(host, config.frameMetrics)
-            analyzer.init()
-            analyzer.getCallback()?.let(callbacks::add)
+            FrameMetricsAnalyzer.create(host, config.frameMetrics).init()
         }
-        MainLooperWatcher.init(host, callbacks)
+
+        host.callbacks.immutable()
+        MainLooperWatcher.init(host, callback = host.callbacks)
     }
 
     private class HostImpl : Host {
         private val parentJob = SupervisorJob()
         private val dumpThread by lazy { HandlerThread("PerformanceDumpThread").apply { start() } }
         private val defaultThread by lazy { HandlerThread("PerformanceDefaultThread").apply { start() } }
+        val callbacks = CompositeMainLooperCallback()
 
         override val mainLooper = Looper.getMainLooper()!!
 
@@ -93,6 +93,14 @@ object Performance {
         override fun getLastActivity(): Activity? {
             return activityWatcher.getLastActivity()
         }
+
+        override fun addCallback(callback: MainLooperCallback) {
+            callbacks.add(callback)
+        }
+
+        override fun removeCallback(callback: MainLooperCallback) {
+            callbacks.remove(callback)
+        }
     }
 
     internal interface Host {
@@ -111,6 +119,12 @@ object Performance {
 
         @MainThread
         fun getLastActivity(): Activity?
+
+        @MainThread
+        fun addCallback(callback: MainLooperCallback)
+
+        @MainThread
+        fun removeCallback(callback: MainLooperCallback)
     }
 
     data class Config(val frameMetrics: FrameMetricsConfig = FrameMetricsConfig()) {
