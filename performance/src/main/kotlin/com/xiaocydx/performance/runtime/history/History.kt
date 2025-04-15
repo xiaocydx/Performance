@@ -65,13 +65,13 @@ internal object History {
     }
 
     @MainThread
-    fun createStartMark(): Long {
+    fun startMark(): Long {
         enter(id = ID_SLICE)
         return recorder.mark()
     }
 
     @MainThread
-    fun createEndMark(): Long {
+    fun endMark(): Long {
         exit(id = ID_SLICE)
         return recorder.mark()
     }

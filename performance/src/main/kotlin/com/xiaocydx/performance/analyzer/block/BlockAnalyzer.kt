@@ -16,10 +16,10 @@
 
 package com.xiaocydx.performance.analyzer.block
 
+import android.os.Handler
 import android.os.SystemClock
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.runtime.history.History
-import com.xiaocydx.performance.runtime.history.Snapshot
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 import kotlinx.coroutines.awaitCancellation
@@ -34,7 +34,8 @@ internal class BlockAnalyzer(
     private val config: BlockConfig,
 ) : MainLooperCallback {
     private val coroutineScope = host.createMainScope()
-    private var startTime = 0L
+    private val handler = Handler(host.dumpLooper)
+    private var startMs = 0L
     private var startMark = 0L
 
     fun init() {
@@ -49,22 +50,40 @@ internal class BlockAnalyzer(
     }
 
     override fun start(type: Type, data: Any?) {
-        startTime = SystemClock.uptimeMillis()
-        startMark = History.createStartMark()
+        startMs = SystemClock.uptimeMillis()
+        startMark = History.startMark()
     }
 
     override fun end(type: Type, data: Any?) {
-        val endTime = SystemClock.uptimeMillis()
-        val endMark = History.createEndMark()
-        val time = endTime - startTime
-        var snapshot: Snapshot? = null
+        val endMs = SystemClock.uptimeMillis()
+        val endMark = History.endMark()
+        val timeMs = endMs - startMs
         for (i in 0 until config.receivers.size) {
             val receiver = config.receivers[i]
-            if (time <= receiver.thresholdMillis) continue
-            if (snapshot == null) {
-                snapshot = History.snapshot(startMark, endMark)
+            if (timeMs > receiver.thresholdMillis) {
+                handler.post(DumpTask(scene = type.name, startMark, endMark, timeMs, config))
+                break
             }
-            receiver.onReceive(scene = type.name, data = data, snapshot)
+        }
+    }
+
+    private class DumpTask(
+        private val scene: String,
+        private val startMark: Long,
+        private val endMark: Long,
+        private val timeMs: Long,
+        private val config: BlockConfig
+    ) : Runnable {
+
+        override fun run() {
+            val snapshot = History.snapshot(startMark, endMark)
+            if (!snapshot.isAvailable) return
+            for (i in 0 until config.receivers.size) {
+                val receiver = config.receivers[i]
+                if (timeMs > receiver.thresholdMillis) {
+                    receiver.onReceive(scene, snapshot)
+                }
+            }
         }
     }
 }

@@ -138,9 +138,23 @@ internal value class Mark(val value: Long) {
     }
 }
 
-class Snapshot internal constructor(internal val value: LongArray) {
+class Snapshot internal constructor(private val value: LongArray) {
 
-    val size = value.size
+    val size: Int
+        get() = value.size
+
+    val isEmpty: Boolean
+        get() = value.isEmpty()
+
+    val isAvailable: Boolean
+        get() {
+            if (value.isEmpty()) return false
+            val first = Record(value.first())
+            val last = Record(value.last())
+            if (!first.isEnter) return false
+            if (value.size > 1 && first.timeMs > last.timeMs) return false
+            return true
+        }
 
     fun valueAt(index: Int): Long {
         return value[index]
@@ -154,12 +168,7 @@ class Snapshot internal constructor(internal val value: LongArray) {
     @Suppress("UNCHECKED_CAST")
     internal fun buildTree(candidateMs: Long = currentMs()): Node {
         val root = Node(ROOT_ID, candidateMs, candidateMs, isComplete = false, emptyList())
-        if (value.isEmpty()) return root
-
-        val first = Record(value.first())
-        val last = Record(value.last())
-        if (!first.isEnter) return root
-        if (value.size > 1 && first.timeMs > last.timeMs) return root
+        if (!isAvailable) return root
 
         val stack = mutableListOf<Any>()
         stack.add(mutableListOf<Node>())

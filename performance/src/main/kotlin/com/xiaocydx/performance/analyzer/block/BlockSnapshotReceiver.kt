@@ -29,7 +29,7 @@ interface BlockSnapshotReceiver {
     val thresholdMillis: Long
         get() = DEFAULT_THRESHOLD_MILLIS
 
-    fun onReceive(scene: String, data: Any?, snapshot: Snapshot)
+    fun onReceive(scene: String, snapshot: Snapshot)
 
     companion object {
         const val DEFAULT_THRESHOLD_MILLIS = 700L

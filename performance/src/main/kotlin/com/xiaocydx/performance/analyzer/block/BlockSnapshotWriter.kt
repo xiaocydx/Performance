@@ -20,7 +20,9 @@ import android.content.Context
 import android.os.SystemClock
 import com.xiaocydx.performance.analyzer.block.BlockSnapshotReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
 import com.xiaocydx.performance.runtime.history.Snapshot
+import kotlinx.coroutines.Dispatchers
 import java.io.File
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * @author xcc
@@ -30,16 +32,17 @@ class BlockSnapshotWriter(
     context: Context,
     override val thresholdMillis: Long = DEFAULT_THRESHOLD_MILLIS,
 ) : BlockSnapshotReceiver {
-    private val applicationContext = requireNotNull(context.applicationContext)
+    private val context = requireNotNull(context.applicationContext)
 
-    override fun onReceive(scene: String, data: Any?, snapshot: Snapshot) {
-        val blockDir = File(applicationContext.filesDir, "performance/block")
-        blockDir.takeIf { !it.exists() }?.mkdirs()
-        // TODO: name转换为时间
-        val file = File(blockDir, "${SystemClock.uptimeMillis()}-snapshot.txt")
-        file.printWriter().use { writer ->
-            for (i in 0 until snapshot.size) {
-                writer.println(snapshot.valueAt(i))
+    override fun onReceive(scene: String, snapshot: Snapshot) {
+        Dispatchers.IO.dispatch(EmptyCoroutineContext) {
+            val blockDir = File(context.filesDir, "performance/block")
+            blockDir.takeIf { !it.exists() }?.mkdirs()
+            val file = File(blockDir, "${SystemClock.uptimeMillis()}-snapshot.txt")
+            file.printWriter().use { writer ->
+                for (i in 0 until snapshot.size) {
+                    writer.println(snapshot.valueAt(i))
+                }
             }
         }
     }

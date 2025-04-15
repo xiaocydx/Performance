@@ -112,7 +112,7 @@ internal class RecorderTest {
         val recorder = Recorder(CAPACITY)
         val start = recorder.mark()
         val end = recorder.mark()
-        assertThat(recorder.snapshot(start, end).value).isEmpty()
+        assertThat(recorder.snapshot(start, end).isEmpty).isTrue()
     }
 
     @Test
@@ -162,7 +162,7 @@ internal class RecorderTest {
         // A'(en) B'(en) B'(ex) C'(en) C'(ex) A'(ex)
         A(recorder)
         val end = recorder.mark()
-        assertThat(recorder.snapshot(start, end).value).isEmpty()
+        assertThat(recorder.snapshot(start, end).isEmpty).isTrue()
     }
 
     @Test
