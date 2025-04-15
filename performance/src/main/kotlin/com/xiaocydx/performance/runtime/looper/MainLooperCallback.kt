@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("ReplaceManualRangeWithIndicesCalls")
+
 package com.xiaocydx.performance.runtime.looper
 
 import android.os.Looper
@@ -62,6 +64,7 @@ internal interface MainLooperCallback {
 @MainThread
 internal class CompositeMainLooperCallback : MainLooperCallback {
     private var callbacks = mutableListOf<MainLooperCallback>()
+    private var dispatchingCallbacks = emptyList<MainLooperCallback>()
     private var isImmutable = false
 
     fun immutable() {
@@ -87,14 +90,17 @@ internal class CompositeMainLooperCallback : MainLooperCallback {
     }
 
     override fun start(type: Type, data: Any?) {
+        dispatchingCallbacks = callbacks
         dispatchCallbacks { it.start(type, data) }
     }
 
     override fun end(type: Type, data: Any?) {
         dispatchCallbacks { it.end(type, data) }
+        dispatchingCallbacks = emptyList()
     }
 
     private inline fun dispatchCallbacks(action: (MainLooperCallback) -> Unit) {
+        val callbacks = dispatchingCallbacks
         for (i in 0 until callbacks.size) action(callbacks[i])
     }
 }
