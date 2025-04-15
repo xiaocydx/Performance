@@ -1,4 +1,4 @@
-package com.xiaocydx.performance.sample
+package com.xiaocydx.sample.performance
 
 import android.os.Bundle
 import android.view.View

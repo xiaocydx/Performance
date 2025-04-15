@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.xiaocydx.performance.sample"
+    namespace = "com.xiaocydx.sample.performance"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.xiaocydx.performance.sample"
+        applicationId = "com.xiaocydx.sample.performance"
         minSdk = 21
         targetSdk = 34
         versionCode = 1

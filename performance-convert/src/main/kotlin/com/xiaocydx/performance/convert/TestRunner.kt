@@ -33,10 +33,10 @@ internal fun main() {
 
 private fun readMapping(): Map<Int, MethodData> {
     val mapping = listOf(
-        "26013,17,com/xiaocydx/performance/sample/PerformanceTest,run,()V",
-        "26014,18,com/xiaocydx/performance/sample/PerformanceTest,A,()V",
-        "26015,18,com/xiaocydx/performance/sample/PerformanceTest,B,()V",
-        "26016,18,com/xiaocydx/performance/sample/PerformanceTest,C,()V",
+        "26013,17,com/xiaocydx/sample/PerformanceTest,run,()V",
+        "26014,18,com/xiaocydx/sample/PerformanceTest,A,()V",
+        "26015,18,com/xiaocydx/sample/PerformanceTest,B,()V",
+        "26016,18,com/xiaocydx/sample/PerformanceTest,C,()V",
     )
     return mapping.map { MethodData.fromOutput(it) }.associateBy { it.id }
 }

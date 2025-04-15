@@ -26,11 +26,11 @@ internal object TracingJson {
     private val gson = Gson()
     private val max = MethodData(
         id = Record.ID_MAX, access = 0,
-        className = "Record", methodName = "Max", desc = ""
+        className = "Record", methodName = "max", desc = ""
     )
     private val slice = MethodData(
         id = Record.ID_SLICE, access = 0,
-        className = "Record", methodName = "Slice", desc = ""
+        className = "Record", methodName = "slice", desc = ""
     )
 
     fun toJson(
