@@ -103,7 +103,6 @@ internal class CollectEnforcer(
         classVisitor: ClassVisitor,
     ) : ClassVisitor(ASM_API, classVisitor) {
         private var className = ""
-        private var superName = ""
         private var isModifiable = false
 
         override fun visit(
@@ -116,7 +115,6 @@ internal class CollectEnforcer(
         ) {
             super.visit(version, access, name, signature, superName, interfaces)
             className = name
-            this.superName = superName ?: ""
             isModifiable = inspector.isModifiable(access)
         }
 
@@ -129,7 +127,7 @@ internal class CollectEnforcer(
         ): MethodVisitor = if (!isModifiable) {
             super.visitMethod(access, name, descriptor, signature, exceptions)
         } else {
-            CollectMethodNode(access, name, descriptor, signature, exceptions, className, superName)
+            CollectMethodNode(access, name, descriptor, signature, exceptions, className)
         }
     }
 
@@ -140,7 +138,6 @@ internal class CollectEnforcer(
         signature: String?,
         exceptions: Array<out String>?,
         private val className: String,
-        private val superName: String,
     ) : MethodNode(ASM_API, access, name, descriptor, signature, exceptions) {
 
         override fun visitEnd() {
@@ -162,21 +159,23 @@ internal class CollectEnforcer(
         private fun isEmptyMethod(): Boolean {
             val isConstructor = name == "<init>"
             val instructions = requireNotNull(instructions)
-            when {
-                !isConstructor -> instructions.forEach {
-                    if (it.opcode != -1) return false
-                }
-                superName != "java/lang/Object" -> return false
-                else -> instructions.forEach {
+            if (!isConstructor) {
+                instructions.forEach { if (it.opcode != -1) return false }
+            } else {
+                var loadCount = 0
+                var invokeCount = 0
+                var returnCount = 0
+                instructions.forEach {
                     when (it.opcode) {
-                        -1,
-                        Opcodes.ALOAD,
-                        Opcodes.INVOKESPECIAL,
-                        Opcodes.RETURN,
-                        -> return@forEach
+                        -1 -> return@forEach
+                        Opcodes.ALOAD -> loadCount++
+                        Opcodes.INVOKESPECIAL -> invokeCount++
+                        Opcodes.RETURN -> returnCount++
                         else -> return false
                     }
                 }
+                // 空构造函数只执行这三种指令
+                if (loadCount != 1 || invokeCount != 1 || returnCount != 1) return false
             }
             return true
         }
