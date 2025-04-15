@@ -1,0 +1,4 @@
+/build
+/outputs/ignored/*
+/outputs/mapping/*
+/snapshot/*
