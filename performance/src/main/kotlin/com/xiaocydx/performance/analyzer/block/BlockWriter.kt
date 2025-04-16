@@ -18,7 +18,7 @@ package com.xiaocydx.performance.analyzer.block
 
 import android.content.Context
 import android.os.SystemClock
-import com.xiaocydx.performance.analyzer.block.BlockSnapshotReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
+import com.xiaocydx.performance.analyzer.block.BlockReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
 import com.xiaocydx.performance.runtime.history.Snapshot
 import kotlinx.coroutines.Dispatchers
 import java.io.File
@@ -28,10 +28,10 @@ import kotlin.coroutines.EmptyCoroutineContext
  * @author xcc
  * @date 2025/4/15
  */
-class BlockSnapshotWriter(
+class BlockWriter(
     context: Context,
     override val thresholdMillis: Long = DEFAULT_THRESHOLD_MILLIS,
-) : BlockSnapshotReceiver {
+) : BlockReceiver {
     private val context = requireNotNull(context.applicationContext)
 
     override fun onReceive(scene: String, snapshot: Snapshot) {

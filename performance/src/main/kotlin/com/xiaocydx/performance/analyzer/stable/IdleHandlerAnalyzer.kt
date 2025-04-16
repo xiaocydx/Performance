@@ -16,13 +16,13 @@
 
 package com.xiaocydx.performance.analyzer.stable
 
+import android.os.Looper
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -32,8 +32,7 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) : Analyzer {
-    private val coroutineScope = host.createMainScope()
+internal class IdleHandlerAnalyzer(host: Performance.Host) : Analyzer(host) {
 
     override fun init() {
         coroutineScope.launch {
@@ -64,10 +63,6 @@ internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) :
         }
     }
 
-    override fun cancel() {
-        coroutineScope.cancel()
-    }
-
     private fun showTimeoutDialog(key: Int) {
         val activity = host.getActivity(key) ?: return
         AlertDialog.Builder(activity)
@@ -82,7 +77,7 @@ internal class ActivityResumedIdleAnalyzer(private val host: Performance.Host) :
                 cont.resume(Unit)
                 false
             }
-            val queue = host.mainLooper.queue
+            val queue = Looper.myQueue()
             queue.addIdleHandler(idleHandler)
             cont.invokeOnCancellation { queue.removeIdleHandler(idleHandler) }
         }

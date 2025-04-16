@@ -53,12 +53,12 @@ internal class ChoreographerFrameInfo {
         if (!fake.checkStubAvailable()) return@apply
         isAvailable = true
         this.fake = fake
-        postMarkStartActions()
     }
 
     fun doOnFrameEnd(action: (() -> Unit)? = null) {
         assertMainThread()
         doOnFrameEnd = action
+        if (action != null) postMarkStartActions()
     }
 
     private fun markFrameStart() {
@@ -82,13 +82,14 @@ internal class ChoreographerFrameInfo {
 
     private fun markFrameEnd() {
         frameEndNanos = System.nanoTime()
-        if (isDoFrameMessage) {
+        if (isDoFrameMessage && doOnFrameEnd != null) {
             postMarkStartActions()
             doOnFrameEnd?.invoke()
         }
     }
 
     private fun postMarkStartActions() {
+        if (!isAvailable) return
         if (isPostMarkStartActions) return
         val fake = fake ?: return
         isPostMarkStartActions = true

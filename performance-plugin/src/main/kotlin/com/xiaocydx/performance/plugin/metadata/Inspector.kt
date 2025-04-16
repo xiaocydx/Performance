@@ -99,7 +99,7 @@ internal class Inspector private constructor(
 
         private const val KEEP_CLASS_PREFIX = "-keepclass "
         private const val KEEP_PACKAGE_PREFIX = "-keeppackage "
-        private val DEFAULT_KEEP_PACKAGE = listOf("android/", "kotlin/", "com/xiaocydx/performance/")
+        private val DEFAULT_KEEP_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
 
         fun create(keepMethodFile: File): Inspector {
             val keepClass = mutableSetOf<String>()

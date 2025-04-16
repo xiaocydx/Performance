@@ -22,7 +22,6 @@ import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.log
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlin.system.measureTimeMillis
@@ -46,21 +45,17 @@ internal class FrameMetricsAnalyzerApi16(
                     listener.onFrameMetricsAvailable()
                 }
             }
-            try {
-                awaitCancellation()
-            } finally {
-                choreographerFrameInfo.doOnFrameEnd(null)
-            }
+            host.addCallback(choreographerFrameInfo.callback)
+            awaitCancellation()
+        }.invokeOnCompletion {
+            choreographerFrameInfo.doOnFrameEnd(action = null)
+            host.removeCallback(choreographerFrameInfo.callback)
         }
         super.init()
     }
 
     override fun createListener(activity: Activity?): FrameMetricsListener {
         return FrameMetricsListenerImpl(activity)
-    }
-
-    override fun getCallback(): MainLooperCallback {
-        return choreographerFrameInfo.callback
     }
 
     private inner class FrameMetricsListenerImpl(activity: Activity?) :

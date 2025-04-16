@@ -3,7 +3,7 @@ package com.xiaocydx.sample.performance
 import android.app.Application
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.block.BlockConfig
-import com.xiaocydx.performance.analyzer.block.BlockSnapshotWriter
+import com.xiaocydx.performance.analyzer.block.BlockWriter
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsPrinter
 
@@ -18,7 +18,7 @@ class App : Application() {
         Performance.init(
             application = this,
             config = Performance.Config(
-                blockConfig = BlockConfig(receivers = listOf(BlockSnapshotWriter(context = this))),
+                blockConfig = BlockConfig(receivers = listOf(BlockWriter(context = this))),
                 frameConfig = FrameMetricsConfig(receivers = listOf(FrameMetricsPrinter()))
             )
         )

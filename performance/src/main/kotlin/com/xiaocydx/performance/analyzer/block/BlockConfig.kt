@@ -20,7 +20,7 @@ package com.xiaocydx.performance.analyzer.block
  * @author xcc
  * @date 2025/4/15
  */
-data class BlockConfig(val receivers: List<BlockSnapshotReceiver> = emptyList()) {
+data class BlockConfig(val receivers: List<BlockReceiver> = emptyList()) {
 
     internal fun checkProperty() {
         receivers.forEach { receiver ->

@@ -16,13 +16,27 @@
 
 package com.xiaocydx.performance.analyzer
 
+import com.xiaocydx.performance.Performance
+import kotlinx.coroutines.cancelChildren
+import java.util.concurrent.atomic.AtomicBoolean
+
 /**
  * @author xcc
  * @date 2025/4/4
  */
-internal interface Analyzer {
+internal abstract class Analyzer(protected val host: Performance.Host) {
+    private val isStarted = AtomicBoolean(false)
+    protected val coroutineScope = host.createMainScope()
 
-    fun init()
+    fun start() {
+        if (!isStarted.compareAndSet(false, true)) return
+        init()
+    }
 
-    fun cancel()
+    fun stop() {
+        if (!isStarted.compareAndSet(true, false)) return
+        coroutineScope.coroutineContext.cancelChildren()
+    }
+
+    protected abstract fun init()
 }

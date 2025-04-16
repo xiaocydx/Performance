@@ -23,7 +23,7 @@ import com.xiaocydx.performance.runtime.history.Snapshot
  * @author xcc
  * @date 2025/4/15
  */
-interface BlockSnapshotReceiver {
+interface BlockReceiver {
 
     @get:IntRange(from = 1)
     val thresholdMillis: Long

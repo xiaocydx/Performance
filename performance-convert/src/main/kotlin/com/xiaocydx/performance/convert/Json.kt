@@ -41,7 +41,7 @@ internal object TracingJson {
         fillMapping[max.id] = max
         fillMapping[slice.id] = slice
         val events = records.map {
-            val method = requireNotNull(fillMapping[it.id])
+            val method = requireNotNull(fillMapping[it.id]) { "id = ${it.id}" }
             TraceEvent(
                 name = "${method.className}.${method.methodName}",
                 ph = if (it.isEnter) TraceEvent.B else TraceEvent.E,

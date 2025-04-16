@@ -25,7 +25,7 @@ import com.xiaocydx.performance.analyzer.block.BlockAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
-import com.xiaocydx.performance.analyzer.stable.ActivityResumedIdleAnalyzer
+import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
@@ -56,14 +56,13 @@ object Performance {
 
         ReferenceQueueDaemon().start()
         activityWatcher.init(application)
-        ActivityResumedIdleAnalyzer(host).init()
 
-        // ANRAnalyzer(host).init()
+        IdleHandlerAnalyzer(host).start()
         if (config.blockConfig.receivers.isNotEmpty()) {
-            BlockAnalyzer(host, config.blockConfig).init()
+            BlockAnalyzer(host, config.blockConfig).start()
         }
         if (config.frameConfig.receivers.isNotEmpty()) {
-            FrameMetricsAnalyzer.create(host, config.frameConfig).init()
+            FrameMetricsAnalyzer.create(host, config.frameConfig).start()
         }
 
         host.callbacks.immutable()

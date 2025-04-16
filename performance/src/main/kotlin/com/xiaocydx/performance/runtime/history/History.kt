@@ -21,7 +21,6 @@ import android.os.Looper
 import android.os.SystemClock
 import android.os.Trace
 import androidx.annotation.AnyThread
-import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.history.Record.Companion.ID_MAX
 import com.xiaocydx.performance.runtime.history.Record.Companion.ID_SLICE
 
@@ -34,7 +33,6 @@ internal object History {
     private val mainThreadId = Looper.getMainLooper().thread.id
 
     @JvmStatic
-    @AnyThread
     fun enter(id: Int) {
         if (id >= ID_MAX) return
         if (!isMainThread()) return
@@ -42,7 +40,6 @@ internal object History {
     }
 
     @JvmStatic
-    @AnyThread
     fun exit(id: Int) {
         if (id >= ID_MAX) return
         if (!isMainThread()) return
@@ -50,7 +47,6 @@ internal object History {
     }
 
     @JvmStatic
-    @AnyThread
     @SuppressLint("UnclosedTrace")
     fun beginTrace(name: String) {
         if (!isMainThread()) return
@@ -64,19 +60,16 @@ internal object History {
         Trace.endSection()
     }
 
-    @MainThread
     fun startMark(): Long {
         enter(id = ID_SLICE)
         return recorder.mark()
     }
 
-    @MainThread
     fun endMark(): Long {
         exit(id = ID_SLICE)
         return recorder.mark()
     }
 
-    @MainThread
     fun snapshot(startMark: Long, endMark: Long): Snapshot {
         return recorder.snapshot(startMark, endMark)
     }

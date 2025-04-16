@@ -27,7 +27,6 @@ import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 internal class ANRAnalyzer(private val host: Performance.Host) : MainLooperCallback {
 
     fun init() {
-        host.addCallback(this)
     }
 
     override fun start(type: Type, data: Any?) {

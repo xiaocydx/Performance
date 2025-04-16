@@ -24,7 +24,6 @@ import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -32,43 +31,43 @@ import kotlinx.coroutines.launch
  * @date 2025/3/27
  */
 internal class BlockAnalyzer(
-    private val host: Performance.Host,
-    private val config: BlockConfig,
-) : Analyzer, MainLooperCallback {
-    private val coroutineScope = host.createMainScope()
-    private val handler = Handler(host.dumpLooper)
-    private var startMs = 0L
-    private var startMark = 0L
+    host: Performance.Host,
+    private val config: BlockConfig
+) : Analyzer(host) {
 
     override fun init() {
+        val handler = Handler(host.dumpLooper)
+        val callback = Callback(handler, config)
         coroutineScope.launch {
-            host.addCallback(this@BlockAnalyzer)
-            try {
-                awaitCancellation()
-            } finally {
-                host.removeCallback(this@BlockAnalyzer)
-            }
+            host.addCallback(callback)
+            awaitCancellation()
+        }.invokeOnCompletion {
+            host.removeCallback(callback)
         }
     }
 
-    override fun cancel() {
-        coroutineScope.cancel()
-    }
+    private class Callback(
+        private val handler: Handler,
+        private val config: BlockConfig,
+    ) : MainLooperCallback {
+        private var startMs = 0L
+        private var startMark = 0L
 
-    override fun start(type: Type, data: Any?) {
-        startMs = SystemClock.uptimeMillis()
-        startMark = History.startMark()
-    }
+        override fun start(type: Type, data: Any?) {
+            startMs = SystemClock.uptimeMillis()
+            startMark = History.startMark()
+        }
 
-    override fun end(type: Type, data: Any?) {
-        val endMs = SystemClock.uptimeMillis()
-        val endMark = History.endMark()
-        val timeMs = endMs - startMs
-        for (i in 0 until config.receivers.size) {
-            val receiver = config.receivers[i]
-            if (timeMs > receiver.thresholdMillis) {
-                handler.post(DumpTask(scene = type.name, startMark, endMark, timeMs, config))
-                break
+        override fun end(type: Type, data: Any?) {
+            val endMs = SystemClock.uptimeMillis()
+            val endMark = History.endMark()
+            val timeMs = endMs - startMs
+            for (i in 0 until config.receivers.size) {
+                val receiver = config.receivers[i]
+                if (timeMs > receiver.thresholdMillis) {
+                    handler.post(DumpTask(scene = type.name, startMark, endMark, timeMs, config))
+                    break
+                }
             }
         }
     }
@@ -78,7 +77,7 @@ internal class BlockAnalyzer(
         private val startMark: Long,
         private val endMark: Long,
         private val timeMs: Long,
-        private val config: BlockConfig
+        private val config: BlockConfig,
     ) : Runnable {
 
         override fun run() {
