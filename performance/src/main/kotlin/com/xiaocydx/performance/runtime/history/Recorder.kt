@@ -45,13 +45,9 @@ internal class Recorder(private val capacity: Int) {
         val start = Mark(startMark)
         val end = Mark(endMark)
         val latest = Mark(latestMark)
-
-        val startReal = capacity * start.overflow + start.index
-        val endReal = capacity * end.overflow + end.index
-        val latestReal = capacity * latest.overflow + latest.index
-        if (startReal + capacity <= latestReal
-                || endReal + capacity <= latestReal
-                || startReal + capacity <= endReal) {
+        if (!Mark.checkRange(start, latest)
+                || !Mark.checkRange(end, latest)
+                || !Mark.checkRange(start, end)) {
             return Snapshot(longArrayOf())
         }
 
@@ -92,11 +88,11 @@ internal inline fun currentMs(): Long {
 }
 
 @JvmInline
-internal value class Mark(val value: Long) {
-    inline val overflow: Int
+internal value class Mark(private val value: Long) {
+    val overflow: Int
         get() = (value ushr INT_BITS).toInt()
 
-    inline val index: Int
+    val index: Int
         get() = (value and INT_MASK).toInt()
 
     companion object {
@@ -105,6 +101,14 @@ internal value class Mark(val value: Long) {
 
         inline fun value(overflow: Int, index: Int): Long {
             return (overflow.toLong() shl INT_BITS) or (index.toLong() and INT_MASK)
+        }
+
+        fun checkRange(start: Mark, end: Mark): Boolean {
+            return when (start.overflow) {
+                end.overflow -> start.index <= end.index
+                end.overflow - 1 -> end.index < start.index
+                else -> false
+            }
         }
     }
 }
