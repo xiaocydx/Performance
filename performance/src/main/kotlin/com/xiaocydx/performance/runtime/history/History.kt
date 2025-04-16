@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("NOTHING_TO_INLINE")
+
 package com.xiaocydx.performance.runtime.history
 
 import android.annotation.SuppressLint
@@ -21,6 +23,8 @@ import android.os.Looper
 import android.os.SystemClock
 import android.os.Trace
 import androidx.annotation.AnyThread
+import androidx.annotation.MainThread
+import com.xiaocydx.performance.runtime.BytecodeApi
 import com.xiaocydx.performance.runtime.history.Record.Companion.ID_MAX
 import com.xiaocydx.performance.runtime.history.Record.Companion.ID_SLICE
 
@@ -29,56 +33,123 @@ import com.xiaocydx.performance.runtime.history.Record.Companion.ID_SLICE
  * @date 2025/4/8
  */
 internal object History {
-    private val recorder = Recorder(capacity = 100 * 10000)
     private val mainThreadId = Looper.getMainLooper().thread.id
+    private var isInitialized = false
+    private lateinit var recorder: Recorder
 
-    @JvmStatic
-    fun enter(id: Int) {
-        if (id >= ID_MAX) return
-        if (!isMainThread()) return
-        recorder.enter(id, currentMs())
+    @Volatile
+    private var isRecorderCreated = false
+
+    @get:MainThread
+    var isTraceEnabled = false; private set
+
+    @get:MainThread
+    var isRecordEnabled = false; private set
+
+    @MainThread
+    fun init() {
+        assert(isMainThread())
+        isInitialized = true
     }
 
     @JvmStatic
-    fun exit(id: Int) {
-        if (id >= ID_MAX) return
-        if (!isMainThread()) return
-        recorder.exit(id, currentMs())
-    }
-
-    @JvmStatic
+    @BytecodeApi
     @SuppressLint("UnclosedTrace")
     fun beginTrace(name: String) {
-        if (!isMainThread()) return
+        if (!isMainThread() || !isInitialized) return
+        isTraceEnabled = true
         Trace.beginSection(name)
     }
 
     @JvmStatic
-    @AnyThread
+    @BytecodeApi
     fun endTrace() {
-        if (!isMainThread()) return
+        if (!isMainThread() || !isInitialized) return
+        // 判断isTraceEnabled，排除调用顺序：
+        // beginTrace() -> init() -> endTrace()
+        if (!isTraceEnabled) return
         Trace.endSection()
     }
 
+    @JvmStatic
+    @BytecodeApi
+    fun enter(id: Int) {
+        if (id >= ID_MAX) return
+        if (!isMainThread() || !isInitialized) return
+        if (!isRecordEnabled) {
+            createRecorder()
+            isRecordEnabled = true
+            // volatile写，release recorder != null
+            isRecorderCreated = true
+        }
+        recorder.enter(id, currentMs())
+    }
+
+    @JvmStatic
+    @BytecodeApi
+    fun exit(id: Int) {
+        if (id >= ID_MAX) return
+        if (!isMainThread() || !isInitialized) return
+        // 判断isRecordEnabled，排除调用顺序：
+        // enter() -> init() -> exit()
+        if (!isRecordEnabled) return
+        recorder.exit(id, currentMs())
+    }
+
+    @MainThread
     fun startMark(): Long {
-        enter(id = ID_SLICE)
+        // 频繁调用不做MainThread断言，流程确保MainSafe
+        if (!isInitialized || !isRecordEnabled) return -1
+        recorder.enter(id = ID_SLICE, currentMs())
         return recorder.mark()
     }
 
+    @MainThread
     fun endMark(): Long {
-        exit(id = ID_SLICE)
+        // 频繁调用不做MainThread断言，流程确保MainSafe
+        if (!isInitialized || !isRecordEnabled) return -1
+        recorder.exit(id = ID_SLICE, currentMs())
         return recorder.mark()
     }
 
-    fun snapshot(startMark: Long, endMark: Long): Snapshot {
-        return recorder.snapshot(startMark, endMark)
+    @AnyThread
+    fun latestMark(): Long {
+        // volatile读，acquire recorder != null
+        if (!isRecorderCreated) return -1
+        return recorder.mark()
     }
 
-    private fun isMainThread(): Boolean {
+    @AnyThread
+    fun snapshot(startMark: Long, endMark: Long): Snapshot {
+        return when {
+            startMark < 0 || endMark < 0 -> Snapshot(longArrayOf())
+            // volatile读，acquire recorder != null
+            !isRecorderCreated -> Snapshot(longArrayOf())
+            // 短时间内[startMark, endMark]的数据不被覆盖，可视为不可变。
+            // 当调用snapshot(startMark, latestMark())时，不稳定的结果：
+            // 1. latestMark()未读到最新值，buffer未读到最新值，可接受的结果。
+            // 2. latestMark()已读到最新值，buffer未读到最新值，需进一步过滤。
+            // recorder.latestMark不用volatile，recorder.record()会频繁调用。
+            else -> recorder.snapshot(startMark, endMark)
+        }
+    }
+
+    @SuppressLint("UnclosedTrace")
+    private fun createRecorder() {
+        Trace.beginSection("HistoryCreateRecorder")
+        recorder = Recorder(capacity = 100 * 10000)
+        Trace.endSection()
+    }
+
+    private inline fun isMainThread(): Boolean {
         return Thread.currentThread().id == mainThreadId
     }
 
     private inline fun currentMs(): Long {
+        // 调用一次耗时是2000 ~ 3000ns，
+        // 调用至少333次才产生ms级的影响，
+        // 这个影响可接受，暂时不用采样方案。
+        // 采样做volatile读，需评估性能损耗。
         return SystemClock.uptimeMillis()
     }
 }

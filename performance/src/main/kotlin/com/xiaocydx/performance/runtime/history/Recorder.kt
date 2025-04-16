@@ -87,35 +87,6 @@ internal class Recorder(private val capacity: Int) {
     }
 }
 
-@JvmInline
-internal value class Record(val value: Long) {
-
-    inline val id: Int
-        get() = ((value ushr SHL_BITS_ID) and MASK_ID).toInt()
-
-    inline val timeMs: Long
-        get() = value and MASK_TIME_MS
-
-    inline val isEnter: Boolean
-        get() = (value ushr SHL_BITS_ENTER) == 1L
-
-    companion object {
-        const val SHL_BITS_ENTER = 63
-        const val SHL_BITS_ID = 43
-        const val MASK_ID = 0xFFFFFL
-        const val MASK_TIME_MS = 0x7FFFFFFFFFFL
-        const val ID_MAX = 0xFFFFF
-        const val ID_SLICE = ID_MAX - 1
-
-        inline fun value(id: Int, timeMs: Long, isEnter: Boolean): Long {
-            var value = if (isEnter) 1L shl SHL_BITS_ENTER else 0L
-            value = value or (id.toLong() shl SHL_BITS_ID) // 函数数量不超过20位
-            value = value or (timeMs and MASK_TIME_MS) // ms时间不超过43位
-            return value
-        }
-    }
-}
-
 internal inline fun currentMs(): Long {
     return System.currentTimeMillis()
 }
@@ -138,7 +109,37 @@ internal value class Mark(val value: Long) {
     }
 }
 
-class Snapshot internal constructor(private val value: LongArray) {
+@JvmInline
+value class Record internal constructor(val value: Long) {
+
+    val id: Int
+        get() = ((value ushr SHL_BITS_ID) and MASK_ID).toInt()
+
+    val timeMs: Long
+        get() = value and MASK_TIME_MS
+
+    val isEnter: Boolean
+        get() = (value ushr SHL_BITS_ENTER) == 1L
+
+    internal companion object {
+        const val SHL_BITS_ENTER = 63
+        const val SHL_BITS_ID = 43
+        const val MASK_ID = 0xFFFFFL
+        const val MASK_TIME_MS = 0x7FFFFFFFFFFL
+        const val ID_MAX = 0xFFFFF
+        const val ID_SLICE = ID_MAX - 1
+
+        inline fun value(id: Int, timeMs: Long, isEnter: Boolean): Long {
+            var value = if (isEnter) 1L shl SHL_BITS_ENTER else 0L
+            value = value or (id.toLong() shl SHL_BITS_ID) // 函数数量不超过20位
+            value = value or (timeMs and MASK_TIME_MS) // ms时间不超过43位
+            return value
+        }
+    }
+}
+
+@JvmInline
+value class Snapshot internal constructor(private val value: LongArray) {
 
     val size: Int
         get() = value.size
@@ -156,11 +157,7 @@ class Snapshot internal constructor(private val value: LongArray) {
             return true
         }
 
-    fun valueAt(index: Int): Long {
-        return value[index]
-    }
-
-    internal fun get(index: Int): Record {
+    operator fun get(index: Int): Record {
         return Record(value[index])
     }
 

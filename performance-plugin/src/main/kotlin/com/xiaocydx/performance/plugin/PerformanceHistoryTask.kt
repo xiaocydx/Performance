@@ -85,7 +85,8 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
         startTime = System.currentTimeMillis()
         val writeMapping = mappingEnforcer.submitWrite(collectResult)
         val outputEnforcer = OutputEnforcer(consumer, output, inspector)
-        val modifyEnforcer = ModifyEnforcer(producer, outputEnforcer, inspector, ext.isTraceEnabled)
+        val modifyEnforcer = ModifyEnforcer(producer, outputEnforcer,
+            inspector, ext.isTraceEnabled, ext.isRecordEnabled)
         modifyEnforcer.await(inputJars, inputDirectories, collectResult)
         outputEnforcer.await()
         writeMapping.await()

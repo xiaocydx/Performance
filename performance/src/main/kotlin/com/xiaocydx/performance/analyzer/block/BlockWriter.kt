@@ -18,9 +18,10 @@ package com.xiaocydx.performance.analyzer.block
 
 import android.content.Context
 import android.os.SystemClock
+import android.util.Log
 import com.xiaocydx.performance.analyzer.block.BlockReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
-import com.xiaocydx.performance.runtime.history.Snapshot
 import kotlinx.coroutines.Dispatchers
+import org.json.JSONObject
 import java.io.File
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -34,16 +35,38 @@ class BlockWriter(
 ) : BlockReceiver {
     private val context = requireNotNull(context.applicationContext)
 
-    override fun onReceive(scene: String, snapshot: Snapshot) {
+    override fun onBlock(report: BlockReport) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
-            val blockDir = File(context.filesDir, "performance/block")
-            blockDir.takeIf { !it.exists() }?.mkdirs()
-            val file = File(blockDir, "${SystemClock.uptimeMillis()}-snapshot.txt")
-            file.printWriter().use { writer ->
-                for (i in 0 until snapshot.size) {
-                    writer.println(snapshot.valueAt(i))
-                }
+            print(report)
+            write(report)
+        }
+    }
+
+    private fun print(report: BlockReport) {
+        val json = JSONObject().apply {
+            put("scene", report.scene)
+            put("durationMillis", report.durationMillis)
+            put("thresholdMillis", report.thresholdMillis)
+            put("isRecordEnabled", report.isRecordEnabled)
+            put("snapshotAvailable", report.snapshot.isAvailable)
+        }
+        Log.e(TAG, json.toString())
+    }
+
+    private fun write(report: BlockReport) {
+        val snapshot = report.snapshot
+        if (!snapshot.isAvailable) return
+        val blockDir = File(context.filesDir, "performance/block")
+        blockDir.takeIf { !it.exists() }?.mkdirs()
+        val file = File(blockDir, "${SystemClock.uptimeMillis()}-snapshot.txt")
+        file.printWriter().use { writer ->
+            for (i in 0 until snapshot.size) {
+                writer.println(snapshot[i].value)
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "BlockWriter"
     }
 }

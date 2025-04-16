@@ -14,23 +14,14 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.block
-
-import androidx.annotation.IntRange
+package com.xiaocydx.performance.runtime
 
 /**
+ * 用于修改字节码的api
+ *
  * @author xcc
- * @date 2025/4/15
+ * @date 2025/4/16
  */
-interface BlockReceiver {
-
-    @get:IntRange(from = 1)
-    val thresholdMillis: Long
-        get() = DEFAULT_THRESHOLD_MILLIS
-
-    fun onBlock(report: BlockReport)
-
-    companion object {
-        const val DEFAULT_THRESHOLD_MILLIS = 700L
-    }
-}
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+internal annotation class BytecodeApi

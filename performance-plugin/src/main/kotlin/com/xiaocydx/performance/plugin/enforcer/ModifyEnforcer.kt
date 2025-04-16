@@ -40,6 +40,7 @@ internal class ModifyEnforcer(
     private val output: OutputEnforcer,
     private val inspector: Inspector,
     private val isTraceEnabled: Boolean,
+    private val isRecordEnabled: Boolean
 ) : AbstractEnforcer() {
 
     fun await(
@@ -161,13 +162,17 @@ internal class ModifyEnforcer(
                 mv.visitLdcInsn(prettyName)
                 mv.visitMethodInsn(INVOKESTATIC, HISTORY, "beginTrace", "(Ljava/lang/String;)V", false)
             }
-            mv.visitLdcInsn(methodData.id)
-            mv.visitMethodInsn(INVOKESTATIC, HISTORY, "enter", "(I)V", false)
+            if (isRecordEnabled) {
+                mv.visitLdcInsn(methodData.id)
+                mv.visitMethodInsn(INVOKESTATIC, HISTORY, "enter", "(I)V", false)
+            }
         }
 
         override fun onMethodExit(opcode: Int) {
-            mv.visitLdcInsn(methodData.id)
-            mv.visitMethodInsn(INVOKESTATIC, HISTORY, "exit", "(I)V", false)
+            if (isRecordEnabled) {
+                mv.visitLdcInsn(methodData.id)
+                mv.visitMethodInsn(INVOKESTATIC, HISTORY, "exit", "(I)V", false)
+            }
             if (isTraceEnabled) {
                 mv.visitMethodInsn(INVOKESTATIC, HISTORY, "endTrace", "()V", false)
             }

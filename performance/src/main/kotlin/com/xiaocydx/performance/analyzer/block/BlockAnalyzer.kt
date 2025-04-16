@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("ReplaceManualRangeWithIndicesCalls")
+
 package com.xiaocydx.performance.analyzer.block
 
 import android.os.Handler
@@ -39,6 +41,7 @@ internal class BlockAnalyzer(
         val handler = Handler(host.dumpLooper)
         val callback = Callback(handler, config)
         coroutineScope.launch {
+            host.needHistory(this@BlockAnalyzer)
             host.addCallback(callback)
             awaitCancellation()
         }.invokeOnCompletion {
@@ -50,22 +53,29 @@ internal class BlockAnalyzer(
         private val handler: Handler,
         private val config: BlockConfig,
     ) : MainLooperCallback {
-        private var startMs = 0L
         private var startMark = 0L
+        private var startMillis = 0L
 
         override fun start(type: Type, data: Any?) {
-            startMs = SystemClock.uptimeMillis()
             startMark = History.startMark()
+            startMillis = SystemClock.uptimeMillis()
         }
 
         override fun end(type: Type, data: Any?) {
-            val endMs = SystemClock.uptimeMillis()
+            val endMillis = SystemClock.uptimeMillis()
             val endMark = History.endMark()
-            val timeMs = endMs - startMs
-            for (i in 0 until config.receivers.size) {
-                val receiver = config.receivers[i]
-                if (timeMs > receiver.thresholdMillis) {
-                    handler.post(DumpTask(scene = type.name, startMark, endMark, timeMs, config))
+            val durationMillis = endMillis - startMillis
+            val receivers = config.receivers
+            for (i in 0 until receivers.size) {
+                if (durationMillis > receivers[i].thresholdMillis) {
+                    handler.post(DumpTask(
+                        scene = type.name,
+                        startMark = startMark,
+                        endMark = endMark,
+                        durationMillis = durationMillis,
+                        isRecordEnabled = History.isRecordEnabled,
+                        receivers = receivers
+                    ))
                     break
                 }
             }
@@ -76,17 +86,23 @@ internal class BlockAnalyzer(
         private val scene: String,
         private val startMark: Long,
         private val endMark: Long,
-        private val timeMs: Long,
-        private val config: BlockConfig,
+        private val durationMillis: Long,
+        private val isRecordEnabled: Boolean,
+        private val receivers: List<BlockReceiver>,
     ) : Runnable {
 
         override fun run() {
             val snapshot = History.snapshot(startMark, endMark)
-            if (!snapshot.isAvailable) return
-            for (i in 0 until config.receivers.size) {
-                val receiver = config.receivers[i]
-                if (timeMs > receiver.thresholdMillis) {
-                    receiver.onReceive(scene, snapshot)
+            for (i in 0 until receivers.size) {
+                val thresholdMillis = receivers[i].thresholdMillis
+                if (durationMillis > thresholdMillis) {
+                    receivers[i].onBlock(BlockReport(
+                        scene = scene,
+                        snapshot = snapshot,
+                        durationMillis = durationMillis,
+                        thresholdMillis = thresholdMillis,
+                        isRecordEnabled = isRecordEnabled
+                    ))
                 }
             }
         }

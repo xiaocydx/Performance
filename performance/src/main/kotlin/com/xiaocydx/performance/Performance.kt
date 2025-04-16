@@ -21,6 +21,7 @@ import android.app.Application
 import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
+import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.block.BlockAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
@@ -30,6 +31,7 @@ import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
+import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.looper.CompositeMainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperCallback
 import com.xiaocydx.performance.runtime.looper.MainLooperWatcher
@@ -58,12 +60,8 @@ object Performance {
         activityWatcher.init(application)
 
         IdleHandlerAnalyzer(host).start()
-        if (config.blockConfig.receivers.isNotEmpty()) {
-            BlockAnalyzer(host, config.blockConfig).start()
-        }
-        if (config.frameConfig.receivers.isNotEmpty()) {
-            FrameMetricsAnalyzer.create(host, config.frameConfig).start()
-        }
+        if (config.isBlockEnabled) BlockAnalyzer(host, config.blockConfig).start()
+        if (config.isFrameEnabled) FrameMetricsAnalyzer.create(host, config.frameConfig).start()
 
         host.callbacks.immutable()
         MainLooperWatcher.init(host, callback = host.callbacks)
@@ -102,6 +100,10 @@ object Performance {
         override fun removeCallback(callback: MainLooperCallback) {
             callbacks.remove(callback)
         }
+
+        override fun needHistory(analyzer: Analyzer) {
+            History.init()
+        }
     }
 
     internal interface Host {
@@ -126,12 +128,18 @@ object Performance {
 
         @MainThread
         fun removeCallback(callback: MainLooperCallback)
+
+        @MainThread
+        fun needHistory(analyzer: Analyzer)
     }
 
     data class Config(
         val blockConfig: BlockConfig = BlockConfig(),
         val frameConfig: FrameMetricsConfig = FrameMetricsConfig(),
     ) {
+        internal val isBlockEnabled = blockConfig.receivers.isNotEmpty()
+        internal val isFrameEnabled = frameConfig.receivers.isNotEmpty()
+
         internal fun checkProperty() {
             blockConfig.checkProperty()
             frameConfig.checkProperty()
