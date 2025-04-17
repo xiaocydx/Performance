@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-@file:Suppress("UnusedReceiverParameter", "PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
 
-package com.xiaocydx.performance.plugin.enforcer
+package com.xiaocydx.performance.plugin.processor
 
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
-import org.objectweb.asm.Opcodes
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -27,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * @author xcc
  * @date 2025/4/13
  */
-internal abstract class AbstractEnforcer {
+internal abstract class AbstractProcessor {
 
     protected inline fun Dispatcher.execute(
         tasks: TaskCountDownLatch,
@@ -65,10 +64,6 @@ internal abstract class AbstractEnforcer {
                 }
             }
         }
-    }
-
-    protected companion object {
-        const val ASM_API = Opcodes.ASM9
     }
 }
 

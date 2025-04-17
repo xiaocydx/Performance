@@ -50,9 +50,9 @@ performance {
         val dir = project(":performance-convert").projectDir
         isTraceEnabled = true
         isRecordEnabled = true
-        keepMethodFile = "${dir}/inputs/keepMethodList.text"
-        ignoredClassFile = "${dir}/outputs/ignored/ignoredClassList.text"
-        ignoredMethodFile = "${dir}/outputs/ignored/ignoredMethodList.text"
-        mappingMethodFile = "${dir}/outputs/mapping/mappingMethodList.text"
+        excludeManifest = "${dir}/inputs/ExcludeManifest.text"
+        excludeClassFile = "${dir}/outputs//exclude/ExcludeClassList.text"
+        excludeMethodFile = "${dir}/outputs//exclude/ExcludeMethodList.text"
+        mappingMethodFile = "${dir}/outputs/mapping/MappingMethodList.text"
     }
 }

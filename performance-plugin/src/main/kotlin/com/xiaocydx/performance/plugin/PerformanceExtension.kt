@@ -44,8 +44,8 @@ open class PerformanceExtension {
 open class PerformanceHistoryExtension(
     var isTraceEnabled: Boolean = false,
     var isRecordEnabled: Boolean = false,
-    var keepMethodFile: String = "",
-    var ignoredClassFile: String = "",
-    var ignoredMethodFile: String = "",
+    var excludeManifest: String = "",
+    var excludeClassFile: String = "",
+    var excludeMethodFile: String = "",
     var mappingMethodFile: String = "",
 )

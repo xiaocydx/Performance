@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin.enforcer
+package com.xiaocydx.performance.plugin.processor
 
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.metadata.MethodData
@@ -31,15 +31,15 @@ import kotlin.system.measureTimeMillis
  * @author xcc
  * @date 2025/4/13
  */
-internal class ModifyEnforcer(
+internal class ModifyProcessor(
     private val dispatcher: Dispatcher,
-    private val output: OutputEnforcer,
-    private val collectResult: CollectResult,
-) : AbstractEnforcer() {
+    private val result: CollectResult,
+    private val output: OutputProcessor,
+) : AbstractProcessor() {
 
     fun await(isTraceEnabled: Boolean, isRecordEnabled: Boolean) {
         val tasks = TaskCountDownLatch()
-        collectResult.mappingClass.forEach {
+        result.mappingClass.forEach {
             dispatcher.execute(tasks) {
                 val entryName = it.value.entryName
                 val time = measureTimeMillis {
@@ -82,12 +82,12 @@ internal class ModifyEnforcer(
 
         classNode.methods.forEach { method ->
             val methodKey = MethodData.key(classNode.name, method.name, method.desc)
-            val methodData = collectResult.mappingMethod[methodKey] ?: return@forEach
+            val methodData = result.mappingMethod[methodKey] ?: return@forEach
             method.instructions.insert(methodEnterInstructions(methodData))
             method.instructions.forEach { insnNode ->
                 val opcode = insnNode.opcode
                 if ((opcode >= Opcodes.IRETURN && opcode <= Opcodes.RETURN) || opcode == Opcodes.ATHROW) {
-                    // method.instructions是双向链表，遍历过程对insnNode插入节点，不影响遍历
+                    // method.instructions是双向链表，遍历过程对insnNode插入prev节点，不影响遍历
                     method.instructions.insertBefore(insnNode, methodExitInstruction(methodData))
                 }
             }

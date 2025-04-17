@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin.enforcer
+package com.xiaocydx.performance.plugin.processor
 
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.metadata.ClassData
@@ -22,11 +22,13 @@ import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.metadata.Metadata.Companion.INITIAL_ID
 import com.xiaocydx.performance.plugin.metadata.MethodData
+import com.xiaocydx.performance.plugin.metadata.put
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.ListProperty
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.MethodNode
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarFile
@@ -36,14 +38,14 @@ import kotlin.system.measureTimeMillis
  * @author xcc
  * @date 2025/4/13
  */
-internal class CollectEnforcer(
+internal class CollectProcessor(
     private val dispatcher: Dispatcher,
-    private val output: OutputEnforcer,
     private val idGenerator: IdGenerator,
     private val inspector: Inspector,
-) : AbstractEnforcer() {
-    private val ignoredClass = ConcurrentHashMap<String, ClassData>()
-    private val ignoredMethod = ConcurrentHashMap<String, MethodData>()
+    private val output: OutputProcessor,
+) : AbstractProcessor() {
+    private val excludeClass = ConcurrentHashMap<String, ClassData>()
+    private val excludeMethod = ConcurrentHashMap<String, MethodData>()
     private val mappingClass = ConcurrentHashMap<String, ClassData>()
     private val mappingMethod = ConcurrentHashMap<String, MethodData>()
 
@@ -58,9 +60,8 @@ internal class CollectEnforcer(
                 val file = JarFile(jar.asFile)
                 file.entries().iterator().forEach action@{ entry ->
                     if (!inspector.isClass(entry)) return@action
-                    inspector.toIgnoredClass(entry)?.let {
-                        val classData = ClassData(it)
-                        ignoredClass[classData.key] = classData
+                    inspector.toExcludeClass(entry)?.let {
+                        excludeClass.put(ClassData(it))
                         output.write(file, entry)
                         return@action
                     }
@@ -75,9 +76,8 @@ internal class CollectEnforcer(
             directory.asFile.walk().forEach action@{ file ->
                 if (!inspector.isClass(file)) return@action
                 val entryName = inspector.entryName(directory, file)
-                inspector.toIgnoredClass(directory, file)?.let {
-                    val classData = ClassData(it)
-                    ignoredClass[classData.key] = classData
+                inspector.toExcludeClass(directory, file)?.let {
+                    excludeClass.put(ClassData(it))
                     output.write(entryName, file)
                     return@action
                 }
@@ -89,7 +89,7 @@ internal class CollectEnforcer(
         }
 
         tasks.await()
-        return CollectResult(ignoredClass, ignoredMethod, mappingClass, mappingMethod)
+        return CollectResult(excludeClass, excludeMethod, mappingClass, mappingMethod)
     }
 
     private fun collect(entryName: String, inputStream: InputStream) {
@@ -98,36 +98,30 @@ internal class CollectEnforcer(
             val classNode = ClassNode()
             classReader.accept(classNode, 0)
 
-            if (!inspector.isModifiable(classNode)) {
-                val classData = ClassData(classNode.name)
-                ignoredClass[classData.key] = classData
+            if (inspector.isExcludeClass(classNode)) {
+                excludeClass.put(ClassData(classNode.name))
                 return@use
             }
 
-            val className = classNode.name
-            val classData = ClassData(className, entryName, classReader, classNode)
-            mappingClass[classData.key] = classData
+            mappingClass.put(ClassData(classNode.name, entryName, classReader, classNode))
             classNode.methods.forEach { method ->
-                val key = MethodData.key(className, method.name, method.desc)
-                if (!inspector.isModifiable(method)) {
-                    ignoredMethod[key] = MethodData(
-                        id = INITIAL_ID, access = method.access,
-                        className = className, methodName = method.name, desc = method.desc
-                    )
+                if (inspector.isExcludeMethod(method)) {
+                    excludeMethod.put(method.toMethodData(id = INITIAL_ID, classNode.name))
                 } else {
-                    mappingMethod[key] = MethodData(
-                        id = idGenerator.generate(), access = method.access,
-                        className = className, methodName = method.name, desc = method.desc
-                    )
+                    mappingMethod.put(method.toMethodData(id = idGenerator.generate(), classNode.name))
                 }
             }
         }
     }
+
+    private fun MethodNode.toMethodData(id: Int, className: String) = run {
+        MethodData(id = id, access = access, className = className, methodName = name, desc = desc)
+    }
 }
 
 internal data class CollectResult(
-    val ignoredClass: Map<String, ClassData>,
-    val ignoredMethod: Map<String, MethodData>,
+    val excludeClass: Map<String, ClassData>,
+    val excludeMethod: Map<String, MethodData>,
     val mappingClass: Map<String, ClassData>,
     val mappingMethod: Map<String, MethodData>,
 )

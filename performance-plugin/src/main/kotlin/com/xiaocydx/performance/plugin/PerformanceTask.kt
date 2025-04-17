@@ -16,14 +16,13 @@
 
 package com.xiaocydx.performance.plugin
 
-import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
-import com.xiaocydx.performance.plugin.enforcer.CollectEnforcer
-import com.xiaocydx.performance.plugin.enforcer.MappingEnforcer
-import com.xiaocydx.performance.plugin.enforcer.ModifyEnforcer
-import com.xiaocydx.performance.plugin.enforcer.OutputEnforcer
-import com.xiaocydx.performance.plugin.enforcer.await
+import com.xiaocydx.performance.plugin.processor.CollectProcessor
+import com.xiaocydx.performance.plugin.processor.MappingProcessor
+import com.xiaocydx.performance.plugin.processor.ModifyProcessor
+import com.xiaocydx.performance.plugin.processor.OutputProcessor
+import com.xiaocydx.performance.plugin.processor.await
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
@@ -53,38 +52,40 @@ internal abstract class PerformanceTask : DefaultTask() {
         val ext = PerformanceExtension.getHistory(project)
         val consumer = SerialDispatcher.single()
         val producer = ExecutorDispatcher(threads = Runtime.getRuntime().availableProcessors() - 1)
+        try {
+            // Step1: ReadMapping
+            var startTime = System.currentTimeMillis()
+            val rootDir = project.rootDir.absolutePath
+            val mappingProcessor = MappingProcessor(
+                dispatcher = producer,
+                excludeManifest = ext.excludeManifest,
+                excludeClassFile = ext.excludeClassFile.ifEmpty { "${rootDir}/outputs/ExcludeClassList.text" },
+                excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${rootDir}/outputs/ExcludeMethodList.text" },
+                mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${rootDir}/outputs/MappingMethodList.text" }
+            )
+            val (inspector, idGenerator, _) = mappingProcessor.read()
+            printTime(startTime, step = "ReadMapping")
 
-        // Step1: ReadMapping
-        var startTime = System.currentTimeMillis()
-        val rootDir = project.rootDir.absolutePath
-        val mappingEnforcer = MappingEnforcer(
-            dispatcher = producer,
-            keepMethodFile = ext.keepMethodFile,
-            ignoredClassFile = ext.ignoredClassFile.ifEmpty { "${rootDir}/outputs/ignoredClassList.text" },
-            ignoredMethodFile = ext.ignoredMethodFile.ifEmpty { "${rootDir}/outputs/ignoredMethodList.text" },
-            mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${rootDir}/outputs/mappingMethodList.text" }
-        )
-        val (inspector, idGenerator, _) = mappingEnforcer.read()
-        printTime(startTime, step = "ReadMapping")
+            // Step2: CollectMethod
+            startTime = System.currentTimeMillis()
+            val outputProcessor = OutputProcessor(consumer, output, inspector)
+            val collectProcessor = CollectProcessor(producer, idGenerator, inspector, outputProcessor)
+            val collectResult = collectProcessor.await(inputJars, inputDirectories)
+            printTime(startTime, step = "CollectMethod")
 
-        // Step2: CollectMethod
-        startTime = System.currentTimeMillis()
-        val outputEnforcer = OutputEnforcer(consumer, output, inspector)
-        val collectEnforcer = CollectEnforcer(producer, outputEnforcer, idGenerator, inspector)
-        val collectResult = collectEnforcer.await(inputJars, inputDirectories)
-        printTime(startTime, step = "CollectMethod")
+            // Step3: ModifyMethod
+            startTime = System.currentTimeMillis()
+            val writeMapping = mappingProcessor.submitWrite(collectResult)
+            val modifyProcessor = ModifyProcessor(producer, collectResult, outputProcessor)
+            modifyProcessor.await(ext.isTraceEnabled, ext.isRecordEnabled)
+            printTime(startTime, step = "ModifyMethod")
 
-        // Step3: ModifyMethod
-        startTime = System.currentTimeMillis()
-        val writeMapping = mappingEnforcer.submitWrite(collectResult)
-        val modifyEnforcer = ModifyEnforcer(producer, outputEnforcer, collectResult)
-        modifyEnforcer.await(ext.isTraceEnabled, ext.isRecordEnabled)
-        printTime(startTime, step = "ModifyMethod")
-
-        writeMapping.await()
-        outputEnforcer.await()
-        consumer.shutdownNow()
-        producer.shutdownNow()
+            writeMapping.await()
+            outputProcessor.await()
+        } finally {
+            consumer.shutdownNow()
+            producer.shutdownNow()
+        }
     }
 
     private fun printTime(startTime: Long, step: String) {

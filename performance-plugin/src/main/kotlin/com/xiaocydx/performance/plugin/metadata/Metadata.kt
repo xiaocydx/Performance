@@ -17,6 +17,7 @@
 package com.xiaocydx.performance.plugin.metadata
 
 import com.xiaocydx.performance.plugin.metadata.Metadata.Companion.INITIAL_ID
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -40,4 +41,15 @@ internal class IdGenerator(initial: Int = INITIAL_ID) {
     private val id = AtomicInteger(initial)
 
     fun generate() = id.incrementAndGet()
+}
+
+internal fun <T : Metadata> MutableMap<String, T>.put(
+    metadata: T
+) = put(metadata.key, metadata)
+
+internal fun Collection<Metadata>.writeTo(file: File) {
+    file.parentFile.takeIf { !it.exists() }?.mkdirs()
+    file.printWriter(Metadata.charset).use { writer ->
+        forEach { writer.println(it.toOutput()) }
+    }
 }

@@ -1,4 +1,3 @@
 /build
-/outputs/ignored/*
-/outputs/mapping/*
+/outputs/*
 /snapshot/*

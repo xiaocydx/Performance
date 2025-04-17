@@ -28,8 +28,8 @@ import java.util.jar.JarEntry
  * @date 2025/4/15
  */
 internal class Inspector private constructor(
-    private val keepClass: Set<String>,
-    private val keepPackage: Set<String>,
+    private val excludeClass: Set<String>,
+    private val excludePackage: Set<String>,
 ) {
 
     fun isClass(entry: JarEntry): Boolean {
@@ -42,32 +42,39 @@ internal class Inspector private constructor(
         return file.name.endsWith(".class")
     }
 
-    fun toIgnoredClass(entry: JarEntry): String? {
+    fun toExcludeClass(entry: JarEntry): String? {
         val entryName = entry.name
         val className = className(entry)
-        DEFAULT_FILTER_CLASS.forEach { if (entryName.contains(it)) return className }
-        if (isKeepClass(className)) return className
+        DEFAULT_EXCLUDE_CLASS.forEach { if (entryName.contains(it)) return className }
+        if (isExcludeClass(className)) return className
         return null
     }
 
-    fun toIgnoredClass(directory: Directory, file: File): String? {
+    fun toExcludeClass(directory: Directory, file: File): String? {
         val fileName = file.name
         val className = className(directory, file)
-        DEFAULT_FILTER_CLASS.forEach { if (fileName.contains(it)) return className }
-        if (isKeepClass(className)) return className
+        DEFAULT_EXCLUDE_CLASS.forEach { if (fileName.contains(it)) return className }
+        if (isExcludeClass(className)) return className
         return null
     }
 
-    fun isModifiable(node: ClassNode): Boolean {
-        return node.access and Opcodes.ACC_INTERFACE == 0
+    fun isExcludeClass(className: String): Boolean {
+        if (excludeClass.contains(className)) return true
+        val last = className.lastIndexOf('/')
+        val end = (last + 1).coerceAtMost(className.length)
+        val packageName = className.substring(0, end)
+        excludePackage.forEach { if (packageName.startsWith(it)) return true }
+        return false
     }
 
-    fun isModifiable(node: MethodNode): Boolean {
-        if (node.access and Opcodes.ACC_ABSTRACT != 0
-                || node.access and Opcodes.ACC_NATIVE != 0) {
-            return false
-        }
-        return !node.isEmpty() && !node.isGetSet() && !node.isNotContainsInvoke()
+    fun isExcludeClass(node: ClassNode): Boolean {
+        return node.access and Opcodes.ACC_INTERFACE != 0
+    }
+
+    fun isExcludeMethod(node: MethodNode): Boolean {
+        return node.access and Opcodes.ACC_ABSTRACT != 0
+                || node.access and Opcodes.ACC_NATIVE != 0
+                || node.isEmpty() || node.isGetSet() || node.isNotContainsInvoke()
     }
 
     fun isWritable(file: File): Boolean {
@@ -93,15 +100,6 @@ internal class Inspector private constructor(
     fun entryName(directory: Directory, file: File): String {
         val path = directory.asFile.toURI().relativize(file.toURI()).path
         return path.replace(File.separatorChar, '/')
-    }
-
-    private fun isKeepClass(className: String): Boolean {
-        if (keepClass.contains(className)) return true
-        val last = className.lastIndexOf('/')
-        val end = (last + 1).coerceAtMost(className.length)
-        val packageName = className.substring(0, end)
-        keepPackage.forEach { if (packageName.startsWith(it)) return true }
-        return false
     }
 
     private fun MethodNode.isEmpty(): Boolean {
@@ -164,31 +162,31 @@ internal class Inspector private constructor(
 
     companion object {
         private const val MODULE_INFO_CLASS = "module-info.class"
-        private val DEFAULT_FILTER_CLASS = listOf(MODULE_INFO_CLASS, "R.class", "R$", "Manifest", "BuildConfig")
+        private val DEFAULT_EXCLUDE_CLASS = listOf(MODULE_INFO_CLASS, "R.class", "R$", "Manifest", "BuildConfig")
 
-        private const val KEEP_CLASS_PREFIX = "-keepclass "
-        private const val KEEP_PACKAGE_PREFIX = "-keeppackage "
-        private val DEFAULT_KEEP_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
+        private const val EXCLUDE_CLASS_PREFIX = "-excludeclass "
+        private const val EXCLUDE_PACKAGE_PREFIX = "-excludepackage "
+        private val DEFAULT_EXCLUDE_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
 
-        fun create(keepMethodFile: File): Inspector {
-            val keepClass = mutableSetOf<String>()
-            val keepPackage = mutableSetOf<String>()
-            keepPackage.addAll(DEFAULT_KEEP_PACKAGE)
-            if (keepMethodFile.exists()) {
-                keepMethodFile.bufferedReader().useLines { lines ->
+        fun create(excludeManifest: File): Inspector {
+            val excludeClass = mutableSetOf<String>()
+            val excludePackage = mutableSetOf<String>()
+            excludePackage.addAll(DEFAULT_EXCLUDE_PACKAGE)
+            if (excludeManifest.exists()) {
+                excludeManifest.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         when {
-                            line.startsWith(KEEP_CLASS_PREFIX) -> {
-                                keepClass.add(line.replace(KEEP_CLASS_PREFIX, ""))
+                            line.startsWith(EXCLUDE_CLASS_PREFIX) -> {
+                                excludeClass.add(line.replace(EXCLUDE_CLASS_PREFIX, ""))
                             }
-                            line.startsWith(KEEP_PACKAGE_PREFIX) -> {
-                                keepPackage.add(line.replace(KEEP_PACKAGE_PREFIX, ""))
+                            line.startsWith(EXCLUDE_PACKAGE_PREFIX) -> {
+                                excludePackage.add(line.replace(EXCLUDE_PACKAGE_PREFIX, ""))
                             }
                         }
                     }
                 }
             }
-            return Inspector(keepClass, keepPackage)
+            return Inspector(excludeClass, excludePackage)
         }
     }
 }

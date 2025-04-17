@@ -1,0 +1,2 @@
+-excludepackage kotlin/
+-excludepackage kotlinx/coroutines/

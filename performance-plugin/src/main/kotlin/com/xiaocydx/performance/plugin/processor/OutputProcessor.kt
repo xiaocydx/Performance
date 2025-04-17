@@ -16,7 +16,7 @@
 
 @file:Suppress("CanBeParameter")
 
-package com.xiaocydx.performance.plugin.enforcer
+package com.xiaocydx.performance.plugin.processor
 
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import com.xiaocydx.performance.plugin.metadata.Inspector
@@ -30,11 +30,11 @@ import java.util.jar.JarOutputStream
  * @author xcc
  * @date 2025/4/13
  */
-internal class OutputEnforcer(
+internal class OutputProcessor(
     private val dispatcher: SerialDispatcher,
     private val output: RegularFileProperty,
     private val inspector: Inspector,
-) : AbstractEnforcer() {
+) : AbstractProcessor() {
     private val jarOutput = JarOutputStream(output.get().asFile.outputStream().buffered())
     private val tasks = TaskCountDownLatch()
 
