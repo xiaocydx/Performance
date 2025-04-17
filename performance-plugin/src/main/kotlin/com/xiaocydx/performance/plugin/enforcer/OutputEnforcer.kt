@@ -55,17 +55,17 @@ internal class OutputEnforcer(
         }
     }
 
-    fun write(jarFile: JarFile, jarEntry: JarEntry) {
-        if (!inspector.isWritable(jarEntry)) return
+    fun write(file: JarFile, entry: JarEntry) {
+        if (!inspector.isWritable(entry)) return
         dispatcher.execute(tasks) {
-            jarOutput.putNextEntry(JarEntry(jarEntry.name))
-            jarFile.getInputStream(jarEntry).use { it.copyTo(jarOutput) }
+            jarOutput.putNextEntry(JarEntry(entry.name))
+            file.getInputStream(entry).use { it.copyTo(jarOutput) }
             jarOutput.closeEntry()
         }
     }
 
-    fun close(jarFile: JarFile) {
-        dispatcher.execute(tasks) { jarFile.close() }
+    fun close(file: JarFile) {
+        dispatcher.execute(tasks) { file.close() }
     }
 
     fun await() {

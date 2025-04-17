@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal interface Metadata {
 
-    fun toKey(): String
+    val key: String
 
     fun toOutput(): String
 

@@ -18,6 +18,8 @@ package com.xiaocydx.performance.plugin.metadata
 
 import org.gradle.api.file.Directory
 import org.objectweb.asm.Opcodes
+import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.MethodNode
 import java.io.File
 import java.util.jar.JarEntry
 
@@ -29,6 +31,7 @@ internal class Inspector private constructor(
     private val keepClass: Set<String>,
     private val keepPackage: Set<String>,
 ) {
+
     fun isClass(entry: JarEntry): Boolean {
         if (entry.isDirectory) return false
         return entry.name.endsWith(".class")
@@ -55,8 +58,16 @@ internal class Inspector private constructor(
         return null
     }
 
-    fun isModifiable(access: Int): Boolean {
-        return access and Opcodes.ACC_INTERFACE == 0 && access and Opcodes.ACC_ABSTRACT == 0
+    fun isModifiable(node: ClassNode): Boolean {
+        return node.access and Opcodes.ACC_INTERFACE == 0
+    }
+
+    fun isModifiable(node: MethodNode): Boolean {
+        if (node.access and Opcodes.ACC_ABSTRACT != 0
+                || node.access and Opcodes.ACC_NATIVE != 0) {
+            return false
+        }
+        return !node.isEmpty() && !node.isGetSet() && !node.isNotContainsInvoke()
     }
 
     fun isWritable(file: File): Boolean {
@@ -79,7 +90,7 @@ internal class Inspector private constructor(
         return pathName.replace(".class", "")
     }
 
-    fun outputName(directory: Directory, file: File): String {
+    fun entryName(directory: Directory, file: File): String {
         val path = directory.asFile.toURI().relativize(file.toURI()).path
         return path.replace(File.separatorChar, '/')
     }
@@ -91,6 +102,64 @@ internal class Inspector private constructor(
         val packageName = className.substring(0, end)
         keepPackage.forEach { if (packageName.startsWith(it)) return true }
         return false
+    }
+
+    private fun MethodNode.isEmpty(): Boolean {
+        val isConstructor = name == "<init>"
+        val instructions = requireNotNull(instructions)
+        if (!isConstructor) {
+            instructions.forEach { if (it.opcode != -1) return false }
+        } else {
+            var loadCount = 0
+            var invokeCount = 0
+            var returnCount = 0
+            instructions.forEach {
+                when (it.opcode) {
+                    -1 -> return@forEach
+                    Opcodes.ALOAD -> loadCount++
+                    Opcodes.INVOKESPECIAL -> invokeCount++
+                    Opcodes.RETURN -> returnCount++
+                    else -> return false
+                }
+            }
+            // 空构造函数只执行这三种指令
+            if (loadCount != 1 || invokeCount != 1 || returnCount != 1) return false
+        }
+        return true
+    }
+
+    private fun MethodNode.isGetSet(): Boolean {
+        val instructions = requireNotNull(instructions)
+        instructions.forEach {
+            val opcode = it.opcode
+            if (opcode == -1) return@forEach
+            if (opcode != Opcodes.GETFIELD
+                    && opcode != Opcodes.GETSTATIC
+                    && opcode != Opcodes.H_GETFIELD
+                    && opcode != Opcodes.H_GETSTATIC
+                    && opcode != Opcodes.RETURN
+                    && opcode != Opcodes.ARETURN
+                    && opcode != Opcodes.DRETURN
+                    && opcode != Opcodes.FRETURN
+                    && opcode != Opcodes.LRETURN
+                    && opcode != Opcodes.IRETURN
+                    && opcode != Opcodes.PUTFIELD
+                    && opcode != Opcodes.PUTSTATIC
+                    && opcode != Opcodes.H_PUTFIELD
+                    && opcode != Opcodes.H_PUTSTATIC
+                    && opcode > Opcodes.SALOAD) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun MethodNode.isNotContainsInvoke(): Boolean {
+        val instructions = requireNotNull(instructions)
+        instructions.forEach {
+            if (it.opcode in Opcodes.INVOKEVIRTUAL..Opcodes.INVOKEDYNAMIC) return false
+        }
+        return true
     }
 
     companion object {

@@ -37,17 +37,17 @@ internal class PerformancePlugin : Plugin<Project> {
             if (!historyExt.isTraceEnabled && !historyExt.isRecordEnabled) return@onVariants
 
             val taskProvider = project.tasks.register(
-                "${variant.name}PerformanceHistory",
-                PerformanceHistoryTask::class.java
+                "${variant.name}Performance",
+                PerformanceTask::class.java
             )
             variant.artifacts
                 .forScope(ScopedArtifacts.Scope.ALL)
                 .use(taskProvider)
                 .toTransform(
                     type = ScopedArtifact.CLASSES,
-                    inputJars = PerformanceHistoryTask::inputJars,
-                    inputDirectories = PerformanceHistoryTask::inputDirectories,
-                    into = PerformanceHistoryTask::output
+                    inputJars = PerformanceTask::inputJars,
+                    inputDirectories = PerformanceTask::inputDirectories,
+                    into = PerformanceTask::output
                 )
         }
     }

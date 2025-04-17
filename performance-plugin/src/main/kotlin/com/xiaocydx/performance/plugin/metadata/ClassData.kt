@@ -16,20 +16,24 @@
 
 package com.xiaocydx.performance.plugin.metadata
 
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.tree.ClassNode
+
 /**
  * @author xcc
  * @date 2025/4/15
  */
-internal data class ClassData(val className: String) : Metadata {
+internal class ClassData(
+    val className: String,
+    val entryName: String = "",
+    private val classReader: ClassReader? = null,
+    private val classNode: ClassNode? = null,
+) : Metadata {
+    override val key = className
 
-    override fun toKey() = key(className)
+    fun requireReader() = requireNotNull(classReader)
+
+    fun requireNode() = requireNotNull(classNode)
 
     override fun toOutput() = className
-
-    companion object {
-
-        fun key(className: String): String {
-            return className
-        }
-    }
 }

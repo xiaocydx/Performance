@@ -22,7 +22,7 @@ import com.xiaocydx.performance.plugin.metadata.Metadata.Companion.SEPARATOR
  * @author xcc
  * @date 2025/4/15
  */
-internal data class MethodData(
+internal class MethodData(
     val id: Int,
     val access: Int,
     val className: String,
@@ -30,9 +30,8 @@ internal data class MethodData(
     val desc: String,
 ) : Metadata {
 
-    override fun toKey(): String {
-        return key(className, methodName, desc)
-    }
+    override val key: String
+        get() = key(className, methodName, desc)
 
     override fun toOutput(): String {
         return "${id}${SEPARATOR}${access}${SEPARATOR}" +

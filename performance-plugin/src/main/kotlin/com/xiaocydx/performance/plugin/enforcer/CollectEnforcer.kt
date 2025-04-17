@@ -26,11 +26,7 @@ import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.ListProperty
 import org.objectweb.asm.ClassReader
-import org.objectweb.asm.ClassVisitor
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.MethodVisitor
-import org.objectweb.asm.Opcodes
-import org.objectweb.asm.tree.MethodNode
+import org.objectweb.asm.tree.ClassNode
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarFile
@@ -42,11 +38,13 @@ import kotlin.system.measureTimeMillis
  */
 internal class CollectEnforcer(
     private val dispatcher: Dispatcher,
+    private val output: OutputEnforcer,
     private val idGenerator: IdGenerator,
     private val inspector: Inspector,
 ) : AbstractEnforcer() {
     private val ignoredClass = ConcurrentHashMap<String, ClassData>()
     private val ignoredMethod = ConcurrentHashMap<String, MethodData>()
+    private val mappingClass = ConcurrentHashMap<String, ClassData>()
     private val mappingMethod = ConcurrentHashMap<String, MethodData>()
 
     fun await(
@@ -57,161 +55,72 @@ internal class CollectEnforcer(
 
         inputJars.get().forEach { jar ->
             dispatcher.execute(tasks) {
-                val jarFile = JarFile(jar.asFile)
-                jarFile.entries().iterator().forEach action@{ entry ->
+                val file = JarFile(jar.asFile)
+                file.entries().iterator().forEach action@{ entry ->
                     if (!inspector.isClass(entry)) return@action
                     inspector.toIgnoredClass(entry)?.let {
-                        ignoredClass[ClassData.key(it)] = ClassData(it)
+                        val classData = ClassData(it)
+                        ignoredClass[classData.key] = classData
+                        output.write(file, entry)
                         return@action
                     }
-                    val time = measureTimeMillis { collect(jarFile.getInputStream(entry)) }
+                    val time = measureTimeMillis { collect(entry.name, file.getInputStream(entry)) }
                     println("Collect from jar ${entry.name} ${time}ms")
                 }
-                jarFile.close()
+                output.close(file)
             }
         }
 
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
                 if (!inspector.isClass(file)) return@action
+                val entryName = inspector.entryName(directory, file)
                 inspector.toIgnoredClass(directory, file)?.let {
-                    ignoredClass[ClassData.key(it)] = ClassData(it)
+                    val classData = ClassData(it)
+                    ignoredClass[classData.key] = classData
+                    output.write(entryName, file)
                     return@action
                 }
                 dispatcher.execute(tasks) {
-                    val name = inspector.outputName(directory, file)
-                    val time = measureTimeMillis { collect(file.inputStream()) }
-                    println("Collect from directory $name ${time}ms")
+                    val time = measureTimeMillis { collect(entryName, file.inputStream()) }
+                    println("Collect from directory $entryName ${time}ms")
                 }
             }
         }
 
         tasks.await()
-        return CollectResult(ignoredClass, ignoredMethod, mappingMethod)
+        return CollectResult(ignoredClass, ignoredMethod, mappingClass, mappingMethod)
     }
 
-    private fun collect(inputStream: InputStream) {
+    private fun collect(entryName: String, inputStream: InputStream) {
         inputStream.use {
             val classReader = ClassReader(it)
-            val classWriter = ClassWriter(ClassWriter.COMPUTE_MAXS)
-            val classVisitor = CollectClassVisitor(classWriter)
-            classReader.accept(classVisitor, 0)
-        }
-    }
+            val classNode = ClassNode()
+            classReader.accept(classNode, 0)
 
-    private inner class CollectClassVisitor(
-        classVisitor: ClassVisitor,
-    ) : ClassVisitor(ASM_API, classVisitor) {
-        private var className = ""
-        private var isModifiable = false
-
-        override fun visit(
-            version: Int,
-            access: Int,
-            name: String,
-            signature: String?,
-            superName: String?,
-            interfaces: Array<out String>?,
-        ) {
-            super.visit(version, access, name, signature, superName, interfaces)
-            className = name
-            isModifiable = inspector.isModifiable(access)
-        }
-
-        override fun visitMethod(
-            access: Int,
-            name: String,
-            descriptor: String,
-            signature: String?,
-            exceptions: Array<out String>?,
-        ): MethodVisitor = if (!isModifiable) {
-            super.visitMethod(access, name, descriptor, signature, exceptions)
-        } else {
-            CollectMethodNode(access, name, descriptor, signature, exceptions, className)
-        }
-    }
-
-    private inner class CollectMethodNode(
-        access: Int,
-        name: String,
-        descriptor: String,
-        signature: String?,
-        exceptions: Array<out String>?,
-        private val className: String,
-    ) : MethodNode(ASM_API, access, name, descriptor, signature, exceptions) {
-
-        override fun visitEnd() {
-            super.visitEnd()
-            val methodKey = MethodData.key(className, name, desc)
-            if (isEmptyMethod() || isGetSetMethod() || isSingleMethod()) {
-                ignoredMethod[methodKey] = MethodData(
-                    id = INITIAL_ID, access = access,
-                    className = className, methodName = name, desc = desc
-                )
-            } else {
-                mappingMethod[methodKey] = MethodData(
-                    id = idGenerator.generate(), access = access,
-                    className = className, methodName = name, desc = desc
-                )
+            if (!inspector.isModifiable(classNode)) {
+                val classData = ClassData(classNode.name)
+                ignoredClass[classData.key] = classData
+                return@use
             }
-        }
 
-        private fun isEmptyMethod(): Boolean {
-            val isConstructor = name == "<init>"
-            val instructions = requireNotNull(instructions)
-            if (!isConstructor) {
-                instructions.forEach { if (it.opcode != -1) return false }
-            } else {
-                var loadCount = 0
-                var invokeCount = 0
-                var returnCount = 0
-                instructions.forEach {
-                    when (it.opcode) {
-                        -1 -> return@forEach
-                        Opcodes.ALOAD -> loadCount++
-                        Opcodes.INVOKESPECIAL -> invokeCount++
-                        Opcodes.RETURN -> returnCount++
-                        else -> return false
-                    }
-                }
-                // 空构造函数只执行这三种指令
-                if (loadCount != 1 || invokeCount != 1 || returnCount != 1) return false
-            }
-            return true
-        }
-
-        private fun isGetSetMethod(): Boolean {
-            val instructions = requireNotNull(instructions)
-            instructions.forEach {
-                val opcode = it.opcode
-                if (opcode == -1) return@forEach
-                if (opcode != Opcodes.GETFIELD
-                        && opcode != Opcodes.GETSTATIC
-                        && opcode != Opcodes.H_GETFIELD
-                        && opcode != Opcodes.H_GETSTATIC
-                        && opcode != Opcodes.RETURN
-                        && opcode != Opcodes.ARETURN
-                        && opcode != Opcodes.DRETURN
-                        && opcode != Opcodes.FRETURN
-                        && opcode != Opcodes.LRETURN
-                        && opcode != Opcodes.IRETURN
-                        && opcode != Opcodes.PUTFIELD
-                        && opcode != Opcodes.PUTSTATIC
-                        && opcode != Opcodes.H_PUTFIELD
-                        && opcode != Opcodes.H_PUTSTATIC
-                        && opcode > Opcodes.SALOAD) {
-                    return false
+            val className = classNode.name
+            val classData = ClassData(className, entryName, classReader, classNode)
+            mappingClass[classData.key] = classData
+            classNode.methods.forEach { method ->
+                val key = MethodData.key(className, method.name, method.desc)
+                if (!inspector.isModifiable(method)) {
+                    ignoredMethod[key] = MethodData(
+                        id = INITIAL_ID, access = method.access,
+                        className = className, methodName = method.name, desc = method.desc
+                    )
+                } else {
+                    mappingMethod[key] = MethodData(
+                        id = idGenerator.generate(), access = method.access,
+                        className = className, methodName = method.name, desc = method.desc
+                    )
                 }
             }
-            return true
-        }
-
-        private fun isSingleMethod(): Boolean {
-            val instructions = requireNotNull(instructions)
-            instructions.forEach {
-                if (it.opcode in Opcodes.INVOKEVIRTUAL..Opcodes.INVOKEDYNAMIC) return false
-            }
-            return true
         }
     }
 }
@@ -219,10 +128,6 @@ internal class CollectEnforcer(
 internal data class CollectResult(
     val ignoredClass: Map<String, ClassData>,
     val ignoredMethod: Map<String, MethodData>,
+    val mappingClass: Map<String, ClassData>,
     val mappingMethod: Map<String, MethodData>,
-) {
-
-    fun isIgnoredClass(className: String): Boolean {
-        return ignoredClass.containsKey(ClassData.key(className))
-    }
-}
+)

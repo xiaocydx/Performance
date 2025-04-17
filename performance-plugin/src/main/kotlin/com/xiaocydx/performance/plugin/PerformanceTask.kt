@@ -37,7 +37,7 @@ import org.gradle.api.tasks.TaskAction
  * @author xcc
  * @date 2025/4/11
  */
-internal abstract class PerformanceHistoryTask : DefaultTask() {
+internal abstract class PerformanceTask : DefaultTask() {
 
     @get:InputFiles
     abstract val inputJars: ListProperty<RegularFile>
@@ -51,16 +51,8 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
     @TaskAction
     fun taskAction() {
         val ext = PerformanceExtension.getHistory(project)
-        val isNop = true
-        val producer: Dispatcher
-        val consumer: SerialDispatcher
-        if (isNop) {
-            producer = SerialDispatcher.nop()
-            consumer = SerialDispatcher.nop()
-        } else {
-            producer = ExecutorDispatcher(threads = 16)
-            consumer = SerialDispatcher.single()
-        }
+        val consumer = SerialDispatcher.single()
+        val producer = ExecutorDispatcher(threads = Runtime.getRuntime().availableProcessors() - 1)
 
         // Step1: ReadMapping
         var startTime = System.currentTimeMillis()
@@ -77,21 +69,20 @@ internal abstract class PerformanceHistoryTask : DefaultTask() {
 
         // Step2: CollectMethod
         startTime = System.currentTimeMillis()
-        val collectEnforcer = CollectEnforcer(producer, idGenerator, inspector)
+        val outputEnforcer = OutputEnforcer(consumer, output, inspector)
+        val collectEnforcer = CollectEnforcer(producer, outputEnforcer, idGenerator, inspector)
         val collectResult = collectEnforcer.await(inputJars, inputDirectories)
         printTime(startTime, step = "CollectMethod")
 
         // Step3: ModifyMethod
         startTime = System.currentTimeMillis()
         val writeMapping = mappingEnforcer.submitWrite(collectResult)
-        val outputEnforcer = OutputEnforcer(consumer, output, inspector)
-        val modifyEnforcer = ModifyEnforcer(producer, outputEnforcer,
-            inspector, ext.isTraceEnabled, ext.isRecordEnabled)
-        modifyEnforcer.await(inputJars, inputDirectories, collectResult)
-        outputEnforcer.await()
-        writeMapping.await()
+        val modifyEnforcer = ModifyEnforcer(producer, outputEnforcer, collectResult)
+        modifyEnforcer.await(ext.isTraceEnabled, ext.isRecordEnabled)
         printTime(startTime, step = "ModifyMethod")
 
+        writeMapping.await()
+        outputEnforcer.await()
         consumer.shutdownNow()
         producer.shutdownNow()
     }
