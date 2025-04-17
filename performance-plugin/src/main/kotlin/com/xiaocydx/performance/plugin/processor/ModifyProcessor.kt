@@ -49,7 +49,7 @@ internal class ModifyProcessor(
                     modify(isTraceEnabled, isRecordEnabled, classNode)
                     classNode.accept(classWriter)
                     val bytes = classWriter.toByteArray()
-                    output.write(entryName, bytes)
+                    output.writeToJar(entryName, bytes)
                 }
                 println("Modify $entryName ${time}ms")
             }

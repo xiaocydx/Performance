@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin
+package com.xiaocydx.performance.plugin.task
 
+import com.xiaocydx.performance.plugin.PerformanceExtension
 import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import com.xiaocydx.performance.plugin.processor.CollectProcessor
@@ -25,10 +26,12 @@ import com.xiaocydx.performance.plugin.processor.OutputProcessor
 import com.xiaocydx.performance.plugin.processor.await
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFile
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
@@ -36,7 +39,7 @@ import org.gradle.api.tasks.TaskAction
  * @author xcc
  * @date 2025/4/11
  */
-internal abstract class PerformanceTask : DefaultTask() {
+internal abstract class TransformTask : DefaultTask() {
 
     @get:InputFiles
     abstract val inputJars: ListProperty<RegularFile>
@@ -44,8 +47,11 @@ internal abstract class PerformanceTask : DefaultTask() {
     @get:InputFiles
     abstract val inputDirectories: ListProperty<Directory>
 
+    @get:OutputDirectory
+    abstract val outputExclude: DirectoryProperty
+
     @get:OutputFile
-    abstract val output: RegularFileProperty
+    abstract val outputJar: RegularFileProperty
 
     @TaskAction
     fun taskAction() {
@@ -68,9 +74,10 @@ internal abstract class PerformanceTask : DefaultTask() {
 
             // Step2: CollectMethod
             startTime = System.currentTimeMillis()
-            val outputProcessor = OutputProcessor(consumer, output, inspector)
-            val collectProcessor = CollectProcessor(producer, idGenerator, inspector, outputProcessor)
+            val outputProcessor = OutputProcessor(consumer, inspector, outputExclude, outputJar)
+            val collectProcessor = CollectProcessor(producer, inspector, idGenerator, outputProcessor)
             val collectResult = collectProcessor.await(inputJars, inputDirectories)
+            collectResult.excludeFiles // TODO: 删除outputExclude不存在于excludeFiles的文件
             printTime(startTime, step = "CollectMethod")
 
             // Step3: ModifyMethod

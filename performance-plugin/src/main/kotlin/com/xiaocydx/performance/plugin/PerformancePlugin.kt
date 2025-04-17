@@ -19,9 +19,13 @@ package com.xiaocydx.performance.plugin
 import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.ScopedArtifacts
+import com.xiaocydx.performance.plugin.task.AppendTask
+import com.xiaocydx.performance.plugin.task.TransformTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import java.io.File
+import java.io.File.separator
 
 internal class PerformancePlugin : Plugin<Project> {
 
@@ -31,23 +35,45 @@ internal class PerformancePlugin : Plugin<Project> {
         }
         PerformanceExtension.inject(project)
 
+        val projectBuildDir = project.layout.buildDirectory.asFile.get()
+        val buildDir = "${projectBuildDir.absolutePath}${separator}performance"
         val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidExt.onVariants { variant ->
             val historyExt = PerformanceExtension.getHistory(project)
             if (!historyExt.isTraceEnabled && !historyExt.isRecordEnabled) return@onVariants
 
-            val taskProvider = project.tasks.register(
-                "${variant.name}Performance",
-                PerformanceTask::class.java
+            val transformTaskProvider = project.tasks.register(
+                "${variant.name}PerformanceTransform",
+                TransformTask::class.java
             )
+            transformTaskProvider.configure { task ->
+                val excludeDir = File(buildDir, "exclude${separator}${variant.name}")
+                excludeDir.takeIf { !it.exists() }?.mkdirs()
+                task.outputExclude.set(excludeDir)
+            }
             variant.artifacts
                 .forScope(ScopedArtifacts.Scope.ALL)
-                .use(taskProvider)
+                .use(transformTaskProvider)
                 .toTransform(
                     type = ScopedArtifact.CLASSES,
-                    inputJars = PerformanceTask::inputJars,
-                    inputDirectories = PerformanceTask::inputDirectories,
-                    into = PerformanceTask::output
+                    inputJars = TransformTask::inputJars,
+                    inputDirectories = TransformTask::inputDirectories,
+                    into = TransformTask::outputJar
+                )
+
+            val appendTaskProvider = project.tasks.register(
+                "${variant.name}PerformanceAppend",
+                AppendTask::class.java
+            )
+            appendTaskProvider.configure {
+                it.input.set(transformTaskProvider.get().outputExclude)
+            }
+            variant.artifacts
+                .forScope(ScopedArtifacts.Scope.ALL)
+                .use(appendTaskProvider)
+                .toAppend(
+                    to = ScopedArtifact.CLASSES,
+                    with = AppendTask::output
                 )
         }
     }

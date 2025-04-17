@@ -21,6 +21,7 @@ package com.xiaocydx.performance.plugin.processor
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * @author xcc
@@ -32,15 +33,22 @@ internal abstract class AbstractProcessor {
         tasks: TaskCountDownLatch,
         crossinline task: () -> Unit,
     ) {
+        if (tasks.hasError()) return
         tasks.increment()
         execute {
-            task()
-            tasks.decrement()
+            try {
+                if (tasks.hasError()) return@execute
+                task()
+                tasks.decrement()
+            } catch (e: Throwable) {
+                tasks.setError(e)
+            }
         }
     }
 
     protected class TaskCountDownLatch {
         private val count = AtomicInteger()
+        private var error = AtomicReference<Throwable>(null)
         private val lock = this as Object
 
         fun increment() {
@@ -49,20 +57,29 @@ internal abstract class AbstractProcessor {
 
         fun decrement() {
             val count = count.decrementAndGet()
-            require(count >= 0) { "计数异常" }
-            if (count == 0) {
-                synchronized(lock) {
-                    lock.notifyAll()
-                }
-            }
+            if (count <= 0) synchronized(lock) { lock.notifyAll() }
         }
 
         fun await() {
-            synchronized(lock) {
-                while (count.get() > 0) {
-                    lock.wait()
-                }
-            }
+            throwError()
+            synchronized(lock) { while (count.get() > 0) lock.wait() }
+            throwError()
+        }
+
+        fun setError(cause: Throwable) {
+            if (!error.compareAndSet(null, cause)) return
+            do {
+                val count = count.get()
+            } while (count > 0 && !this.count.compareAndSet(count, 0))
+            synchronized(lock) { lock.notifyAll() }
+        }
+
+        fun hasError(): Boolean {
+            return error.get() != null
+        }
+
+        private fun throwError() {
+            error.get()?.let { throw it }
         }
     }
 }

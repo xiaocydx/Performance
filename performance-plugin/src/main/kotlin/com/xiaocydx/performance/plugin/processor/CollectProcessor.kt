@@ -29,6 +29,7 @@ import org.gradle.api.provider.ListProperty
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
+import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarFile
@@ -40,12 +41,13 @@ import kotlin.system.measureTimeMillis
  */
 internal class CollectProcessor(
     private val dispatcher: Dispatcher,
-    private val idGenerator: IdGenerator,
     private val inspector: Inspector,
+    private val idGenerator: IdGenerator,
     private val output: OutputProcessor,
 ) : AbstractProcessor() {
     private val excludeClass = ConcurrentHashMap<String, ClassData>()
     private val excludeMethod = ConcurrentHashMap<String, MethodData>()
+    private val excludeFiles = ConcurrentHashMap.newKeySet<File>()
     private val mappingClass = ConcurrentHashMap<String, ClassData>()
     private val mappingMethod = ConcurrentHashMap<String, MethodData>()
 
@@ -62,13 +64,15 @@ internal class CollectProcessor(
                     if (!inspector.isClass(entry)) return@action
                     inspector.toExcludeClass(entry)?.let {
                         excludeClass.put(ClassData(it))
-                        output.write(file, entry)
+                        output.writeToExclude(file, entry)
+                            ?.let(excludeFiles::add)
+                                ?: output.writeToJar(file, entry)
                         return@action
                     }
                     val time = measureTimeMillis { collect(entry.name, file.getInputStream(entry)) }
                     println("Collect from jar ${entry.name} ${time}ms")
                 }
-                output.close(file)
+                output.closeJarFile(file)
             }
         }
 
@@ -78,7 +82,7 @@ internal class CollectProcessor(
                 val entryName = inspector.entryName(directory, file)
                 inspector.toExcludeClass(directory, file)?.let {
                     excludeClass.put(ClassData(it))
-                    output.write(entryName, file)
+                    output.writeToJar(entryName, file)
                     return@action
                 }
                 dispatcher.execute(tasks) {
@@ -89,7 +93,7 @@ internal class CollectProcessor(
         }
 
         tasks.await()
-        return CollectResult(excludeClass, excludeMethod, mappingClass, mappingMethod)
+        return CollectResult(excludeClass, excludeMethod, excludeFiles, mappingClass, mappingMethod)
     }
 
     private fun collect(entryName: String, inputStream: InputStream) {
@@ -122,6 +126,7 @@ internal class CollectProcessor(
 internal data class CollectResult(
     val excludeClass: Map<String, ClassData>,
     val excludeMethod: Map<String, MethodData>,
+    val excludeFiles: Set<File>,
     val mappingClass: Map<String, ClassData>,
     val mappingMethod: Map<String, MethodData>,
 )
