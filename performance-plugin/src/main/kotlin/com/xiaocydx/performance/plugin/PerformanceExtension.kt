@@ -48,4 +48,5 @@ open class PerformanceHistoryExtension(
     var excludeClassFile: String = "",
     var excludeMethodFile: String = "",
     var mappingMethodFile: String = "",
+    var mappingSnapshotDir: String = ""
 )

@@ -1,5 +1,4 @@
 import java.io.File.separator
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -49,28 +48,22 @@ dependencies {
 }
 
 performance {
-    val properties = File(rootDir, "gradle.properties")
-        .inputStream().use { Properties().apply { load(it) } }
     history {
+        val dir = "${rootDir}${separator}build-files"
         isTraceEnabled = true
         isRecordEnabled = true
-        excludeManifest = properties.getPath("excludeManifest")
-        excludeClassFile = properties.getPath("excludeClassFile")
-        excludeMethodFile = properties.getPath("excludeMethodFile")
-        mappingMethodFile = properties.getPath("mappingMethodFile")
-        val file = File(excludeManifest)
-        if (!file.exists()) {
-            file.parentFile.mkdirs()
-            file.printWriter().use {
-                it.println("-package kotlin/")
-                it.println("-package kotlinx/coroutines/")
+        excludeManifest = "${dir}${separator}exclude${separator}ExcludeManifest.text"
+        excludeClassFile = "${dir}${separator}exclude${separator}ExcludeClassList.text"
+        excludeMethodFile = "${dir}${separator}exclude${separator}ExcludeMethodList.text"
+        mappingMethodFile = "${dir}${separator}mapping${separator}MappingMethodList.text"
+        mappingSnapshotDir = "${dir}${separator}snapshot"
+        File(excludeManifest).takeIf { !it.exists() }?.let {
+            it.parentFile.mkdirs()
+            it.printWriter().use { writer ->
+                writer.println("-package kotlin/")
+                writer.println("-package kotlinx/coroutines/")
             }
         }
+        File(mappingSnapshotDir).takeIf { !it.exists() }?.mkdirs()
     }
-}
-
-private fun Properties.getPath(key: String): String {
-    val value = getProperty(key, "")
-    if (value.isEmpty()) return ""
-    return "${rootDir}${separator}${value}"
 }

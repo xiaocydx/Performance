@@ -21,6 +21,7 @@ import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.ComponentIdentity
 import com.android.build.api.variant.ScopedArtifacts
 import com.xiaocydx.performance.plugin.task.AppendTask
+import com.xiaocydx.performance.plugin.task.GenerateJsonTask
 import com.xiaocydx.performance.plugin.task.TransformTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
@@ -35,6 +36,7 @@ internal class PerformancePlugin : Plugin<Project> {
             throw GradleException("Performance Plugin, Android Application plugin required.")
         }
         PerformanceExtension.inject(project)
+        project.tasks.register("performanceGenerateJson", GenerateJsonTask::class.java)
 
         val projectBuildDir = project.layout.buildDirectory.asFile.get()
         val buildDir = "${projectBuildDir.absolutePath}${separator}performance"
