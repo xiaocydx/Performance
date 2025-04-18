@@ -41,7 +41,7 @@ internal class MappingProcessor(
     private val excludeMethodFile = File(excludeMethodFile)
     private val mappingMethodFile = File(mappingMethodFile)
 
-    fun read(): MappingResult {
+    fun read(): ManifestResult {
         // TODO: 实现增量才需要mappingMethod
         // val mappingMethod = readMethod(mappingMethodFile)
         // val idGenerator = when {
@@ -51,7 +51,7 @@ internal class MappingProcessor(
         val inspector = Inspector.create(excludeManifest)
         val idGenerator = IdGenerator()
         val mappingMethod = emptyList<MethodData>()
-        return MappingResult(inspector, idGenerator, mappingMethod)
+        return ManifestResult(inspector, idGenerator, mappingMethod)
     }
 
     fun submitWrite(result: CollectResult): Future<Unit> {
@@ -71,7 +71,7 @@ internal class MappingProcessor(
     }
 }
 
-internal data class MappingResult(
+internal data class ManifestResult(
     val inspector: Inspector,
     val idGenerator: IdGenerator,
     val mappingMethod: List<MethodData>,

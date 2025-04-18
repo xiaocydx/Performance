@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.plugin.processor
 
+import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.metadata.MethodData
 import org.objectweb.asm.ClassWriter
@@ -25,7 +26,7 @@ import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.InsnList
 import org.objectweb.asm.tree.LdcInsnNode
 import org.objectweb.asm.tree.MethodInsnNode
-import kotlin.system.measureTimeMillis
+import kotlin.time.measureTime
 
 /**
  * @author xcc
@@ -36,13 +37,14 @@ internal class ModifyProcessor(
     private val result: CollectResult,
     private val output: OutputProcessor,
 ) : AbstractProcessor() {
+    private val logger = Logger(javaClass)
 
     fun await(isTraceEnabled: Boolean, isRecordEnabled: Boolean) {
         val tasks = TaskCountDownLatch()
         result.mappingClass.forEach {
             dispatcher.execute(tasks) {
                 val entryName = it.value.entryName
-                val time = measureTimeMillis {
+                val time = measureTime {
                     val classReader = it.value.requireReader()
                     val classNode = it.value.requireNode()
                     val classWriter = ClassWriter(classReader, ClassWriter.COMPUTE_MAXS)
@@ -51,7 +53,7 @@ internal class ModifyProcessor(
                     val bytes = classWriter.toByteArray()
                     output.writeToJar(entryName, bytes)
                 }
-                println("Modify $entryName ${time}ms")
+                logger.debug { "Modify $entryName $time" }
             }
         }
         tasks.await()

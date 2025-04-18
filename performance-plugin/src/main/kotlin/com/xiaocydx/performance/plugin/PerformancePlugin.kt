@@ -18,6 +18,7 @@ package com.xiaocydx.performance.plugin
 
 import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.variant.AndroidComponentsExtension
+import com.android.build.api.variant.ComponentIdentity
 import com.android.build.api.variant.ScopedArtifacts
 import com.xiaocydx.performance.plugin.task.AppendTask
 import com.xiaocydx.performance.plugin.task.TransformTask
@@ -43,7 +44,7 @@ internal class PerformancePlugin : Plugin<Project> {
             if (!historyExt.isTraceEnabled && !historyExt.isRecordEnabled) return@onVariants
 
             val transformTaskProvider = project.tasks.register(
-                "${variant.name}PerformanceTransform",
+                "performanceTransform${variant.taskSuffix()}",
                 TransformTask::class.java
             )
             transformTaskProvider.configure { task ->
@@ -62,7 +63,7 @@ internal class PerformancePlugin : Plugin<Project> {
                 )
 
             val appendTaskProvider = project.tasks.register(
-                "${variant.name}PerformanceAppend",
+                "performanceAppend${variant.taskSuffix()}",
                 AppendTask::class.java
             )
             appendTaskProvider.configure {
@@ -76,5 +77,9 @@ internal class PerformancePlugin : Plugin<Project> {
                     with = AppendTask::output
                 )
         }
+    }
+
+    private fun ComponentIdentity.taskSuffix(): String {
+        return name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 }

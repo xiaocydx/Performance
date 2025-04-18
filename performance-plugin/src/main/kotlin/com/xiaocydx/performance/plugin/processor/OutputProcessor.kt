@@ -18,6 +18,7 @@
 
 package com.xiaocydx.performance.plugin.processor
 
+import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import com.xiaocydx.performance.plugin.metadata.Inspector
 import org.gradle.api.file.DirectoryProperty
@@ -26,6 +27,7 @@ import java.io.File
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
+import kotlin.time.measureTime
 
 /**
  * @author xcc
@@ -40,44 +42,58 @@ internal class OutputProcessor(
     private val jar = JarOutputStream(outputJar.get().asFile.outputStream().buffered())
     private val excludeDir = outputExclude.get().asFile
     private val tasks = TaskCountDownLatch()
+    private val logger = Logger(javaClass)
 
     fun writeToExclude(file: JarFile, entry: JarEntry): File? {
         // TODO: 补充R文件过滤
         if (!inspector.isWritable(entry)) return null
-        val crc = entry.crc.toString(16)
-        val excludeFile = File(excludeDir, "${entry.name}_${crc}")
-        if (!excludeFile.exists()) {
-            excludeFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
-            excludeFile.outputStream().use { os ->
-                file.getInputStream(entry).use { it.copyTo(os) }
+        val excludeFile: File
+        val time = measureTime {
+            val crc = entry.crc.toString(16)
+            excludeFile = File(excludeDir, "${entry.name}_${crc}")
+            if (!excludeFile.exists()) {
+                excludeFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
+                excludeFile.outputStream().use { os ->
+                    file.getInputStream(entry).use { it.copyTo(os) }
+                }
             }
         }
+        logger.debug { "writeToExclude ${entry.name} $time" }
         return excludeFile
     }
 
     fun writeToJar(name: String, bytes: ByteArray) {
         dispatcher.execute(tasks) {
-            jar.putNextEntry(JarEntry(name))
-            jar.write(bytes)
-            jar.closeEntry()
+            val time = measureTime {
+                jar.putNextEntry(JarEntry(name))
+                jar.write(bytes)
+                jar.closeEntry()
+            }
+            logger.debug { "writeToJar $name $time" }
         }
     }
 
     fun writeToJar(name: String, file: File) {
         if (!inspector.isWritable(file)) return
         dispatcher.execute(tasks) {
-            jar.putNextEntry(JarEntry(name))
-            file.inputStream().use { it.copyTo(jar) }
-            jar.closeEntry()
+            val time = measureTime {
+                jar.putNextEntry(JarEntry(name))
+                file.inputStream().use { it.copyTo(jar) }
+                jar.closeEntry()
+            }
+            logger.debug { "writeToJar $name $time" }
         }
     }
 
     fun writeToJar(file: JarFile, entry: JarEntry) {
         if (!inspector.isWritable(entry)) return
         dispatcher.execute(tasks) {
-            jar.putNextEntry(JarEntry(entry.name))
-            file.getInputStream(entry).use { it.copyTo(jar) }
-            jar.closeEntry()
+            val time = measureTime {
+                jar.putNextEntry(JarEntry(entry.name))
+                file.getInputStream(entry).use { it.copyTo(jar) }
+                jar.closeEntry()
+            }
+            logger.debug { "writeToJar ${entry.name} $time" }
         }
     }
 

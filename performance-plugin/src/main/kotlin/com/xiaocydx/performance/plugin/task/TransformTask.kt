@@ -16,10 +16,14 @@
 
 package com.xiaocydx.performance.plugin.task
 
+import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.PerformanceExtension
 import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
+import com.xiaocydx.performance.plugin.metadata.IdGenerator
+import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.processor.CollectProcessor
+import com.xiaocydx.performance.plugin.processor.CollectResult
 import com.xiaocydx.performance.plugin.processor.MappingProcessor
 import com.xiaocydx.performance.plugin.processor.ModifyProcessor
 import com.xiaocydx.performance.plugin.processor.OutputProcessor
@@ -34,6 +38,8 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import java.util.concurrent.Future
+import kotlin.time.measureTime
 
 /**
  * @author xcc
@@ -53,49 +59,62 @@ internal abstract class TransformTask : DefaultTask() {
     @get:OutputFile
     abstract val outputJar: RegularFileProperty
 
+    private val logger = Logger(javaClass)
+
     @TaskAction
     fun taskAction() {
         val ext = PerformanceExtension.getHistory(project)
+        val rootDir = project.rootDir.absolutePath
         val consumer = SerialDispatcher.single()
         val producer = ExecutorDispatcher(threads = Runtime.getRuntime().availableProcessors() - 1)
         try {
-            // Step1: ReadMapping
-            var startTime = System.currentTimeMillis()
-            val rootDir = project.rootDir.absolutePath
-            val mappingProcessor = MappingProcessor(
-                dispatcher = producer,
-                excludeManifest = ext.excludeManifest,
-                excludeClassFile = ext.excludeClassFile.ifEmpty { "${rootDir}/outputs/ExcludeClassList.text" },
-                excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${rootDir}/outputs/ExcludeMethodList.text" },
-                mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${rootDir}/outputs/MappingMethodList.text" }
-            )
-            val (inspector, idGenerator, _) = mappingProcessor.read()
-            printTime(startTime, step = "ReadMapping")
+            // Step1: ReadManifest
+            val inspector: Inspector
+            val idGenerator: IdGenerator
+            val mappingProcessor: MappingProcessor
+            var time = measureTime {
+                mappingProcessor = MappingProcessor(
+                    dispatcher = producer,
+                    excludeManifest = ext.excludeManifest,
+                    excludeClassFile = ext.excludeClassFile.ifEmpty { "${rootDir}/outputs/ExcludeClassList.text" },
+                    excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${rootDir}/outputs/ExcludeMethodList.text" },
+                    mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${rootDir}/outputs/MappingMethodList.text" }
+                )
+                val result = mappingProcessor.read()
+                inspector = result.inspector
+                idGenerator = result.idGenerator
+            }
+            logger.lifecycle { "ReadManifest $time" }
 
             // Step2: CollectMethod
-            startTime = System.currentTimeMillis()
-            val outputProcessor = OutputProcessor(consumer, inspector, outputExclude, outputJar)
-            val collectProcessor = CollectProcessor(producer, inspector, idGenerator, outputProcessor)
-            val collectResult = collectProcessor.await(inputJars, inputDirectories)
-            collectResult.excludeFiles // TODO: 删除outputExclude不存在于excludeFiles的文件
-            printTime(startTime, step = "CollectMethod")
+            val collectResult: CollectResult
+            val outputProcessor: OutputProcessor
+            time = measureTime {
+                outputProcessor = OutputProcessor(consumer, inspector, outputExclude, outputJar)
+                val collectProcessor = CollectProcessor(producer, inspector, idGenerator, outputProcessor)
+                collectResult = collectProcessor.await(inputJars, inputDirectories)
+                collectResult.excludeFiles // TODO: 删除outputExclude不存在于excludeFiles的文件
+            }
+            logger.lifecycle { "CollectMethod $time" }
 
             // Step3: ModifyMethod
-            startTime = System.currentTimeMillis()
-            val writeMapping = mappingProcessor.submitWrite(collectResult)
-            val modifyProcessor = ModifyProcessor(producer, collectResult, outputProcessor)
-            modifyProcessor.await(ext.isTraceEnabled, ext.isRecordEnabled)
-            printTime(startTime, step = "ModifyMethod")
+            val writeMapping: Future<Unit>
+            time = measureTime {
+                writeMapping = mappingProcessor.submitWrite(collectResult)
+                val modifyProcessor = ModifyProcessor(producer, collectResult, outputProcessor)
+                modifyProcessor.await(ext.isTraceEnabled, ext.isRecordEnabled)
+            }
+            logger.lifecycle { "ModifyMethod $time" }
 
-            writeMapping.await()
-            outputProcessor.await()
+            // Step4: AwaitOutput
+            time = measureTime {
+                writeMapping.await()
+                outputProcessor.await()
+            }
+            logger.lifecycle { "AwaitOutput $time" }
         } finally {
             consumer.shutdownNow()
             producer.shutdownNow()
         }
-    }
-
-    private fun printTime(startTime: Long, step: String) {
-        println("PerformanceTask -> $step time = ${System.currentTimeMillis() - startTime} ms")
     }
 }

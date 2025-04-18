@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.plugin.processor
 
+import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.metadata.ClassData
 import com.xiaocydx.performance.plugin.metadata.IdGenerator
@@ -33,7 +34,7 @@ import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarFile
-import kotlin.system.measureTimeMillis
+import kotlin.time.measureTime
 
 /**
  * @author xcc
@@ -50,6 +51,7 @@ internal class CollectProcessor(
     private val excludeFiles = ConcurrentHashMap.newKeySet<File>()
     private val mappingClass = ConcurrentHashMap<String, ClassData>()
     private val mappingMethod = ConcurrentHashMap<String, MethodData>()
+    private val logger = Logger(javaClass)
 
     fun await(
         inputJars: ListProperty<RegularFile>,
@@ -67,10 +69,11 @@ internal class CollectProcessor(
                         output.writeToExclude(file, entry)
                             ?.let(excludeFiles::add)
                                 ?: output.writeToJar(file, entry)
+                        logger.debug { "Exclude from jar ${entry.name}" }
                         return@action
                     }
-                    val time = measureTimeMillis { collect(entry.name, file.getInputStream(entry)) }
-                    println("Collect from jar ${entry.name} ${time}ms")
+                    val time = measureTime { collect(entry.name, file.getInputStream(entry)) }
+                    logger.debug { "Collect from jar ${entry.name} $time" }
                 }
                 output.closeJarFile(file)
             }
@@ -83,11 +86,12 @@ internal class CollectProcessor(
                 inspector.toExcludeClass(directory, file)?.let {
                     excludeClass.put(ClassData(it))
                     output.writeToJar(entryName, file)
+                    logger.debug { "Exclude from directory $entryName" }
                     return@action
                 }
                 dispatcher.execute(tasks) {
-                    val time = measureTimeMillis { collect(entryName, file.inputStream()) }
-                    println("Collect from directory $entryName ${time}ms")
+                    val time = measureTime { collect(entryName, file.inputStream()) }
+                    logger.debug { "Collect from directory $entryName $time" }
                 }
             }
         }
@@ -103,6 +107,7 @@ internal class CollectProcessor(
             classReader.accept(classNode, 0)
 
             if (inspector.isExcludeClass(classNode)) {
+                logger.debug { "Exclude from ClassNode $entryName" }
                 excludeClass.put(ClassData(classNode.name))
                 return@use
             }
