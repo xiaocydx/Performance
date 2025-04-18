@@ -24,7 +24,6 @@ import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.processor.CollectProcessor
 import com.xiaocydx.performance.plugin.processor.CollectResult
-import com.xiaocydx.performance.plugin.processor.MappingProcessor
 import com.xiaocydx.performance.plugin.processor.ModifyProcessor
 import com.xiaocydx.performance.plugin.processor.OutputProcessor
 import com.xiaocydx.performance.plugin.processor.await
@@ -38,6 +37,8 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import java.io.File
+import java.io.File.separator
 import java.util.concurrent.Future
 import kotlin.time.measureTime
 
@@ -64,57 +65,56 @@ internal abstract class TransformTask : DefaultTask() {
     @TaskAction
     fun taskAction() {
         val ext = PerformanceExtension.getHistory(project)
-        val rootDir = project.rootDir.absolutePath
-        val consumer = SerialDispatcher.single()
-        val producer = ExecutorDispatcher(threads = Runtime.getRuntime().availableProcessors() - 1)
+        val dispatcher = ExecutorDispatcher(Runtime.getRuntime().availableProcessors() - 1)
+        val jarDispatcher = SerialDispatcher.single()
         try {
             // Step1: ReadManifest
             val inspector: Inspector
-            val idGenerator: IdGenerator
-            val mappingProcessor: MappingProcessor
+            val output: OutputProcessor
+            val idGenerator = IdGenerator()
             var time = measureTime {
-                mappingProcessor = MappingProcessor(
-                    dispatcher = producer,
-                    excludeManifest = ext.excludeManifest,
-                    excludeClassFile = ext.excludeClassFile.ifEmpty { "${rootDir}/outputs/ExcludeClassList.text" },
-                    excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${rootDir}/outputs/ExcludeMethodList.text" },
-                    mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${rootDir}/outputs/MappingMethodList.text" }
+                val dir = "${project.rootDir}${separator}outputs${separator}"
+                inspector = Inspector.create(File(ext.excludeManifest))
+                output = OutputProcessor(
+                    outputExclude = outputExclude.get().asFile,
+                    outputJar = outputJar.get().asFile,
+                    inspector = inspector,
+                    excludeClassFile = ext.excludeClassFile.ifEmpty { "${dir}ExcludeClassList.text" },
+                    excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${dir}ExcludeMethodList.text" },
+                    mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${dir}MappingMethodList.text" },
+                    dispatcher = dispatcher,
+                    jarDispatcher = jarDispatcher
                 )
-                val result = mappingProcessor.read()
-                inspector = result.inspector
-                idGenerator = result.idGenerator
             }
             logger.lifecycle { "ReadManifest $time" }
 
             // Step2: CollectMethod
             val collectResult: CollectResult
-            val outputProcessor: OutputProcessor
+            val writeMapping: Future<Unit>
             time = measureTime {
-                outputProcessor = OutputProcessor(consumer, inspector, outputExclude, outputJar)
-                val collectProcessor = CollectProcessor(producer, inspector, idGenerator, outputProcessor)
-                collectResult = collectProcessor.await(inputJars, inputDirectories)
+                val collect = CollectProcessor(dispatcher, inspector, idGenerator, output)
+                collectResult = collect.await(inputJars, inputDirectories)
                 collectResult.excludeFiles // TODO: 删除outputExclude不存在于excludeFiles的文件
+                writeMapping = output.writeToMapping(collectResult)
             }
             logger.lifecycle { "CollectMethod $time" }
 
             // Step3: ModifyMethod
-            val writeMapping: Future<Unit>
             time = measureTime {
-                writeMapping = mappingProcessor.submitWrite(collectResult)
-                val modifyProcessor = ModifyProcessor(producer, collectResult, outputProcessor)
-                modifyProcessor.await(ext.isTraceEnabled, ext.isRecordEnabled)
+                val modify = ModifyProcessor(dispatcher, collectResult, output)
+                modify.await(ext.isTraceEnabled, ext.isRecordEnabled)
             }
             logger.lifecycle { "ModifyMethod $time" }
 
             // Step4: AwaitOutput
             time = measureTime {
                 writeMapping.await()
-                outputProcessor.await()
+                output.await()
             }
             logger.lifecycle { "AwaitOutput $time" }
         } finally {
-            consumer.shutdownNow()
-            producer.shutdownNow()
+            dispatcher.shutdownNow()
+            jarDispatcher.shutdownNow()
         }
     }
 }

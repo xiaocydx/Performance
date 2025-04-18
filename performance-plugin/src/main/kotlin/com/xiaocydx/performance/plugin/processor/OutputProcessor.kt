@@ -19,11 +19,12 @@
 package com.xiaocydx.performance.plugin.processor
 
 import com.xiaocydx.performance.plugin.Logger
+import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
 import com.xiaocydx.performance.plugin.metadata.Inspector
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.RegularFileProperty
+import com.xiaocydx.performance.plugin.metadata.writeTo
 import java.io.File
+import java.util.concurrent.Future
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -34,14 +35,17 @@ import kotlin.time.measureTime
  * @date 2025/4/13
  */
 internal class OutputProcessor(
-    private val dispatcher: SerialDispatcher,
+    private val outputExclude: File,
+    private val outputJar: File,
     private val inspector: Inspector,
-    private val outputExclude: DirectoryProperty,
-    private val outputJar: RegularFileProperty,
+    private val excludeClassFile: String,
+    private val excludeMethodFile: String,
+    private val mappingMethodFile: String,
+    private val dispatcher: Dispatcher,
+    private val jarDispatcher: SerialDispatcher,
 ) : AbstractProcessor() {
-    private val jar = JarOutputStream(outputJar.get().asFile.outputStream().buffered())
-    private val excludeDir = outputExclude.get().asFile
-    private val tasks = TaskCountDownLatch()
+    private val jarTasks = TaskCountDownLatch()
+    private val jarOutput = JarOutputStream(outputJar.outputStream().buffered())
     private val logger = Logger(javaClass)
 
     fun writeToExclude(file: JarFile, entry: JarEntry): File? {
@@ -50,7 +54,7 @@ internal class OutputProcessor(
         val excludeFile: File
         val time = measureTime {
             val crc = entry.crc.toString(16)
-            excludeFile = File(excludeDir, "${entry.name}_${crc}")
+            excludeFile = File(outputExclude, "${entry.name}_${crc}")
             if (!excludeFile.exists()) {
                 excludeFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
                 excludeFile.outputStream().use { os ->
@@ -63,11 +67,11 @@ internal class OutputProcessor(
     }
 
     fun writeToJar(name: String, bytes: ByteArray) {
-        dispatcher.execute(tasks) {
+        jarDispatcher.execute(jarTasks) {
             val time = measureTime {
-                jar.putNextEntry(JarEntry(name))
-                jar.write(bytes)
-                jar.closeEntry()
+                jarOutput.putNextEntry(JarEntry(name))
+                jarOutput.write(bytes)
+                jarOutput.closeEntry()
             }
             logger.debug { "writeToJar $name $time" }
         }
@@ -75,11 +79,11 @@ internal class OutputProcessor(
 
     fun writeToJar(name: String, file: File) {
         if (!inspector.isWritable(file)) return
-        dispatcher.execute(tasks) {
+        jarDispatcher.execute(jarTasks) {
             val time = measureTime {
-                jar.putNextEntry(JarEntry(name))
-                file.inputStream().use { it.copyTo(jar) }
-                jar.closeEntry()
+                jarOutput.putNextEntry(JarEntry(name))
+                file.inputStream().use { it.copyTo(jarOutput) }
+                jarOutput.closeEntry()
             }
             logger.debug { "writeToJar $name $time" }
         }
@@ -87,22 +91,30 @@ internal class OutputProcessor(
 
     fun writeToJar(file: JarFile, entry: JarEntry) {
         if (!inspector.isWritable(entry)) return
-        dispatcher.execute(tasks) {
+        jarDispatcher.execute(jarTasks) {
             val time = measureTime {
-                jar.putNextEntry(JarEntry(entry.name))
-                file.getInputStream(entry).use { it.copyTo(jar) }
-                jar.closeEntry()
+                jarOutput.putNextEntry(JarEntry(entry.name))
+                file.getInputStream(entry).use { it.copyTo(jarOutput) }
+                jarOutput.closeEntry()
             }
             logger.debug { "writeToJar ${entry.name} $time" }
         }
     }
 
     fun closeJarFile(file: JarFile) {
-        dispatcher.execute(tasks) { file.close() }
+        jarDispatcher.execute(jarTasks) { file.close() }
+    }
+
+    fun writeToMapping(result: CollectResult): Future<Unit> {
+        return dispatcher.submit {
+            result.excludeClass.values.toList().writeTo(File(excludeClassFile))
+            result.excludeMethod.values.toList().writeTo(File(excludeMethodFile))
+            result.mappingMethod.values.sortedBy { it.id }.writeTo(File(mappingMethodFile))
+        }
     }
 
     fun await() {
-        tasks.await()
-        jar.close()
+        jarTasks.await()
+        jarOutput.close()
     }
 }
