@@ -16,8 +16,9 @@
 
 package com.xiaocydx.performance.plugin.processor
 
-import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
+import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
+import com.xiaocydx.performance.plugin.dispatcher.execute
 import com.xiaocydx.performance.plugin.metadata.MethodData
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
@@ -37,7 +38,6 @@ internal class ModifyProcessor(
     private val result: CollectResult,
     private val output: OutputProcessor,
 ) : AbstractProcessor() {
-    private val logger = Logger(javaClass)
 
     fun await(isTraceEnabled: Boolean, isRecordEnabled: Boolean) {
         val tasks = TaskCountDownLatch()

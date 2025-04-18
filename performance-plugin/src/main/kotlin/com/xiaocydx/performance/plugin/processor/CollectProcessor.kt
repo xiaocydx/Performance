@@ -16,8 +16,9 @@
 
 package com.xiaocydx.performance.plugin.processor
 
-import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
+import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
+import com.xiaocydx.performance.plugin.dispatcher.execute
 import com.xiaocydx.performance.plugin.metadata.ClassData
 import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
@@ -51,7 +52,6 @@ internal class CollectProcessor(
     private val excludeFiles = ConcurrentHashMap.newKeySet<File>()
     private val mappingClass = ConcurrentHashMap<String, ClassData>()
     private val mappingMethod = ConcurrentHashMap<String, MethodData>()
-    private val logger = Logger(javaClass)
 
     fun await(
         inputJars: ListProperty<RegularFile>,
@@ -66,9 +66,12 @@ internal class CollectProcessor(
                     if (!inspector.isClass(entry)) return@action
                     inspector.toExcludeClass(entry)?.let {
                         excludeClass.put(ClassData(it))
-                        output.writeToExclude(file, entry)
-                            ?.let(excludeFiles::add)
-                                ?: output.writeToJar(file, entry)
+                        val excludeFile = output.writeToExclude(file, entry)
+                        if (excludeFile != null) {
+                            excludeFiles.add(excludeFile)
+                        } else {
+                            output.writeToJar(file, entry)
+                        }
                         logger.debug { "Exclude from jar ${entry.name}" }
                         return@action
                     }

@@ -18,9 +18,10 @@
 
 package com.xiaocydx.performance.plugin.processor
 
-import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
+import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
+import com.xiaocydx.performance.plugin.dispatcher.execute
 import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.metadata.writeTo
 import java.io.File
@@ -28,6 +29,7 @@ import java.util.concurrent.Future
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
+import java.util.zip.Deflater
 import kotlin.time.measureTime
 
 /**
@@ -46,10 +48,12 @@ internal class OutputProcessor(
 ) : AbstractProcessor() {
     private val jarTasks = TaskCountDownLatch()
     private val jarOutput = JarOutputStream(outputJar.outputStream().buffered())
-    private val logger = Logger(javaClass)
+
+    init {
+        jarOutput.setLevel(Deflater.NO_COMPRESSION)
+    }
 
     fun writeToExclude(file: JarFile, entry: JarEntry): File? {
-        // TODO: 补充R文件过滤
         if (!inspector.isWritable(entry)) return null
         val excludeFile: File
         val time = measureTime {
@@ -103,6 +107,20 @@ internal class OutputProcessor(
 
     fun closeJarFile(file: JarFile) {
         jarDispatcher.execute(jarTasks) { file.close() }
+    }
+
+    fun cleanNotExist(result: CollectResult): Future<Unit> {
+        return dispatcher.submit {
+            val time = measureTime {
+                outputExclude.walkBottomUp().forEach { file ->
+                    when {
+                        file.isFile -> if (file !in result.excludeFiles) file.delete()
+                        file.isDirectory -> if (file.list().isNullOrEmpty()) file.delete()
+                    }
+                }
+            }
+            logger.debug { "cleanNotExist $time" }
+        }
     }
 
     fun writeToMapping(result: CollectResult): Future<Unit> {

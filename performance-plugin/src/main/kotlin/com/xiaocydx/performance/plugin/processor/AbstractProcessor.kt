@@ -18,70 +18,12 @@
 
 package com.xiaocydx.performance.plugin.processor
 
-import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
-import java.util.concurrent.Future
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import com.xiaocydx.performance.plugin.Logger
 
 /**
  * @author xcc
  * @date 2025/4/13
  */
 internal abstract class AbstractProcessor {
-
-    protected inline fun Dispatcher.execute(
-        tasks: TaskCountDownLatch,
-        crossinline task: () -> Unit,
-    ) {
-        if (tasks.hasError()) return
-        tasks.increment()
-        execute {
-            try {
-                if (tasks.hasError()) return@execute
-                task()
-                tasks.decrement()
-            } catch (e: Throwable) {
-                tasks.setError(e)
-            }
-        }
-    }
-
-    protected class TaskCountDownLatch {
-        private val count = AtomicInteger()
-        private var error = AtomicReference<Throwable>(null)
-        private val lock = this as Object
-
-        fun increment() {
-            count.incrementAndGet()
-        }
-
-        fun decrement() {
-            val count = count.decrementAndGet()
-            if (count <= 0) synchronized(lock) { lock.notifyAll() }
-        }
-
-        fun await() {
-            throwError()
-            synchronized(lock) { while (count.get() > 0) lock.wait() }
-            throwError()
-        }
-
-        fun setError(cause: Throwable) {
-            if (!error.compareAndSet(null, cause)) return
-            do {
-                val count = count.get()
-            } while (count > 0 && !this.count.compareAndSet(count, 0))
-            synchronized(lock) { lock.notifyAll() }
-        }
-
-        fun hasError(): Boolean {
-            return error.get() != null
-        }
-
-        private fun throwError() {
-            error.get()?.let { throw it }
-        }
-    }
+    protected val logger = Logger(javaClass)
 }
-
-internal fun <R> Future<R>.await() = get()

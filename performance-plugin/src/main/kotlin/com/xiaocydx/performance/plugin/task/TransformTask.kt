@@ -20,13 +20,13 @@ import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.PerformanceExtension
 import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
 import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
+import com.xiaocydx.performance.plugin.dispatcher.await
 import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.processor.CollectProcessor
 import com.xiaocydx.performance.plugin.processor.CollectResult
 import com.xiaocydx.performance.plugin.processor.ModifyProcessor
 import com.xiaocydx.performance.plugin.processor.OutputProcessor
-import com.xiaocydx.performance.plugin.processor.await
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
@@ -90,11 +90,12 @@ internal abstract class TransformTask : DefaultTask() {
 
             // Step2: CollectMethod
             val collectResult: CollectResult
+            val cleanNotExist: Future<Unit>
             val writeMapping: Future<Unit>
             time = measureTime {
                 val collect = CollectProcessor(dispatcher, inspector, idGenerator, output)
                 collectResult = collect.await(inputJars, inputDirectories)
-                collectResult.excludeFiles // TODO: 删除outputExclude不存在于excludeFiles的文件
+                cleanNotExist = output.cleanNotExist(collectResult)
                 writeMapping = output.writeToMapping(collectResult)
             }
             logger.lifecycle { "CollectMethod $time" }
@@ -108,6 +109,7 @@ internal abstract class TransformTask : DefaultTask() {
 
             // Step4: AwaitOutput
             time = measureTime {
+                cleanNotExist.await()
                 writeMapping.await()
                 output.await()
             }

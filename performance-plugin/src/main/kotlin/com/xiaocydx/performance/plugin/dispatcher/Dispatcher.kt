@@ -31,3 +31,5 @@ internal interface Dispatcher {
 
     fun shutdownNow()
 }
+
+internal fun <R> Future<R>.await() = get()

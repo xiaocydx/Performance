@@ -16,16 +16,23 @@
 
 package com.xiaocydx.performance.plugin.task
 
+import com.xiaocydx.performance.plugin.Logger
+import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
+import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
+import com.xiaocydx.performance.plugin.dispatcher.execute
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileType
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
-import org.gradle.work.ChangeType.*
+import org.gradle.work.ChangeType.ADDED
+import org.gradle.work.ChangeType.MODIFIED
+import org.gradle.work.ChangeType.REMOVED
 import org.gradle.work.Incremental
 import org.gradle.work.InputChanges
 import java.io.File
+import kotlin.time.measureTime
 
 /**
  * @author xcc
@@ -40,24 +47,37 @@ internal abstract class AppendTask : DefaultTask() {
     @get:OutputDirectory
     abstract val output: DirectoryProperty
 
+    private val logger = Logger(javaClass)
+
     @TaskAction
     fun taskAction(inputChanges: InputChanges) {
         val inputDir = input.get().asFile
         val outputDir = output.get().asFile
+
+        val dispatcher = ExecutorDispatcher(16)
+        val tasks = TaskCountDownLatch()
         inputChanges
             .getFileChanges(input)
             .asSequence()
             .filter { it.fileType == FileType.FILE }
             .forEach { inputChange ->
-                val outputPath = inputDir.toURI()
-                    .relativize(inputChange.file.toURI()).path
-                    .substringBeforeLast("_")
-                when(inputChange.changeType) {
-                    ADDED -> inputChange.file.copyTo(File(outputDir, outputPath))
-                    MODIFIED -> inputChange.file.copyTo(File(outputDir, outputPath), true)
-                    REMOVED -> File(outputDir, outputPath).delete()
-                    else -> return@forEach
+                dispatcher.execute(tasks) {
+                    val outputPath: String
+                    val time = measureTime {
+                        outputPath = inputDir.toURI()
+                            .relativize(inputChange.file.toURI())
+                            .path.substringBeforeLast("_")
+                        when(inputChange.changeType) {
+                            ADDED -> inputChange.file.copyTo(File(outputDir, outputPath))
+                            MODIFIED -> inputChange.file.copyTo(File(outputDir, outputPath), true)
+                            REMOVED -> File(outputDir, outputPath).delete()
+                            else -> return@measureTime
+                        }
+                    }
+                    logger.debug { "${inputChange.changeType} $outputPath $time" }
                 }
             }
+        tasks.await()
+        dispatcher.shutdownNow()
     }
 }
