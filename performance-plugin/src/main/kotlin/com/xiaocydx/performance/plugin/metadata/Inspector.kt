@@ -164,8 +164,8 @@ internal class Inspector private constructor(
         private const val MODULE_INFO_CLASS = "module-info.class"
         private val DEFAULT_EXCLUDE_CLASS = listOf(MODULE_INFO_CLASS, "R.class", "R$", "Manifest", "BuildConfig")
 
-        private const val EXCLUDE_CLASS_PREFIX = "-excludeclass "
-        private const val EXCLUDE_PACKAGE_PREFIX = "-excludepackage "
+        private const val EXCLUDE_CLASS_PREFIX = "-class "
+        private const val EXCLUDE_PACKAGE_PREFIX = "-package "
         private val DEFAULT_EXCLUDE_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
 
         fun create(excludeManifest: File): Inspector {

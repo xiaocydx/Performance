@@ -1,3 +1,6 @@
+import java.io.File.separator
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -46,13 +49,28 @@ dependencies {
 }
 
 performance {
+    val properties = File(rootDir, "gradle.properties")
+        .inputStream().use { Properties().apply { load(it) } }
     history {
-        val dir = project(":performance-convert").projectDir
         isTraceEnabled = true
         isRecordEnabled = true
-        excludeManifest = "${dir}/inputs/ExcludeManifest.text"
-        excludeClassFile = "${dir}/outputs//exclude/ExcludeClassList.text"
-        excludeMethodFile = "${dir}/outputs//exclude/ExcludeMethodList.text"
-        mappingMethodFile = "${dir}/outputs/mapping/MappingMethodList.text"
+        excludeManifest = properties.getPath("excludeManifest")
+        excludeClassFile = properties.getPath("excludeClassFile")
+        excludeMethodFile = properties.getPath("excludeMethodFile")
+        mappingMethodFile = properties.getPath("mappingMethodFile")
+        val file = File(excludeManifest)
+        if (!file.exists()) {
+            file.parentFile.mkdirs()
+            file.printWriter().use {
+                it.println("-package kotlin/")
+                it.println("-package kotlinx/coroutines/")
+            }
+        }
     }
+}
+
+private fun Properties.getPath(key: String): String {
+    val value = getProperty(key, "")
+    if (value.isEmpty()) return ""
+    return "${rootDir}${separator}${value}"
 }
