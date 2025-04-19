@@ -34,6 +34,7 @@ import org.objectweb.asm.tree.MethodNode
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import kotlin.time.measureTime
 
@@ -64,19 +65,14 @@ internal class CollectProcessor(
                 val file = JarFile(jar.asFile)
                 file.entries().iterator().forEach action@{ entry ->
                     if (!inspector.isClass(entry)) return@action
-                    inspector.toExcludeClass(entry)?.let {
-                        excludeClass.put(ClassData(it))
-                        val excludeFile = output.writeToExclude(file, entry)
-                        if (excludeFile != null) {
-                            excludeFiles.add(excludeFile)
-                        } else {
-                            output.writeToJar(file, entry)
-                        }
-                        logger.debug { "Exclude from jar ${entry.name}" }
-                        return@action
+                    inspector.excludeClassName(entry)?.let { className ->
+                        return@action exclude(className, file, entry)
                     }
-                    val time = measureTime { collect(entry.name, file.getInputStream(entry)) }
-                    logger.debug { "Collect from jar ${entry.name} $time" }
+                    collect(from = "jar", entry.name, file.getInputStream(entry)) { classNode ->
+                        val isExcludeClass = inspector.isExcludeClass(classNode)
+                        if (isExcludeClass) exclude(classNode.name, file, entry)
+                        isExcludeClass
+                    }
                 }
                 output.closeJarFile(file)
             }
@@ -86,15 +82,15 @@ internal class CollectProcessor(
             directory.asFile.walk().forEach action@{ file ->
                 if (!inspector.isClass(file)) return@action
                 val entryName = inspector.entryName(directory, file)
-                inspector.toExcludeClass(directory, file)?.let {
-                    excludeClass.put(ClassData(it))
-                    output.writeToJar(entryName, file)
-                    logger.debug { "Exclude from directory $entryName" }
-                    return@action
+                inspector.excludeClassName(directory, file)?.let { className ->
+                    return@action exclude(className, entryName, file)
                 }
                 dispatcher.execute(tasks) {
-                    val time = measureTime { collect(entryName, file.inputStream()) }
-                    logger.debug { "Collect from directory $entryName $time" }
+                    collect(from = "directory", entryName, file.inputStream()) { classNode ->
+                        val isExcludeClass = inspector.isExcludeClass(classNode)
+                        if (isExcludeClass) exclude(classNode.name, entryName, file)
+                        isExcludeClass
+                    }
                 }
             }
         }
@@ -103,27 +99,49 @@ internal class CollectProcessor(
         return CollectResult(excludeClass, excludeMethod, excludeFiles, mappingClass, mappingMethod)
     }
 
-    private fun collect(entryName: String, inputStream: InputStream) {
-        inputStream.use {
-            val classReader = ClassReader(it)
-            val classNode = ClassNode()
-            classReader.accept(classNode, 0)
+    private fun exclude(className: String, file: JarFile, entry: JarEntry) {
+        excludeClass.put(ClassData(className))
+        val excludeFile = output.writeToExclude(file, entry)
+        if (excludeFile != null) {
+            excludeFiles.add(excludeFile)
+        } else {
+            output.writeToJar(file, entry)
+        }
+        logger.debug { "exclude from jar ${entry.name}" }
+    }
 
-            if (inspector.isExcludeClass(classNode)) {
-                logger.debug { "Exclude from ClassNode $entryName" }
-                excludeClass.put(ClassData(classNode.name))
-                return@use
-            }
+    private fun exclude(className: String, entryName: String, file: File) {
+        excludeClass.put(ClassData(className))
+        output.writeToJar(entryName, file)
+        logger.debug { "exclude from directory $entryName" }
+    }
 
-            mappingClass.put(ClassData(classNode.name, entryName, classReader, classNode))
-            classNode.methods.forEach { method ->
-                if (inspector.isExcludeMethod(method)) {
-                    excludeMethod.put(method.toMethodData(id = INITIAL_ID, classNode.name))
-                } else {
-                    mappingMethod.put(method.toMethodData(id = idGenerator.generate(), classNode.name))
+    private inline fun collect(
+        from: String,
+        entryName: String,
+        inputStream: InputStream,
+        isExcludeClass: (ClassNode) -> Boolean
+    ) {
+        var isCollected = false
+        val time = measureTime {
+            inputStream.use {
+                val classReader = ClassReader(it)
+                val classNode = ClassNode()
+                classReader.accept(classNode, 0)
+                if (isExcludeClass(classNode)) return@use
+
+                mappingClass.put(ClassData(classNode.name, entryName, classReader, classNode))
+                classNode.methods.forEach { method ->
+                    if (inspector.isExcludeMethod(method)) {
+                        excludeMethod.put(method.toMethodData(id = INITIAL_ID, classNode.name))
+                    } else {
+                        mappingMethod.put(method.toMethodData(id = idGenerator.generate(), classNode.name))
+                    }
                 }
+                isCollected = true
             }
         }
+        if (isCollected) logger.debug { "collect from $from $entryName $time" }
     }
 
     private fun MethodNode.toMethodData(id: Int, className: String) = run {
