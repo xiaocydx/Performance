@@ -50,9 +50,7 @@ internal class PerformancePlugin : Plugin<Project> {
                 TransformTask::class.java
             )
             transformTaskProvider.configure { task ->
-                val excludeDir = File(buildDir, "exclude${separator}${variant.name}")
-                excludeDir.takeIf { !it.exists() }?.mkdirs()
-                task.outputExclude.set(excludeDir)
+                task.cacheDirectory.set(File(buildDir, variant.name))
             }
             variant.artifacts
                 .forScope(ScopedArtifacts.Scope.ALL)
@@ -70,7 +68,7 @@ internal class PerformancePlugin : Plugin<Project> {
                     AppendTask::class.java
                 )
                 appendTaskProvider.configure {
-                    it.input.set(transformTaskProvider.get().outputExclude)
+                    it.input.set(transformTaskProvider.get().cacheDirectory)
                 }
                 variant.artifacts
                     .forScope(ScopedArtifacts.Scope.ALL)

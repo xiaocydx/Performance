@@ -55,7 +55,7 @@ internal abstract class TransformTask : DefaultTask() {
     abstract val inputDirectories: ListProperty<Directory>
 
     @get:OutputDirectory
-    abstract val outputExclude: DirectoryProperty
+    abstract val cacheDirectory: DirectoryProperty
 
     @get:OutputFile
     abstract val outputJar: RegularFileProperty
@@ -76,7 +76,7 @@ internal abstract class TransformTask : DefaultTask() {
                 val dir = "${project.rootDir}${separator}outputs${separator}"
                 inspector = Inspector.create(File(ext.excludeManifest), ext.isIncrementalEnabled)
                 output = OutputProcessor(
-                    outputExclude = outputExclude.get().asFile,
+                    cacheDir = cacheDirectory.get().asFile,
                     outputJar = outputJar.get().asFile,
                     inspector = inspector,
                     excludeClassFile = ext.excludeClassFile.ifEmpty { "${dir}ExcludeClassList.text" },

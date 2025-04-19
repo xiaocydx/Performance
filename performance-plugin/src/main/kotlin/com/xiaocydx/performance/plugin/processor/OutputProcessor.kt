@@ -38,7 +38,7 @@ import kotlin.time.measureTime
  * @date 2025/4/13
  */
 internal class OutputProcessor(
-    private val outputExclude: File,
+    private val cacheDir: File,
     private val outputJar: File,
     private val inspector: Inspector,
     private val excludeClassFile: String,
@@ -51,25 +51,26 @@ internal class OutputProcessor(
     private val jarOutput = JarOutputStream(outputJar.outputStream().buffered())
 
     init {
+        cacheDir.takeIf { !it.exists() }?.mkdirs()
         jarOutput.setLevel(Deflater.NO_COMPRESSION)
     }
 
-    fun writeToExclude(file: JarFile, entry: JarEntry): File? {
+    fun writeToCache(file: JarFile, entry: JarEntry): File? {
         if (!inspector.isIncrementalEnabled) return null
         if (!inspector.isWritable(entry)) return null
-        val excludeFile: File
+        val cacheFile: File
         val time = measureTime {
             val crc = entry.crc.toString(16)
-            excludeFile = File(outputExclude, "${entry.name}_${crc}")
-            if (!excludeFile.exists()) {
-                excludeFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
-                excludeFile.outputStream().use { os ->
+            cacheFile = File(cacheDir, "${entry.name}_${crc}")
+            if (!cacheFile.exists()) {
+                cacheFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
+                cacheFile.outputStream().use { os ->
                     file.getInputStream(entry).use { it.copyTo(os) }
                 }
             }
         }
-        logger.debug { "writeToExclude ${entry.name} $time" }
-        return excludeFile
+        logger.debug { "writeToCache ${entry.name} $time" }
+        return cacheFile
     }
 
     fun writeToJar(name: String, bytes: ByteArray) {
@@ -117,9 +118,9 @@ internal class OutputProcessor(
         }
         return dispatcher.submit {
             val time = measureTime {
-                outputExclude.walkBottomUp().forEach { file ->
+                cacheDir.walkBottomUp().forEach { file ->
                     when {
-                        file.isFile -> if (file !in result.excludeFiles) file.delete()
+                        file.isFile -> if (file !in result.cacheFiles) file.delete()
                         file.isDirectory -> if (file.list().isNullOrEmpty()) file.delete()
                     }
                 }

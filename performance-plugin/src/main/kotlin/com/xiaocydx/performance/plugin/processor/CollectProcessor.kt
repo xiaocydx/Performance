@@ -50,9 +50,9 @@ internal class CollectProcessor(
 ) : AbstractProcessor() {
     private val excludeClass = ConcurrentHashMap<String, ClassData>()
     private val excludeMethod = ConcurrentHashMap<String, MethodData>()
-    private val excludeFiles = ConcurrentHashMap.newKeySet<File>()
     private val mappingClass = ConcurrentHashMap<String, ClassData>()
     private val mappingMethod = ConcurrentHashMap<String, MethodData>()
+    private val cacheFiles = ConcurrentHashMap.newKeySet<File>()
 
     fun await(
         inputJars: ListProperty<RegularFile>,
@@ -96,14 +96,14 @@ internal class CollectProcessor(
         }
 
         tasks.await()
-        return CollectResult(excludeClass, excludeMethod, excludeFiles, mappingClass, mappingMethod)
+        return CollectResult(excludeClass, excludeMethod, mappingClass, mappingMethod, cacheFiles)
     }
 
     private fun exclude(className: String, file: JarFile, entry: JarEntry) {
         excludeClass.put(ClassData(className))
-        val excludeFile = output.writeToExclude(file, entry)
-        if (excludeFile != null) {
-            excludeFiles.add(excludeFile)
+        val cacheFile = output.writeToCache(file, entry)
+        if (cacheFile != null) {
+            cacheFiles.add(cacheFile)
         } else {
             output.writeToJar(file, entry)
         }
@@ -152,7 +152,7 @@ internal class CollectProcessor(
 internal data class CollectResult(
     val excludeClass: Map<String, ClassData>,
     val excludeMethod: Map<String, MethodData>,
-    val excludeFiles: Set<File>,
     val mappingClass: Map<String, ClassData>,
     val mappingMethod: Map<String, MethodData>,
+    val cacheFiles: Set<File>,
 )
