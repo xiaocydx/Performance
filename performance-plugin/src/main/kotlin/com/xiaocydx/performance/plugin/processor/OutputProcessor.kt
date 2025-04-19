@@ -26,6 +26,7 @@ import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.metadata.writeTo
 import java.io.File
 import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -54,6 +55,7 @@ internal class OutputProcessor(
     }
 
     fun writeToExclude(file: JarFile, entry: JarEntry): File? {
+        if (!inspector.isIncrementalEnabled) return null
         if (!inspector.isWritable(entry)) return null
         val excludeFile: File
         val time = measureTime {
@@ -110,6 +112,9 @@ internal class OutputProcessor(
     }
 
     fun cleanNotExist(result: CollectResult): Future<Unit> {
+        if (!inspector.isIncrementalEnabled) {
+            return FutureTask {}.apply { run() }
+        }
         return dispatcher.submit {
             val time = measureTime {
                 outputExclude.walkBottomUp().forEach { file ->
@@ -123,10 +128,10 @@ internal class OutputProcessor(
         }
     }
 
-    fun writeToMapping(result: CollectResult): Future<Unit> {
+    fun writeMapping(result: CollectResult): Future<Unit> {
         return dispatcher.submit {
-            result.excludeClass.values.toList().writeTo(File(excludeClassFile))
-            result.excludeMethod.values.toList().writeTo(File(excludeMethodFile))
+            result.excludeClass.values.writeTo(File(excludeClassFile))
+            result.excludeMethod.values.writeTo(File(excludeMethodFile))
             result.mappingMethod.values.sortedBy { it.id }.writeTo(File(mappingMethodFile))
         }
     }

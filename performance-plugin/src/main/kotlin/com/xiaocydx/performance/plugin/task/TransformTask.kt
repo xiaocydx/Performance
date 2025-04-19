@@ -74,7 +74,7 @@ internal abstract class TransformTask : DefaultTask() {
             val idGenerator = IdGenerator()
             var time = measureTime {
                 val dir = "${project.rootDir}${separator}outputs${separator}"
-                inspector = Inspector.create(File(ext.excludeManifest))
+                inspector = Inspector.create(File(ext.excludeManifest), ext.isIncrementalEnabled)
                 output = OutputProcessor(
                     outputExclude = outputExclude.get().asFile,
                     outputJar = outputJar.get().asFile,
@@ -96,7 +96,7 @@ internal abstract class TransformTask : DefaultTask() {
                 val collect = CollectProcessor(dispatcher, inspector, idGenerator, output)
                 collectResult = collect.await(inputJars, inputDirectories)
                 cleanNotExist = output.cleanNotExist(collectResult)
-                writeMapping = output.writeToMapping(collectResult)
+                writeMapping = output.writeMapping(collectResult)
             }
             logger.lifecycle { "CollectMethod $time" }
 

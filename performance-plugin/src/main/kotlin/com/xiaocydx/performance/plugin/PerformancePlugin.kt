@@ -64,20 +64,22 @@ internal class PerformancePlugin : Plugin<Project> {
                     into = TransformTask::outputJar
                 )
 
-            val appendTaskProvider = project.tasks.register(
-                "performanceAppend${variant.taskSuffix()}",
-                AppendTask::class.java
-            )
-            appendTaskProvider.configure {
-                it.input.set(transformTaskProvider.get().outputExclude)
-            }
-            variant.artifacts
-                .forScope(ScopedArtifacts.Scope.ALL)
-                .use(appendTaskProvider)
-                .toAppend(
-                    to = ScopedArtifact.CLASSES,
-                    with = AppendTask::output
+            if (historyExt.isIncrementalEnabled) {
+                val appendTaskProvider = project.tasks.register(
+                    "performanceAppend${variant.taskSuffix()}",
+                    AppendTask::class.java
                 )
+                appendTaskProvider.configure {
+                    it.input.set(transformTaskProvider.get().outputExclude)
+                }
+                variant.artifacts
+                    .forScope(ScopedArtifacts.Scope.ALL)
+                    .use(appendTaskProvider)
+                    .toAppend(
+                        to = ScopedArtifact.CLASSES,
+                        with = AppendTask::output
+                    )
+            }
         }
     }
 

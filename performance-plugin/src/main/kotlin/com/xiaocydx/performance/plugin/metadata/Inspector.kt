@@ -30,6 +30,7 @@ import java.util.jar.JarEntry
 internal class Inspector private constructor(
     private val excludeClass: Set<String>,
     private val excludePackage: Set<String>,
+    val isIncrementalEnabled: Boolean
 ) {
 
     fun isClass(entry: JarEntry): Boolean {
@@ -42,7 +43,7 @@ internal class Inspector private constructor(
         return file.name.endsWith(".class")
     }
 
-    fun toExcludeClass(entry: JarEntry): String? {
+    fun excludeClassName(entry: JarEntry): String? {
         val entryName = entry.name
         val className = className(entry)
         DEFAULT_EXCLUDE_CLASS.forEach { if (entryName.contains(it)) return className }
@@ -50,7 +51,7 @@ internal class Inspector private constructor(
         return null
     }
 
-    fun toExcludeClass(directory: Directory, file: File): String? {
+    fun excludeClassName(directory: Directory, file: File): String? {
         val fileName = file.name
         val className = className(directory, file)
         DEFAULT_EXCLUDE_CLASS.forEach { if (fileName.contains(it)) return className }
@@ -168,7 +169,7 @@ internal class Inspector private constructor(
         private const val EXCLUDE_PACKAGE_PREFIX = "-package "
         private val DEFAULT_EXCLUDE_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
 
-        fun create(excludeManifest: File): Inspector {
+        fun create(excludeManifest: File, isIncrementalEnabled: Boolean): Inspector {
             val excludeClass = mutableSetOf<String>()
             val excludePackage = mutableSetOf<String>()
             excludePackage.addAll(DEFAULT_EXCLUDE_PACKAGE)
@@ -186,7 +187,7 @@ internal class Inspector private constructor(
                     }
                 }
             }
-            return Inspector(excludeClass, excludePackage)
+            return Inspector(excludeClass, excludePackage, isIncrementalEnabled)
         }
     }
 }
