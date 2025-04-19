@@ -41,13 +41,16 @@ open class PerformanceExtension {
     }
 }
 
+/**
+ * `@JvmField support Groovy`
+ */
 open class PerformanceHistoryExtension(
-    var isTraceEnabled: Boolean = false,
-    var isRecordEnabled: Boolean = false,
-    var isIncrementalEnabled: Boolean = true,
-    var excludeManifest: String = "",
-    var excludeClassFile: String = "",
-    var excludeMethodFile: String = "",
-    var mappingMethodFile: String = "",
-    var mappingSnapshotDir: String = ""
+    @JvmField var isTraceEnabled: Boolean = false,
+    @JvmField var isRecordEnabled: Boolean = false,
+    @JvmField var isIncrementalEnabled: Boolean = true,
+    @JvmField var excludeManifest: String = "",
+    @JvmField var excludeClassFile: String = "",
+    @JvmField var excludeMethodFile: String = "",
+    @JvmField var mappingMethodFile: String = "",
+    @JvmField var mappingSnapshotDir: String = ""
 )

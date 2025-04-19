@@ -10,6 +10,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+kotlin {
+    sourceSets.all {
+        languageSettings {
+            optIn("kotlin.time.ExperimentalTime")
+        }
+    }
+}
+
 dependencies {
     implementation("com.android.tools.build:gradle:7.4.0")
     implementation("org.ow2.asm:asm:9.1")

@@ -16,7 +16,7 @@
 
 package com.xiaocydx.performance.analyzer.block
 
-import android.content.Context
+import android.app.Application
 import android.os.SystemClock
 import android.util.Log
 import com.xiaocydx.performance.analyzer.block.BlockReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
@@ -30,10 +30,9 @@ import kotlin.coroutines.EmptyCoroutineContext
  * @date 2025/4/15
  */
 class BlockWriter(
-    context: Context,
+    private val application: Application,
     override val thresholdMillis: Long = DEFAULT_THRESHOLD_MILLIS,
 ) : BlockReceiver {
-    private val context = requireNotNull(context.applicationContext)
 
     override fun onBlock(report: BlockReport) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
@@ -56,7 +55,7 @@ class BlockWriter(
     private fun write(report: BlockReport) {
         val snapshot = report.snapshot
         if (!snapshot.isAvailable) return
-        val blockDir = File(context.filesDir, "performance/block")
+        val blockDir = File(application.filesDir, "performance/block")
         blockDir.takeIf { !it.exists() }?.mkdirs()
         val file = File(blockDir, "${SystemClock.uptimeMillis()}-snapshot.txt")
         file.printWriter().use { writer ->

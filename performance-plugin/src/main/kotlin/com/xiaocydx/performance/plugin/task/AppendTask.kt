@@ -29,6 +29,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.work.ChangeType.ADDED
 import org.gradle.work.ChangeType.MODIFIED
 import org.gradle.work.ChangeType.REMOVED
+import org.gradle.work.FileChange
 import org.gradle.work.Incremental
 import org.gradle.work.InputChanges
 import java.io.File
@@ -53,31 +54,49 @@ internal abstract class AppendTask : DefaultTask() {
     fun taskAction(inputChanges: InputChanges) {
         val inputDir = input.get().asFile
         val outputDir = output.get().asFile
-
-        val dispatcher = ExecutorDispatcher(16)
-        val tasks = TaskCountDownLatch()
+        val added = mutableListOf<FileChange>()
+        val modified = mutableListOf<FileChange>()
+        val removed = mutableListOf<FileChange>()
         inputChanges
             .getFileChanges(input)
-            .asSequence()
             .filter { it.fileType == FileType.FILE }
-            .forEach { inputChange ->
-                dispatcher.execute(tasks) {
-                    val outputPath: String
-                    val time = measureTime {
-                        outputPath = inputDir.toURI()
-                            .relativize(inputChange.file.toURI())
-                            .path.substringBeforeLast("_")
-                        when(inputChange.changeType) {
-                            ADDED -> inputChange.file.copyTo(File(outputDir, outputPath))
-                            MODIFIED -> inputChange.file.copyTo(File(outputDir, outputPath), true)
-                            REMOVED -> File(outputDir, outputPath).delete()
-                            else -> return@measureTime
-                        }
-                    }
-                    logger.debug { "${inputChange.changeType} $outputPath $time" }
+            .forEach { change ->
+                when (change.changeType) {
+                    ADDED -> added.add(change)
+                    MODIFIED -> modified.add(change)
+                    REMOVED -> removed.add(change)
+                    else -> return@forEach
                 }
             }
+
+        // 修改源文件A.class：
+        // 1. inputChanges删除A.class_1，新增A.class_2。
+        // 2. A.class_2映射为A.class输出，copyTo()报错。
+        // 因此，先删除A.class_1映射的A.class，再处理新增。
+        removed.forEach { handleChange(inputDir, outputDir, it) }
+
+        if (added.isEmpty() && modified.isEmpty()) return
+        val dispatcher = ExecutorDispatcher(16)
+        val tasks = TaskCountDownLatch()
+        added.forEach { dispatcher.execute(tasks) { handleChange(inputDir, outputDir, it) } }
+        modified.forEach { dispatcher.execute(tasks) { handleChange(inputDir, outputDir, it) } }
         tasks.await()
         dispatcher.shutdownNow()
+    }
+
+    private fun handleChange(inputDir: File, outputDir: File, change: FileChange) {
+        val outputPath: String
+        val time = measureTime {
+            outputPath = inputDir.toURI()
+                .relativize(change.file.toURI())
+                .path.substringBeforeLast("_")
+            when (change.changeType) {
+                ADDED -> change.file.copyTo(File(outputDir, outputPath))
+                MODIFIED -> change.file.copyTo(File(outputDir, outputPath), true)
+                REMOVED -> File(outputDir, outputPath).delete()
+                else -> return@measureTime
+            }
+        }
+        logger.debug { "${change.changeType} $outputPath $time" }
     }
 }

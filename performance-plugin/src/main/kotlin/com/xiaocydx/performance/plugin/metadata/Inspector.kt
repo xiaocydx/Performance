@@ -70,6 +70,7 @@ internal class Inspector private constructor(
 
     fun isExcludeClass(node: ClassNode): Boolean {
         return node.access and Opcodes.ACC_INTERFACE != 0
+                || node.access and Opcodes.ACC_ABSTRACT != 0
     }
 
     fun isExcludeMethod(node: MethodNode): Boolean {

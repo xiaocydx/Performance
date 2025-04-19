@@ -18,7 +18,7 @@ class App : Application() {
         Performance.init(
             application = this,
             config = Performance.Config(
-                blockConfig = BlockConfig(receivers = listOf(BlockWriter(context = this))),
+                blockConfig = BlockConfig(receivers = listOf(BlockWriter(this))),
                 frameConfig = FrameMetricsConfig(receivers = listOf(FrameMetricsPrinter()))
             )
         )
