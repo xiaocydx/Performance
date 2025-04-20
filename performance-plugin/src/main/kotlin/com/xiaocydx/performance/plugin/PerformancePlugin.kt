@@ -49,8 +49,8 @@ internal class PerformancePlugin : Plugin<Project> {
                 "performanceTransform${variant.taskSuffix()}",
                 TransformTask::class.java
             )
-            transformTaskProvider.configure { task ->
-                task.cacheDirectory.set(File(buildDir, variant.name))
+            transformTaskProvider.configure {
+                it.cacheDirectory.set(File(buildDir, variant.name))
             }
             variant.artifacts
                 .forScope(ScopedArtifacts.Scope.ALL)
