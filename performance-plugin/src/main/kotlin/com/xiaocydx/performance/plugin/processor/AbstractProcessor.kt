@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
-
 package com.xiaocydx.performance.plugin.processor
 
 import com.xiaocydx.performance.plugin.Logger
