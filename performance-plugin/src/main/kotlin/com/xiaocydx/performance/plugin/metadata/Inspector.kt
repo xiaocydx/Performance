@@ -29,8 +29,7 @@ import java.util.jar.JarEntry
  */
 internal class Inspector private constructor(
     private val excludeClass: Set<String>,
-    private val excludePackage: Set<String>,
-    val isIncrementalEnabled: Boolean
+    private val excludePackage: Set<String>
 ) {
 
     fun isClass(entry: JarEntry): Boolean {
@@ -170,7 +169,7 @@ internal class Inspector private constructor(
         private const val EXCLUDE_PACKAGE_PREFIX = "-package "
         private val DEFAULT_EXCLUDE_PACKAGE = listOf("android/", "com/xiaocydx/performance/")
 
-        fun create(excludeManifest: File, isIncrementalEnabled: Boolean): Inspector {
+        fun create(excludeManifest: File): Inspector {
             val excludeClass = mutableSetOf<String>()
             val excludePackage = mutableSetOf<String>()
             excludePackage.addAll(DEFAULT_EXCLUDE_PACKAGE)
@@ -188,7 +187,7 @@ internal class Inspector private constructor(
                     }
                 }
             }
-            return Inspector(excludeClass, excludePackage, isIncrementalEnabled)
+            return Inspector(excludeClass, excludePackage)
         }
     }
 }

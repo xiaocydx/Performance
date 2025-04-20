@@ -16,9 +16,6 @@
 
 package com.xiaocydx.performance.plugin.processor
 
-import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
-import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
-import com.xiaocydx.performance.plugin.dispatcher.execute
 import com.xiaocydx.performance.plugin.metadata.ClassData
 import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
@@ -34,6 +31,7 @@ import org.objectweb.asm.tree.MethodNode
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import kotlin.time.measureTime
@@ -43,10 +41,10 @@ import kotlin.time.measureTime
  * @date 2025/4/13
  */
 internal class CollectProcessor(
-    private val dispatcher: Dispatcher,
     private val inspector: Inspector,
     private val idGenerator: IdGenerator,
     private val output: OutputProcessor,
+    private val executor:ExecutorService,
 ) : AbstractProcessor() {
     private val excludeClass = ConcurrentHashMap<String, ClassData>()
     private val excludeMethod = ConcurrentHashMap<String, MethodData>()
@@ -61,34 +59,36 @@ internal class CollectProcessor(
         val tasks = TaskCountDownLatch()
 
         inputJars.get().forEach { jar ->
-            dispatcher.execute(tasks) {
+            executor.execute(tasks) {
                 val file = JarFile(jar.asFile)
                 file.entries().iterator().forEach action@{ entry ->
                     if (!inspector.isClass(entry)) return@action
+                    val cache = output.cacheFile(entry)?.also(cacheFiles::add)
                     inspector.excludeClassName(entry)?.let { className ->
-                        return@action exclude(className, file, entry)
+                        return@action exclude(className, file, entry, cache)
                     }
-                    collect(from = "jar", entry.name, file.getInputStream(entry)) { classNode ->
+                    collect(from = "jar", entry.name, file.getInputStream(entry), cache) { classNode ->
                         val isExcludeClass = inspector.isExcludeClass(classNode)
-                        if (isExcludeClass) exclude(classNode.name, file, entry)
+                        if (isExcludeClass) exclude(classNode.name, file, entry, cache)
                         isExcludeClass
                     }
                 }
-                output.closeJarFile(file)
+                file.close()
             }
         }
 
         directories.get().forEach { directory ->
             directory.asFile.walk().forEach action@{ file ->
                 if (!inspector.isClass(file)) return@action
-                val entryName = inspector.entryName(directory, file)
-                inspector.excludeClassName(directory, file)?.let { className ->
-                    return@action exclude(className, entryName, file)
-                }
-                dispatcher.execute(tasks) {
-                    collect(from = "directory", entryName, file.inputStream()) { classNode ->
+                executor.execute(tasks) {
+                    val entryName = inspector.entryName(directory, file)
+                    val cache = output.cacheFile(entryName, file)?.also(cacheFiles::add)
+                    inspector.excludeClassName(directory, file)?.let { className ->
+                        return@execute exclude(className, entryName, file, cache)
+                    }
+                    collect(from = "directory", entryName, file.inputStream(), cache) { classNode ->
                         val isExcludeClass = inspector.isExcludeClass(classNode)
-                        if (isExcludeClass) exclude(classNode.name, entryName, file)
+                        if (isExcludeClass) exclude(classNode.name, entryName, file, cache)
                         isExcludeClass
                     }
                 }
@@ -99,20 +99,15 @@ internal class CollectProcessor(
         return CollectResult(excludeClass, excludeMethod, mappingClass, mappingMethod, cacheFiles)
     }
 
-    private fun exclude(className: String, file: JarFile, entry: JarEntry) {
+    private fun exclude(className: String, file: JarFile, entry: JarEntry, cache: File?) {
         excludeClass.put(ClassData(className))
-        val cacheFile = output.writeToCache(file, entry)
-        if (cacheFile != null) {
-            cacheFiles.add(cacheFile)
-        } else {
-            output.writeToJar(file, entry)
-        }
+        output.write(file, entry, cache)
         logger.debug { "exclude from jar ${entry.name}" }
     }
 
-    private fun exclude(className: String, entryName: String, file: File) {
+    private fun exclude(className: String, entryName: String, file: File, cache: File?) {
         excludeClass.put(ClassData(className))
-        output.writeToJar(entryName, file)
+        output.write(entryName, file, cache)
         logger.debug { "exclude from directory $entryName" }
     }
 
@@ -120,6 +115,7 @@ internal class CollectProcessor(
         from: String,
         entryName: String,
         inputStream: InputStream,
+        cache: File?,
         isExcludeClass: (ClassNode) -> Boolean
     ) {
         var isCollected = false
@@ -130,7 +126,7 @@ internal class CollectProcessor(
                 classReader.accept(classNode, 0)
                 if (isExcludeClass(classNode)) return@use
 
-                mappingClass.put(ClassData(classNode.name, entryName, classReader, classNode))
+                mappingClass.put(ClassData(classNode.name, entryName, cache, classReader, classNode))
                 classNode.methods.forEach { method ->
                     if (inspector.isExcludeMethod(method)) {
                         excludeMethod.put(method.toMethodData(id = INITIAL_ID, classNode.name))

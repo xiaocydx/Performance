@@ -18,6 +18,7 @@ package com.xiaocydx.performance.plugin.metadata
 
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
+import java.io.File
 
 /**
  * @author xcc
@@ -26,6 +27,7 @@ import org.objectweb.asm.tree.ClassNode
 internal class ClassData(
     val className: String,
     val entryName: String = "",
+    val cacheFile: File? = null,
     private val classReader: ClassReader? = null,
     private val classNode: ClassNode? = null,
 ) : Metadata {

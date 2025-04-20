@@ -17,9 +17,9 @@
 package com.xiaocydx.performance.plugin.task
 
 import com.xiaocydx.performance.plugin.Logger
-import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
-import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
-import com.xiaocydx.performance.plugin.dispatcher.execute
+import com.xiaocydx.performance.plugin.output.CacheOutput.Companion.CACHE_SEPARATOR
+import com.xiaocydx.performance.plugin.processor.TaskCountDownLatch
+import com.xiaocydx.performance.plugin.processor.execute
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileType
@@ -33,6 +33,7 @@ import org.gradle.work.FileChange
 import org.gradle.work.Incremental
 import org.gradle.work.InputChanges
 import java.io.File
+import java.util.concurrent.Executors
 import kotlin.time.measureTime
 
 /**
@@ -68,20 +69,27 @@ internal abstract class AppendTask : DefaultTask() {
                     else -> return@forEach
                 }
             }
+        val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+        try {
+            if (removed.isNotEmpty()) {
+                // 修改源文件A.class：
+                // 1. inputChanges删除A.class_1，新增A.class_2。
+                // 2. A.class_2映射为A.class输出，copyTo()报错。
+                // 因此，先删除A.class_1映射的A.class，再处理新增。
+                val tasks = TaskCountDownLatch()
+                removed.forEach { executor.execute(tasks) { handleChange(inputDir, outputDir, it) } }
+                tasks.await()
+            }
 
-        // 修改源文件A.class：
-        // 1. inputChanges删除A.class_1，新增A.class_2。
-        // 2. A.class_2映射为A.class输出，copyTo()报错。
-        // 因此，先删除A.class_1映射的A.class，再处理新增。
-        removed.forEach { handleChange(inputDir, outputDir, it) }
-
-        if (added.isEmpty() && modified.isEmpty()) return
-        val dispatcher = ExecutorDispatcher(16)
-        val tasks = TaskCountDownLatch()
-        added.forEach { dispatcher.execute(tasks) { handleChange(inputDir, outputDir, it) } }
-        modified.forEach { dispatcher.execute(tasks) { handleChange(inputDir, outputDir, it) } }
-        tasks.await()
-        dispatcher.shutdownNow()
+            if (added.isNotEmpty() || modified.isNotEmpty()) {
+                val tasks = TaskCountDownLatch()
+                added.forEach { executor.execute(tasks) { handleChange(inputDir, outputDir, it) } }
+                modified.forEach { executor.execute(tasks) { handleChange(inputDir, outputDir, it) } }
+                tasks.await()
+            }
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     private fun handleChange(inputDir: File, outputDir: File, change: FileChange) {
@@ -89,7 +97,7 @@ internal abstract class AppendTask : DefaultTask() {
         val time = measureTime {
             outputPath = inputDir.toURI()
                 .relativize(change.file.toURI())
-                .path.substringBeforeLast("_")
+                .path.substringBeforeLast(CACHE_SEPARATOR)
             when (change.changeType) {
                 ADDED -> change.file.copyTo(File(outputDir, outputPath))
                 MODIFIED -> change.file.copyTo(File(outputDir, outputPath), true)

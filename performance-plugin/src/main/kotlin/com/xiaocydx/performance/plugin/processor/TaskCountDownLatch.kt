@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin.dispatcher
+package com.xiaocydx.performance.plugin.processor
 
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
@@ -62,7 +63,7 @@ internal class TaskCountDownLatch {
     }
 }
 
-internal inline fun Dispatcher.execute(
+internal inline fun Executor.execute(
     tasks: TaskCountDownLatch,
     crossinline task: () -> Unit,
 ) {

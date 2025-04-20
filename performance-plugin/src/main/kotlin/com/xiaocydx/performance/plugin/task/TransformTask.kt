@@ -18,11 +18,10 @@ package com.xiaocydx.performance.plugin.task
 
 import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.PerformanceExtension
-import com.xiaocydx.performance.plugin.dispatcher.ExecutorDispatcher
-import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
-import com.xiaocydx.performance.plugin.dispatcher.await
 import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
+import com.xiaocydx.performance.plugin.output.CacheOutput
+import com.xiaocydx.performance.plugin.output.JarOutput
 import com.xiaocydx.performance.plugin.processor.CollectProcessor
 import com.xiaocydx.performance.plugin.processor.CollectResult
 import com.xiaocydx.performance.plugin.processor.ModifyProcessor
@@ -39,7 +38,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 import java.io.File.separator
-import java.util.concurrent.Future
+import java.util.concurrent.Executors
 import kotlin.time.measureTime
 
 /**
@@ -54,19 +53,18 @@ internal abstract class TransformTask : DefaultTask() {
     @get:InputFiles
     abstract val inputDirectories: ListProperty<Directory>
 
-    @get:OutputDirectory
-    abstract val cacheDirectory: DirectoryProperty
-
     @get:OutputFile
     abstract val outputJar: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val cacheDirectory: DirectoryProperty
 
     private val logger = Logger(javaClass)
 
     @TaskAction
     fun taskAction() {
         val ext = PerformanceExtension.getHistory(project)
-        val dispatcher = ExecutorDispatcher(Runtime.getRuntime().availableProcessors() - 1)
-        val jarDispatcher = SerialDispatcher.single()
+        val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
         try {
             // Step1: ReadManifest
             val inspector: Inspector
@@ -74,49 +72,42 @@ internal abstract class TransformTask : DefaultTask() {
             val idGenerator = IdGenerator()
             var time = measureTime {
                 val dir = "${project.rootDir}${separator}outputs${separator}"
-                inspector = Inspector.create(File(ext.excludeManifest), ext.isIncrementalEnabled)
+                inspector = Inspector.create(File(ext.excludeManifest))
                 output = OutputProcessor(
-                    cacheDir = cacheDirectory.get().asFile,
-                    outputJar = outputJar.get().asFile,
                     inspector = inspector,
+                    jarOutput = JarOutput(outputJar),
+                    cacheOutput = if (ext.isIncrementalEnabled) CacheOutput(cacheDirectory) else null,
                     excludeClassFile = ext.excludeClassFile.ifEmpty { "${dir}ExcludeClassList.text" },
                     excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${dir}ExcludeMethodList.text" },
                     mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${dir}MappingMethodList.text" },
-                    dispatcher = dispatcher,
-                    jarDispatcher = jarDispatcher
+                    executor = executor
                 )
+                output.scanningCache()
             }
             logger.lifecycle { "ReadManifest $time" }
 
             // Step2: CollectMethod
-            val collectResult: CollectResult
-            val cleanNotExist: Future<Unit>
-            val writeMapping: Future<Unit>
+            val collect: CollectResult
             time = measureTime {
-                val collect = CollectProcessor(dispatcher, inspector, idGenerator, output)
-                collectResult = collect.await(inputJars, inputDirectories)
-                cleanNotExist = output.cleanNotExist(collectResult)
-                writeMapping = output.writeMapping(collectResult)
+                val processor = CollectProcessor(inspector, idGenerator, output, executor)
+                collect = processor.await(inputJars, inputDirectories)
+                output.cleanInvalidCache(collect)
+                output.writeMappingMethod(collect)
             }
             logger.lifecycle { "CollectMethod $time" }
 
             // Step3: ModifyMethod
             time = measureTime {
-                val modify = ModifyProcessor(dispatcher, collectResult, output)
-                modify.await(ext.isTraceEnabled, ext.isRecordEnabled)
+                val processor = ModifyProcessor(collect, output, executor)
+                processor.await(ext.isTraceEnabled, ext.isRecordEnabled)
             }
             logger.lifecycle { "ModifyMethod $time" }
 
             // Step4: AwaitOutput
-            time = measureTime {
-                cleanNotExist.await()
-                writeMapping.await()
-                output.await()
-            }
+            time = measureTime { output.await() }
             logger.lifecycle { "AwaitOutput $time" }
         } finally {
-            dispatcher.shutdownNow()
-            jarDispatcher.shutdownNow()
+            executor.shutdownNow()
         }
     }
 }

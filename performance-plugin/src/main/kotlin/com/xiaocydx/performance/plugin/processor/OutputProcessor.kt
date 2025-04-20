@@ -14,131 +14,157 @@
  * limitations under the License.
  */
 
-@file:Suppress("CanBeParameter")
-
 package com.xiaocydx.performance.plugin.processor
 
-import com.xiaocydx.performance.plugin.dispatcher.Dispatcher
-import com.xiaocydx.performance.plugin.dispatcher.SerialDispatcher
-import com.xiaocydx.performance.plugin.dispatcher.TaskCountDownLatch
-import com.xiaocydx.performance.plugin.dispatcher.execute
 import com.xiaocydx.performance.plugin.metadata.Inspector
 import com.xiaocydx.performance.plugin.metadata.writeTo
+import com.xiaocydx.performance.plugin.output.CacheOutput
+import com.xiaocydx.performance.plugin.output.JarOutput
 import java.io.File
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
-import java.util.concurrent.FutureTask
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
-import java.util.jar.JarOutputStream
-import java.util.zip.Deflater
 import kotlin.time.measureTime
+
 
 /**
  * @author xcc
  * @date 2025/4/13
  */
 internal class OutputProcessor(
-    private val cacheDir: File,
-    private val outputJar: File,
     private val inspector: Inspector,
+    private val jarOutput: JarOutput,
+    private val cacheOutput: CacheOutput?,
     private val excludeClassFile: String,
     private val excludeMethodFile: String,
     private val mappingMethodFile: String,
-    private val dispatcher: Dispatcher,
-    private val jarDispatcher: SerialDispatcher,
+    private val executor: ExecutorService,
 ) : AbstractProcessor() {
-    private val jarTasks = TaskCountDownLatch()
-    private val jarOutput = JarOutputStream(outputJar.outputStream().buffered())
+    private val tasks = TaskCountDownLatch()
+    private var scanningTask: Future<ScanningResult>? = null
 
-    init {
-        cacheDir.takeIf { !it.exists() }?.mkdirs()
-        jarOutput.setLevel(Deflater.NO_COMPRESSION)
-    }
-
-    fun writeToCache(file: JarFile, entry: JarEntry): File? {
-        if (!inspector.isIncrementalEnabled) return null
-        if (!inspector.isWritable(entry)) return null
-        val cacheFile: File
-        val time = measureTime {
-            val crc = entry.crc.toString(16)
-            cacheFile = File(cacheDir, "${entry.name}_${crc}")
-            if (!cacheFile.exists()) {
-                cacheFile.parentFile?.takeIf { !it.exists() }?.mkdirs()
-                cacheFile.outputStream().use { os ->
-                    file.getInputStream(entry).use { it.copyTo(os) }
+    fun scanningCache() {
+        val cacheDir = cacheOutput?.cacheDir ?: return
+        scanningTask = executor.submit(Callable {
+            val scanning = ScanningResult()
+            val time = measureTime {
+                val subTasks = mutableListOf<Future<ScanningResult>>()
+                fun addSubTask(listFiles: Array<File>) {
+                    listFiles.forEach {
+                        if (it.isDirectory && (it.name == "com"
+                                        || it.name == "kotlin"
+                                        || it.name == "androidx")) {
+                            addSubTask(it.listFiles() ?: emptyArray())
+                            return@forEach
+                        }
+                        subTasks.add(executor.submit(Callable {
+                            val result = ScanningResult()
+                            it.walk().forEach { file -> result.add(file) }
+                            result
+                        }))
+                    }
                 }
+                addSubTask(cacheDir.listFiles() ?: emptyArray())
+                subTasks.forEach { scanning.add(it.get()) }
             }
-        }
-        logger.debug { "writeToCache ${entry.name} $time" }
-        return cacheFile
+            logger.debug { "scanningCache $time" }
+            scanning
+        })
     }
 
-    fun writeToJar(name: String, bytes: ByteArray) {
-        jarDispatcher.execute(jarTasks) {
-            val time = measureTime {
-                jarOutput.putNextEntry(JarEntry(name))
-                jarOutput.write(bytes)
-                jarOutput.closeEntry()
-            }
-            logger.debug { "writeToJar $name $time" }
-        }
+    fun cacheFile(entry: JarEntry): File? {
+        return cacheOutput?.cacheFile(entry)
     }
 
-    fun writeToJar(name: String, file: File) {
-        if (!inspector.isWritable(file)) return
-        jarDispatcher.execute(jarTasks) {
-            val time = measureTime {
-                jarOutput.putNextEntry(JarEntry(name))
-                file.inputStream().use { it.copyTo(jarOutput) }
-                jarOutput.closeEntry()
-            }
-            logger.debug { "writeToJar $name $time" }
+    fun cacheFile(entryName: String, file: File): File? {
+        return cacheOutput?.cacheFile(entryName, file)
+    }
+
+    fun write(entryName: String, bytes: ByteArray, cache: File?) {
+        if (cacheOutput != null && cache != null) {
+            cacheOutput.write(bytes, cache)
+            logger.debug { "writeToCache $entryName" }
+        } else {
+            jarOutput.write(entryName, bytes)
+            logger.debug { "writeToJar $entryName" }
         }
     }
 
-    fun writeToJar(file: JarFile, entry: JarEntry) {
+    fun write(file: JarFile, entry: JarEntry, cache: File?) {
         if (!inspector.isWritable(entry)) return
-        jarDispatcher.execute(jarTasks) {
-            val time = measureTime {
-                jarOutput.putNextEntry(JarEntry(entry.name))
-                file.getInputStream(entry).use { it.copyTo(jarOutput) }
-                jarOutput.closeEntry()
-            }
-            logger.debug { "writeToJar ${entry.name} $time" }
+        if (cacheOutput != null && cache != null) {
+            cacheOutput.write(file, entry, cache)
+            logger.debug { "writeToCache ${entry.name}" }
+        } else {
+            jarOutput.write(file, entry)
+            logger.debug { "writeToJar ${entry.name}" }
         }
     }
 
-    fun closeJarFile(file: JarFile) {
-        jarDispatcher.execute(jarTasks) { file.close() }
+    fun write(entryName: String, file: File, cache: File?) {
+        if (!inspector.isWritable(file)) return
+        if (cacheOutput != null && cache != null) {
+            cacheOutput.write(file, cache)
+            logger.debug { "writeToCache $entryName" }
+        } else {
+            jarOutput.write(entryName, file)
+            logger.debug { "writeToJar $entryName" }
+        }
     }
 
-    fun cleanNotExist(result: CollectResult): Future<Unit> {
-        if (!inspector.isIncrementalEnabled) {
-            return FutureTask {}.apply { run() }
-        }
-        return dispatcher.submit {
-            val time = measureTime {
-                cacheDir.walkBottomUp().forEach { file ->
-                    when {
-                        file.isFile -> if (file !in result.cacheFiles) file.delete()
-                        file.isDirectory -> if (file.list().isNullOrEmpty()) file.delete()
+    fun cleanInvalidCache(collect: CollectResult) {
+        val scanningTask = scanningTask ?: return
+        this.scanningTask = null
+        executor.execute(tasks) {
+            val scanning = scanningTask.get()
+            scanning.cacheFiles.forEach {
+                executor.execute(tasks) {
+                    if (it !in collect.cacheFiles) {
+                        it.delete()
+                        logger.debug { "cleanInvalidCache $it" }
                     }
                 }
             }
-            logger.debug { "cleanNotExist $time" }
+            scanning.emptyDirectories.forEach {
+                executor.execute(tasks) {
+                    it.delete()
+                    logger.debug { "cleanInvalidCache $it" }
+                }
+            }
         }
     }
 
-    fun writeMapping(result: CollectResult): Future<Unit> {
-        return dispatcher.submit {
-            result.excludeClass.values.writeTo(File(excludeClassFile))
-            result.excludeMethod.values.writeTo(File(excludeMethodFile))
-            result.mappingMethod.values.sortedBy { it.id }.writeTo(File(mappingMethodFile))
-        }
+    fun writeMappingMethod(collect: CollectResult) = with(collect) {
+        val excludeClass = excludeClass.values
+        val excludeMethod = excludeMethod.values
+        val mapping = mappingMethod.values
+        executor.execute(tasks) { excludeClass.writeTo(File(excludeClassFile)) }
+        executor.execute(tasks) { excludeMethod.writeTo(File(excludeMethodFile)) }
+        executor.execute(tasks) { mapping.sortedBy { it.id }.writeTo(File(mappingMethodFile)) }
     }
 
     fun await() {
-        jarTasks.await()
+        tasks.await()
         jarOutput.close()
+    }
+
+    private class ScanningResult(
+        val cacheFiles: MutableList<File> = ArrayList(1000),
+        val emptyDirectories: MutableList<File> = ArrayList(100)
+    ) {
+        fun add(result: ScanningResult) {
+            cacheFiles.addAll(result.cacheFiles)
+            emptyDirectories.addAll(result.emptyDirectories)
+        }
+
+        fun add(file: File) {
+            if (file.isFile) {
+                cacheFiles.add(file)
+            } else if (file.list().isNullOrEmpty()) {
+                emptyDirectories.add(file)
+            }
+        }
     }
 }
