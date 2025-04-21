@@ -34,7 +34,7 @@ import kotlin.time.measureTime
 internal class ModifyProcessor(
     private val result: CollectResult,
     private val output: OutputProcessor,
-    private val executor: ExecutorService,
+    private val executor: ExecutorService
 ) : AbstractProcessor() {
 
     fun await(isTraceEnabled: Boolean, isRecordEnabled: Boolean) {

@@ -29,7 +29,7 @@ internal class ClassData(
     val entryName: String = "",
     val cacheFile: File? = null,
     private val classReader: ClassReader? = null,
-    private val classNode: ClassNode? = null,
+    private val classNode: ClassNode? = null
 ) : Metadata {
     override val key = className
 

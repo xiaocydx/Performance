@@ -40,7 +40,7 @@ internal class OutputProcessor(
     private val excludeClassFile: String,
     private val excludeMethodFile: String,
     private val mappingMethodFile: String,
-    private val executor: ExecutorService,
+    private val executor: ExecutorService
 ) : AbstractProcessor() {
     private val tasks = TaskCountDownLatch()
     private var scanningTask: Future<ScanningResult>? = null

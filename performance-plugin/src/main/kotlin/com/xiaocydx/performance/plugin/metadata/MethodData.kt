@@ -27,7 +27,7 @@ internal class MethodData(
     val access: Int,
     val className: String,
     val methodName: String,
-    val desc: String,
+    val desc: String
 ) : Metadata {
 
     override val key: String

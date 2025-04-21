@@ -44,7 +44,7 @@ internal class CollectProcessor(
     private val inspector: Inspector,
     private val idGenerator: IdGenerator,
     private val output: OutputProcessor,
-    private val executor:ExecutorService,
+    private val executor:ExecutorService
 ) : AbstractProcessor() {
     private val excludeClass = ConcurrentHashMap<String, ClassData>()
     private val excludeMethod = ConcurrentHashMap<String, MethodData>()
