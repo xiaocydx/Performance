@@ -45,6 +45,8 @@ class BlockWriter(
         val json = JSONObject().apply {
             put("scene", report.scene)
             put("lastActivity", report.lastActivity)
+            put("priority", report.priority)
+            put("nice", report.nice)
             put("thresholdMillis", report.thresholdMillis)
             put("wallDurationMillis", report.wallDurationMillis)
             put("cpuDurationMillis", report.cpuDurationMillis)

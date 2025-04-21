@@ -19,8 +19,10 @@
 package com.xiaocydx.performance.analyzer.block
 
 import android.os.Handler
+import android.os.Process
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.runtime.ProcStat
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -97,6 +99,7 @@ internal class BlockAnalyzer(
 
         override fun run() {
             val snapshot = History.snapshot(startMark, endMark)
+            val procStat = ProcStat.get(Process.myPid())
             for (i in 0 until receivers.size) {
                 val thresholdMillis = receivers[i].thresholdMillis
                 if (wallDurationMillis > thresholdMillis) {
@@ -104,6 +107,8 @@ internal class BlockAnalyzer(
                         scene = scene,
                         value = value,
                         lastActivity = lastActivity,
+                        priority = procStat.priority,
+                        nice = procStat.nice,
                         snapshot = snapshot,
                         thresholdMillis = thresholdMillis,
                         wallDurationMillis = wallDurationMillis,
