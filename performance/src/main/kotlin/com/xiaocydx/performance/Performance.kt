@@ -17,11 +17,14 @@
 package com.xiaocydx.performance
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.Application
 import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
+import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
@@ -57,8 +60,10 @@ object Performance {
         config.checkProperty()
 
         ReferenceQueueDaemon().start()
+        host.application = application
         activityWatcher.init(application)
 
+        ANRAnalyzer(host).start()
         IdleHandlerAnalyzer(host).start()
         if (config.isBlockEnabled) BlockAnalyzer(host, config.blockConfig).start()
         if (config.isFrameEnabled) FrameMetricsAnalyzer.create(host, config.frameConfig).start()
@@ -72,10 +77,13 @@ object Performance {
         private val dumpThread by lazy { HandlerThread("PerformanceDumpThread").apply { start() } }
         private val defaultThread by lazy { HandlerThread("PerformanceDefaultThread").apply { start() } }
         val callbacks = CompositeLooperCallback()
+        lateinit var application: Application
 
         override val dumpLooper by lazy { dumpThread.looper!! }
 
         override val defaultLooper by lazy { defaultThread.looper!! }
+
+        override val ams by lazy { application.getSystemService(ACTIVITY_SERVICE) as ActivityManager }
 
         override val activityEvent get() = activityWatcher.event
 
@@ -109,6 +117,8 @@ object Performance {
         val dumpLooper: Looper
 
         val defaultLooper: Looper
+
+        val ams: ActivityManager
 
         val activityEvent: SharedFlow<ActivityEvent>
 

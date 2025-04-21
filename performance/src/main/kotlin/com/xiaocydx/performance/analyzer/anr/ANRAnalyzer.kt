@@ -17,18 +17,25 @@
 package com.xiaocydx.performance.analyzer.anr
 
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.runtime.looper.DispatchContext
-import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.analyzer.Analyzer
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 
 /**
  * @author xcc
  * @date 2025/3/27
  */
-internal class ANRAnalyzer(private val host: Performance.Host) : LooperCallback {
+internal class ANRAnalyzer(host: Performance.Host) : Analyzer(host) {
 
-    fun init() {
-    }
-
-    override fun dispatch(current: DispatchContext) {
+    override fun init() {
+        var watchDog: ANRWatchDog? = null
+        coroutineScope.launch {
+            watchDog = ANRWatchDog(host.ams)
+            watchDog!!.start()
+            awaitCancellation()
+        }.invokeOnCompletion {
+            watchDog?.interrupt()
+            watchDog = null
+        }
     }
 }
