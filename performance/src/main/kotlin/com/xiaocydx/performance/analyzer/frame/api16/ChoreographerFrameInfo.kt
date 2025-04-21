@@ -20,8 +20,9 @@ import android.view.Choreographer
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.fake.FakeChoreographer
 import com.xiaocydx.performance.runtime.assertMainThread
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.Scene
+import com.xiaocydx.performance.runtime.looper.LooperCallback
 
 /**
  * @author xcc
@@ -44,7 +45,7 @@ internal class ChoreographerFrameInfo {
     var animationStartNanos = 0L; private set
     var traversalStartNanos = 0L; private set
     var frameEndNanos = 0L; private set
-    val callback: MainLooperCallback = DoFrameCallback()
+    val callback: LooperCallback = DoFrameCallback()
 
     fun init() = apply {
         assertMainThread()
@@ -96,13 +97,10 @@ internal class ChoreographerFrameInfo {
         fake.interceptSchedule(postMarkStartActions)
     }
 
-    private inner class DoFrameCallback : MainLooperCallback {
-        override fun start(type: Type, data: Any?) {
-            if (type == Type.Message) markFrameStart()
-        }
-
-        override fun end(type: Type, data: Any?) {
-            if (type == Type.Message) markFrameEnd()
+    private inner class DoFrameCallback : LooperCallback {
+        override fun dispatch(current: DispatchContext) {
+            if (current.scene != Scene.Message) return
+            if (current.isStart) markInputStart() else markFrameEnd()
         }
     }
 

@@ -26,17 +26,16 @@ import com.xiaocydx.performance.fake.FakeLooperObserver
 import com.xiaocydx.performance.fake.toReal
 import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.runtime.gc.Cleaner
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc
  * @date 2025/3/19
  */
-internal class MainLooperMessageWatcher private constructor(
+internal class LooperMessageWatcher private constructor(
     private val original: Printer?,
     private val mainLooper: Looper,
-    private val callback: MainLooperCallback
-) : MainLooperWatcher() {
+    private val dispatcher: LooperDispatcher
+) : LooperWatcher() {
     private val printer = PrinterImpl()
 
     override fun trackGC(thunk: Runnable) {
@@ -53,8 +52,8 @@ internal class MainLooperMessageWatcher private constructor(
         override fun println(x: String) {
             original?.println(x)
             when {
-                x[0] == '>' -> callback.start(type = Type.Message, data = x)
-                x[0] == '<' -> callback.end(type = Type.Message, data = x)
+                x[0] == '>' -> dispatcher.start(scene = Scene.Message, value = x)
+                x[0] == '<' -> dispatcher.end(scene = Scene.Message, value = x)
             }
         }
     }
@@ -64,14 +63,14 @@ internal class MainLooperMessageWatcher private constructor(
         @MainThread
         fun setup(
             mainLooper: Looper,
-            callback: MainLooperCallback
-        ): MainLooperWatcher {
+            dispatcher: LooperDispatcher
+        ): LooperWatcher {
             val original = runCatching {
                 val fields = Looper::class.java.toSafe().declaredInstanceFields
                 val mLogging = fields.find("mLogging").apply { isAccessible = true }
                 mLogging.get(mainLooper) as? Printer
             }.getOrNull()
-            val watcher = MainLooperMessageWatcher(original, mainLooper, callback)
+            val watcher = LooperMessageWatcher(original, mainLooper, dispatcher)
             mainLooper.setMessageLogging(watcher.printer)
             return watcher
         }
@@ -79,11 +78,11 @@ internal class MainLooperMessageWatcher private constructor(
 }
 
 @RequiresApi(29)
-internal class MainLooperMessageWatcher29 private constructor(
+internal class LooperMessageWatcher29 private constructor(
     original: Any?,
     private val mainLooper: Looper,
-    private val callback: MainLooperCallback
-) : MainLooperWatcher() {
+    private val dispatcher: LooperDispatcher
+) : LooperWatcher() {
     private val fakeObserver = FakeLooperObserverImpl()
     private val realObserver = fakeObserver.toReal(original)
 
@@ -106,17 +105,17 @@ internal class MainLooperMessageWatcher29 private constructor(
 
         @AnyThread
         override fun messageDispatchStarting() {
-            ifMainThread { callback.start(type = Type.Message, data = null) }
+            ifMainThread { dispatcher.start(scene = Scene.Message, value = null) }
         }
 
         @AnyThread
         override fun messageDispatched(msg: Message) {
-            ifMainThread { callback.end(type = Type.Message, data = msg) }
+            ifMainThread { dispatcher.end(scene = Scene.Message, value = msg) }
         }
 
         @AnyThread
         override fun dispatchingThrewException(msg: Message, exception: Exception) {
-            ifMainThread { callback.end(type = Type.Message, data = msg) }
+            ifMainThread { dispatcher.end(scene = Scene.Message, value = msg) }
         }
     }
 
@@ -125,14 +124,14 @@ internal class MainLooperMessageWatcher29 private constructor(
         @MainThread
         fun setupOrThrow(
             mainLooper: Looper,
-            callback: MainLooperCallback
-        ): MainLooperWatcher {
+            dispatcher: LooperDispatcher
+        ): LooperWatcher {
             val fields = Looper::class.java.toSafe().declaredStaticFields
             val methods = Looper::class.java.toSafe().declaredMethods
             val sObserver = fields.find("sObserver").apply { isAccessible = true }
             val setObserver = methods.find("setObserver").apply { isAccessible = true }
             val original = sObserver.get(null)
-            val watcher = MainLooperMessageWatcher29(original, mainLooper, callback)
+            val watcher = LooperMessageWatcher29(original, mainLooper, dispatcher)
             setObserver.invoke(null, watcher.realObserver)
             return watcher
         }

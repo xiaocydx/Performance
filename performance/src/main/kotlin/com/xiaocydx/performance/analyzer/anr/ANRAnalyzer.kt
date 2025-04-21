@@ -17,23 +17,18 @@
 package com.xiaocydx.performance.analyzer.anr
 
 import com.xiaocydx.performance.Performance
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
+import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.LooperCallback
 
 /**
  * @author xcc
  * @date 2025/3/27
  */
-internal class ANRAnalyzer(private val host: Performance.Host) : MainLooperCallback {
+internal class ANRAnalyzer(private val host: Performance.Host) : LooperCallback {
 
     fun init() {
     }
 
-    override fun start(type: Type, data: Any?) {
-
-    }
-
-    override fun end(type: Type, data: Any?) {
-        // TODO: 收集data的信息进队列
+    override fun dispatch(current: DispatchContext) {
     }
 }

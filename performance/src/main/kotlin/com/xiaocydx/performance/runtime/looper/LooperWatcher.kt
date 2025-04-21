@@ -18,7 +18,7 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/27
  */
-internal sealed class MainLooperWatcher {
+internal sealed class LooperWatcher {
 
     /**
      * 观察者被GC后，调用[thunk]
@@ -38,20 +38,21 @@ internal sealed class MainLooperWatcher {
         @MainThread
         fun init(
             host: Performance.Host,
-            callback: MainLooperCallback,
+            callback: LooperCallback,
             resetAfterGC: Boolean = true
         ) {
-            val mainLooper = host.mainLooper
-            val finalCallback = NotReentrantMainLooperCallback(callback)
+            val mainQueue = Looper.myQueue()
+            val mainLooper = Looper.getMainLooper()
+            val dispatcher = LooperDispatcher(callback)
             val scope = host.createMainScope()
             scope.launch {
                 log { "设置MainLooperMessageWatcher" }
                 while (true) {
                     val watcher = if (Build.VERSION.SDK_INT < 29) {
-                        MainLooperMessageWatcher.setup(mainLooper, finalCallback)
+                        LooperMessageWatcher.setup(mainLooper, dispatcher)
                     } else {
-                        runCatching { MainLooperMessageWatcher29.setupOrThrow(mainLooper, finalCallback) }
-                            .getOrNull() ?: MainLooperMessageWatcher.setup(mainLooper, finalCallback)
+                        runCatching { LooperMessageWatcher29.setupOrThrow(mainLooper, dispatcher) }
+                            .getOrNull() ?: LooperMessageWatcher.setup(mainLooper, dispatcher)
                     }
                     if (resetAfterGC) watcher.awaitGC() else break
                     log { "重新设置MainLooperMessageWatcher" }
@@ -61,7 +62,7 @@ internal sealed class MainLooperWatcher {
             scope.launch {
                 log { "设置MainLooperIdleHandlerWatcher" }
                 while (true) {
-                    val watcher = MainLooperIdleHandlerWatcher.setup(mainLooper, finalCallback)
+                    val watcher = LooperIdleHandlerWatcher.setup(mainQueue, dispatcher)
                     if (resetAfterGC) watcher.awaitGC() else break
                     log { "重新设置MainLooperIdleHandlerWatcher" }
                 }
@@ -71,13 +72,13 @@ internal sealed class MainLooperWatcher {
                 log { "设置MainLooperNativeTouchWatcher" }
                 host.activityEvent.filterIsInstance<ActivityEvent.Created>().collect {
                     val activity = host.getActivity(it.activityKey) ?: return@collect
-                    MainLooperNativeTouchWatcher.setup(activity.window, finalCallback)
+                    LooperNativeTouchWatcher.setup(activity.window, dispatcher)
                 }
             }
         }
     }
 }
 
-private suspend fun MainLooperWatcher.awaitGC() {
+private suspend fun LooperWatcher.awaitGC() {
     suspendCancellableCoroutine { cont -> trackGC { cont.resume(Unit) } }
 }

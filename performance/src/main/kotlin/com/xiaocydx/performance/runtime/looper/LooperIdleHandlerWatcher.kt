@@ -16,21 +16,19 @@
 
 package com.xiaocydx.performance.runtime.looper
 
-import android.os.Looper
 import android.os.MessageQueue
 import android.os.MessageQueue.IdleHandler
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.runtime.gc.Cleaner
-import com.xiaocydx.performance.runtime.looper.MainLooperCallback.Type
 
 /**
  * @author xcc
  * @date 2025/3/19
  */
-internal class MainLooperIdleHandlerWatcher private constructor(
-    private val callback: MainLooperCallback
-) : MainLooperWatcher() {
+internal class LooperIdleHandlerWatcher private constructor(
+    private val dispatcher: LooperDispatcher
+) : LooperWatcher() {
     private val list = IdleHandlerList()
     private var canTrackGC = false
 
@@ -70,9 +68,9 @@ internal class MainLooperIdleHandlerWatcher private constructor(
     private inner class IdleHandlerWrapper(val delegate: IdleHandler) : IdleHandler {
 
         override fun queueIdle(): Boolean {
-            callback.start(type = Type.IdleHandler, data = delegate)
+            dispatcher.start(scene = Scene.IdleHandler, value = delegate)
             val keep = delegate.queueIdle()
-            callback.end(type = Type.IdleHandler, data = delegate)
+            dispatcher.end(scene = Scene.IdleHandler, value = delegate)
             return keep
         }
     }
@@ -82,16 +80,16 @@ internal class MainLooperIdleHandlerWatcher private constructor(
         @MainThread
         @Suppress("UNCHECKED_CAST")
         fun setup(
-            mainLooper: Looper,
-            callback: MainLooperCallback
-        ): MainLooperIdleHandlerWatcher {
-            val watcher = MainLooperIdleHandlerWatcher(callback)
+            mainQueue: MessageQueue,
+            dispatcher: LooperDispatcher,
+        ): LooperIdleHandlerWatcher {
+            val watcher = LooperIdleHandlerWatcher(dispatcher)
             runCatching {
                 val fields = MessageQueue::class.java.toSafe().declaredInstanceFields
                 val mIdleHandlers = fields.find("mIdleHandlers").apply { isAccessible = true }
-                val original = mIdleHandlers.get(mainLooper.queue) as? List<IdleHandler>
+                val original = mIdleHandlers.get(mainQueue) as? List<IdleHandler>
                 watcher.set(original)
-                mIdleHandlers.set(mainLooper.queue, watcher.get())
+                mIdleHandlers.set(mainQueue, watcher.get())
             }
             return watcher
         }
