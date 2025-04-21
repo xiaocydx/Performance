@@ -44,12 +44,15 @@ class BlockWriter(
     private fun print(report: BlockReport) {
         val json = JSONObject().apply {
             put("scene", report.scene)
-            put("durationMillis", report.durationMillis)
+            put("lastActivity", report.lastActivity)
             put("thresholdMillis", report.thresholdMillis)
+            put("wallDurationMillis", report.wallDurationMillis)
+            put("cpuDurationMillis", report.cpuDurationMillis)
             put("isRecordEnabled", report.isRecordEnabled)
             put("snapshotAvailable", report.snapshot.isAvailable)
+            put("value", report.value)
         }
-        Log.e(TAG, json.toString())
+        Log.e(TAG, json.toString(2))
     }
 
     private fun write(report: BlockReport) {

@@ -8,8 +8,11 @@ import com.xiaocydx.performance.runtime.history.Snapshot
  */
 class BlockReport(
     val scene: String,
+    val value: String,
+    val lastActivity: String,
     val snapshot: Snapshot,
-    val durationMillis: Long,
     val thresholdMillis: Long,
+    val wallDurationMillis: Long,
+    val cpuDurationMillis: Long,
     val isRecordEnabled: Boolean,
 )
