@@ -55,7 +55,7 @@ open class PerformanceExtension {
 open class PerformanceHistoryExtension(
     @JvmField var isTraceEnabled: Boolean = false,
     @JvmField var isRecordEnabled: Boolean = false,
-    @JvmField var isIncrementalEnabled: Boolean = true,
+    @JvmField var isIncremental: Boolean = true,
     @JvmField var excludeManifest: String = "",
     @JvmField var excludeClassFile: String = "",
     @JvmField var excludeMethodFile: String = "",

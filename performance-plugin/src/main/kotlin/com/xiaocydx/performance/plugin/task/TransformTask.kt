@@ -74,7 +74,7 @@ internal abstract class TransformTask : DefaultTask() {
                 output = OutputProcessor(
                     inspector = inspector,
                     jarOutput = JarOutput(outputJar),
-                    cacheOutput = if (ext.isIncrementalEnabled) CacheOutput(cacheDirectory) else null,
+                    cacheOutput = if (ext.isIncremental) CacheOutput(cacheDirectory) else null,
                     excludeClassFile = ext.excludeClassFile,
                     excludeMethodFile = ext.excludeMethodFile,
                     mappingMethodFile = ext.mappingMethodFile,

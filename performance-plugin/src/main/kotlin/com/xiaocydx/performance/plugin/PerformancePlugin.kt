@@ -60,7 +60,7 @@ internal class PerformancePlugin : Plugin<Project> {
                     into = TransformTask::outputJar
                 )
 
-            if (historyExt.isIncrementalEnabled) {
+            if (historyExt.isIncremental) {
                 val appendTaskProvider = project.tasks.register(
                     "performanceAppend${variant.taskSuffix()}",
                     AppendTask::class.java
