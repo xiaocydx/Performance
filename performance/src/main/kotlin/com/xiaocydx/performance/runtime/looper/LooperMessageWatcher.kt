@@ -52,8 +52,8 @@ internal class LooperMessageWatcher private constructor(
         override fun println(x: String) {
             original?.println(x)
             when {
-                x[0] == '>' -> dispatcher.start(scene = Scene.Message, value = x)
-                x[0] == '<' -> dispatcher.end(scene = Scene.Message, value = x)
+                x[0] == '>' -> dispatcher.start(scene = Scene.Message, metadata = x)
+                x[0] == '<' -> dispatcher.end(scene = Scene.Message, metadata = x)
             }
         }
     }
@@ -105,17 +105,17 @@ internal class LooperMessageWatcher29 private constructor(
 
         @AnyThread
         override fun messageDispatchStarting() {
-            ifMainThread { dispatcher.start(scene = Scene.Message, value = null) }
+            ifMainThread { dispatcher.start(scene = Scene.Message, metadata = null) }
         }
 
         @AnyThread
         override fun messageDispatched(msg: Message) {
-            ifMainThread { dispatcher.end(scene = Scene.Message, value = msg) }
+            ifMainThread { dispatcher.end(scene = Scene.Message, metadata = msg) }
         }
 
         @AnyThread
         override fun dispatchingThrewException(msg: Message, exception: Exception) {
-            ifMainThread { dispatcher.end(scene = Scene.Message, value = msg) }
+            ifMainThread { dispatcher.end(scene = Scene.Message, metadata = msg) }
         }
     }
 

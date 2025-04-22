@@ -26,7 +26,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.roundToInt
 
 /**
- * [FrameMetricsAggregate]的日志打印
+ * 打印[FrameMetricsAggregate]
  *
  * @author xcc
  * @date 2025/4/3
@@ -39,7 +39,7 @@ class FrameMetricsPrinter(
 ) : FrameMetricsReceiver {
     private val json = Json()
 
-    override fun onAvailable(aggregate: FrameMetricsAggregate) {
+    override fun receive(aggregate: FrameMetricsAggregate) {
         var visitor = visitorPool.acquire()
         if (visitor == null) {
             visitor = FrameMetricsVisitor()

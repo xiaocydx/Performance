@@ -44,9 +44,9 @@ internal class LooperNativeTouchWatcher private constructor(
 
         @MainThread
         override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-            dispatcher.start(scene = Scene.NativeTouch, value = event)
+            dispatcher.start(scene = Scene.NativeTouch, metadata = event)
             val consumed = delegate.dispatchTouchEvent(event)
-            dispatcher.end(scene = Scene.NativeTouch, value = event)
+            dispatcher.end(scene = Scene.NativeTouch, metadata = event)
             return consumed
         }
     }

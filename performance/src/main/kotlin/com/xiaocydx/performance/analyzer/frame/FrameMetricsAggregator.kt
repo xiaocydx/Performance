@@ -79,7 +79,7 @@ internal class FrameMetricsAggregator(
             avgFps = NANOS_PER_SECOND / (totalNanos / renderedFrames)
             avgRefreshRate = refreshRates / renderedFrames
             dropped.calculateAvg()
-            receiver.onAvailable(aggregate = this)
+            receiver.receive(aggregate = this)
         }
         reset()
     }

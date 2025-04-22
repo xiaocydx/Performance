@@ -16,21 +16,16 @@
 
 package com.xiaocydx.performance.analyzer.block
 
-import androidx.annotation.IntRange
-
 /**
  * @author xcc
  * @date 2025/4/15
  */
-interface BlockReceiver {
+data class BlockMetricsConfig(val receiver: BlockMetricsReceiver) {
 
-    @get:IntRange(from = 1)
-    val thresholdMillis: Long
-        get() = DEFAULT_THRESHOLD_MILLIS
-
-    fun onBlock(report: BlockReport)
-
-    companion object {
-        const val DEFAULT_THRESHOLD_MILLIS = 700L
+    internal fun checkProperty() {
+        val name = receiver.javaClass.simpleName
+        require(receiver.thresholdMillis >= 1) {
+            "${name}.thresholdMillis < 1"
+        }
     }
 }

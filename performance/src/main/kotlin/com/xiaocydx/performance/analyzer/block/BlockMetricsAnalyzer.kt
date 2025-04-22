@@ -19,7 +19,9 @@
 package com.xiaocydx.performance.analyzer.block
 
 import android.os.Handler
+import android.os.Looper
 import android.os.Process
+import android.os.SystemClock
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.ProcStat
@@ -33,16 +35,16 @@ import kotlinx.coroutines.launch
  * @author xcc
  * @date 2025/3/27
  */
-internal class BlockAnalyzer(
+internal class BlockMetricsAnalyzer(
     host: Performance.Host,
-    private val config: BlockConfig
+    private val config: BlockMetricsConfig
 ) : Analyzer(host) {
 
     override fun init() {
         val handler = Handler(host.dumpLooper)
         val callback = Callback(handler)
         coroutineScope.launch {
-            host.needHistory(this@BlockAnalyzer)
+            host.needHistory(this@BlockMetricsAnalyzer)
             host.addCallback(callback)
             awaitCancellation()
         }.invokeOnCompletion {
@@ -50,73 +52,85 @@ internal class BlockAnalyzer(
         }
     }
 
-    private inner class Callback(private val handler: Handler) : LooperCallback {
+    private inner class Callback(private val handler: Handler) : Runnable, LooperCallback {
         private var startMark = 0L
         private var startUptimeMillis = 0L
         private var startThreadTimeMillis = 0L
+        @Volatile private var stackTrace: Array<StackTraceElement>? = null
+
+        override fun run() {
+            stackTrace = Looper.getMainLooper().thread.stackTrace
+        }
+
+        private fun consumeStackTrace(): Array<StackTraceElement>? {
+            val stackTrace = stackTrace ?: return null
+            this.stackTrace = null
+            return stackTrace
+        }
 
         override fun dispatch(current: DispatchContext) {
+            val thresholdMillis = config.receiver.thresholdMillis
             if (current.isStart) {
+                handler.postDelayed(this, (thresholdMillis * 0.7).toLong())
                 startMark = History.startMark()
                 startUptimeMillis = current.uptimeMillis
                 startThreadTimeMillis = current.threadTimeMillis
             } else {
+                handler.removeCallbacks(this)
                 val endMark = History.endMark()
                 val wallDurationMillis = current.uptimeMillis - startUptimeMillis
                 val cpuDurationMillis = current.threadTimeMillis - startThreadTimeMillis
-                val receivers = config.receivers
-                for (i in 0 until receivers.size) {
-                    if (wallDurationMillis > receivers[i].thresholdMillis) {
-                        handler.post(BlockReportTask(
-                            scene = current.scene.name,
-                            value = current.value?.toString() ?: "",
-                            lastActivity = host.getLastActivity()?.javaClass?.name ?: "",
-                            startMark = startMark,
-                            endMark = endMark,
-                            wallDurationMillis = wallDurationMillis,
-                            cpuDurationMillis = cpuDurationMillis,
-                            isRecordEnabled = History.isRecordEnabled,
-                            receivers = receivers
-                        ))
-                        break
-                    }
+                if (wallDurationMillis > thresholdMillis) {
+                    handler.post(BlockTask(
+                        scene = current.scene.name,
+                        lastActivity = host.getLastActivity()?.javaClass?.name ?: "",
+                        startMark = startMark,
+                        endMark = endMark,
+                        thresholdMillis = thresholdMillis,
+                        wallDurationMillis = wallDurationMillis,
+                        cpuDurationMillis = cpuDurationMillis,
+                        isRecordEnabled = History.isRecordEnabled,
+                        metadata = current.metadata?.toString() ?: "",
+                        stackTrace = consumeStackTrace(),
+                        receiver = config.receiver
+                    ))
                 }
             }
         }
     }
 
-    private class BlockReportTask(
+    private class BlockTask(
         private val scene: String,
-        private val value: String,
         private val lastActivity: String,
         private val startMark: Long,
         private val endMark: Long,
+        private val thresholdMillis: Long,
         private val wallDurationMillis: Long,
         private val cpuDurationMillis: Long,
         private val isRecordEnabled: Boolean,
-        private val receivers: List<BlockReceiver>,
+        private val metadata: String,
+        private val stackTrace: Array<StackTraceElement>?,
+        private val receiver: BlockMetricsReceiver
     ) : Runnable {
 
         override fun run() {
             val snapshot = History.snapshot(startMark, endMark)
             val procStat = ProcStat.get(Process.myPid())
-            for (i in 0 until receivers.size) {
-                val thresholdMillis = receivers[i].thresholdMillis
-                if (wallDurationMillis > thresholdMillis) {
-                    receivers[i].onBlock(BlockReport(
-                        scene = scene,
-                        value = value,
-                        lastActivity = lastActivity,
-                        priority = procStat.priority,
-                        nice = procStat.nice,
-                        snapshot = snapshot,
-                        thresholdMillis = thresholdMillis,
-                        wallDurationMillis = wallDurationMillis,
-                        cpuDurationMillis = cpuDurationMillis,
-                        isRecordEnabled = isRecordEnabled
-                    ))
-                }
-            }
+            SystemClock.uptimeMillis()
+            receiver.receive(BlockMetrics(
+                scene = scene,
+                lastActivity = lastActivity,
+                priority = procStat.priority,
+                nice = procStat.nice,
+                createTimeMillis = System.currentTimeMillis(),
+                thresholdMillis = thresholdMillis,
+                wallDurationMillis = wallDurationMillis,
+                cpuDurationMillis = cpuDurationMillis,
+                isRecordEnabled = isRecordEnabled,
+                metadata = metadata,
+                snapshot = snapshot,
+                stackTrace = stackTrace
+            ))
         }
     }
 }

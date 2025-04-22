@@ -48,7 +48,7 @@ interface FrameMetricsReceiver {
         get() = DefaultDroppedFramesThreshold
 
     /**
-     * 达到[intervalMillis]，接收可用的[FrameMetricsAggregate]
+     * 达到[intervalMillis]，接收[FrameMetricsAggregate]
      *
      * **注意**：
      * 1. 该函数不能执行耗时较长的逻辑（比如IO操作），这会导致[aggregate]不准确。
@@ -58,7 +58,7 @@ interface FrameMetricsReceiver {
      *
      * [FrameMetricsVisitor]的使用可以参考[FrameMetricsPrinter]。
      */
-    fun onAvailable(aggregate: FrameMetricsAggregate)
+    fun receive(aggregate: FrameMetricsAggregate)
 
     companion object {
         private val DefaultDroppedFramesThreshold = DroppedFrames.Threshold()

@@ -25,8 +25,8 @@ import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
-import com.xiaocydx.performance.analyzer.block.BlockAnalyzer
-import com.xiaocydx.performance.analyzer.block.BlockConfig
+import com.xiaocydx.performance.analyzer.block.BlockMetricsAnalyzer
+import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
@@ -65,8 +65,8 @@ object Performance {
 
         ANRAnalyzer(host).start()
         IdleHandlerAnalyzer(host).start()
-        if (config.isBlockEnabled) BlockAnalyzer(host, config.blockConfig).start()
-        if (config.isFrameEnabled) FrameMetricsAnalyzer.create(host, config.frameConfig).start()
+        config.blockConfig?.let { BlockMetricsAnalyzer(host, it).start() }
+        config.frameConfig?.let { FrameMetricsAnalyzer.create(host, it).start() }
 
         host.callbacks.immutable()
         LooperWatcher.init(host, callback = host.callbacks)
@@ -141,15 +141,13 @@ object Performance {
     }
 
     data class Config(
-        val blockConfig: BlockConfig = BlockConfig(),
-        val frameConfig: FrameMetricsConfig = FrameMetricsConfig(),
+        val blockConfig: BlockMetricsConfig? = null,
+        val frameConfig: FrameMetricsConfig? = null,
     ) {
-        internal val isBlockEnabled = blockConfig.receivers.isNotEmpty()
-        internal val isFrameEnabled = frameConfig.receivers.isNotEmpty()
 
         internal fun checkProperty() {
-            blockConfig.checkProperty()
-            frameConfig.checkProperty()
+            blockConfig?.checkProperty()
+            frameConfig?.checkProperty()
         }
     }
 }

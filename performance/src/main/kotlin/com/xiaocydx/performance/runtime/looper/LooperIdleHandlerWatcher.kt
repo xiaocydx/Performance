@@ -68,9 +68,9 @@ internal class LooperIdleHandlerWatcher private constructor(
     private inner class IdleHandlerWrapper(val delegate: IdleHandler) : IdleHandler {
 
         override fun queueIdle(): Boolean {
-            dispatcher.start(scene = Scene.IdleHandler, value = delegate)
+            dispatcher.start(scene = Scene.IdleHandler, metadata = delegate)
             val keep = delegate.queueIdle()
-            dispatcher.end(scene = Scene.IdleHandler, value = delegate)
+            dispatcher.end(scene = Scene.IdleHandler, metadata = delegate)
             return keep
         }
     }

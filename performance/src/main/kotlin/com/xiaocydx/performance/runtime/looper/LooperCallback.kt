@@ -54,7 +54,7 @@ internal interface DispatchContext {
      * [Scene.IdleHandler]：[IdleHandler]。
      * [Scene.NativeTouch]：[MotionEvent]。
      */
-    val value: Any?
+    val metadata: Any?
 
     /**
      * [LooperCallback.dispatch]的[SystemClock.uptimeMillis]

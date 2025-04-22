@@ -26,24 +26,24 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     private var dispatchingScene: Scene? = null
     private val current = DispatchContextImpl()
 
-    fun start(scene: Scene, value: Any?) {
+    fun start(scene: Scene, metadata: Any?) {
         if (dispatchingScene != null) return
         dispatchingScene = scene
         makeCurrent {
             isStart = true
             this.scene = scene
-            this.value = value
+            this.metadata = metadata
         }
         callback.dispatch(current)
     }
 
-    fun end(scene: Scene, value: Any?) {
+    fun end(scene: Scene, metadata: Any?) {
         if (dispatchingScene != scene) return
         dispatchingScene = null
         makeCurrent {
             isStart = false
             this.scene = scene
-            this.value = value
+            this.metadata = metadata
         }
         callback.dispatch(current)
     }
@@ -57,7 +57,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     private class DispatchContextImpl : DispatchContext {
         override var isStart = false
         override var scene = Scene.Message
-        override var value: Any? = null
+        override var metadata: Any? = null
         override var uptimeMillis = 0L
         override var threadTimeMillis = 0L
     }
