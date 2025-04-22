@@ -49,7 +49,8 @@ internal class CacheOutput(cacheDirectory: DirectoryProperty) {
                 crc.update(buffer, 0, bytesRead)
             }
         }
-        return File(cacheDir, "${entryName}${CACHE_SEPARATOR}${crc.value}")
+        val value = crc.value.toString(16)
+        return File(cacheDir, "${entryName}${CACHE_SEPARATOR}${value}")
     }
 
     fun write(bytes: ByteArray, cache: File) {
