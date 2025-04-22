@@ -52,5 +52,6 @@ open class PerformanceHistoryExtension(
     @JvmField var excludeClassFile: String = "",
     @JvmField var excludeMethodFile: String = "",
     @JvmField var mappingMethodFile: String = "",
+    @JvmField var mappingBaseFile: String = "",
     @JvmField var mappingSnapshotDir: String = ""
 )

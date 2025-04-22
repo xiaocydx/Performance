@@ -44,7 +44,7 @@ internal class CollectProcessor(
     private val inspector: Inspector,
     private val idGenerator: IdGenerator,
     private val output: OutputProcessor,
-    private val executor:ExecutorService
+    private val executor: ExecutorService
 ) : AbstractProcessor() {
     private val excludeClass = ConcurrentHashMap<String, ClassData>()
     private val excludeMethod = ConcurrentHashMap<String, MethodData>()
@@ -129,9 +129,9 @@ internal class CollectProcessor(
                 mappingClass.put(ClassData(classNode.name, entryName, cache, classReader, classNode))
                 classNode.methods.forEach { method ->
                     if (inspector.isExcludeMethod(method)) {
-                        excludeMethod.put(method.toMethodData(id = INITIAL_ID, classNode.name))
+                        excludeMethod.put(method.toMethodData(idGenerator = null, classNode.name))
                     } else {
-                        mappingMethod.put(method.toMethodData(id = idGenerator.generate(), classNode.name))
+                        mappingMethod.put(method.toMethodData(idGenerator, classNode.name))
                     }
                 }
                 isCollected = true
@@ -140,7 +140,8 @@ internal class CollectProcessor(
         if (isCollected) logger.debug { "collect from $from $entryName $time" }
     }
 
-    private fun MethodNode.toMethodData(id: Int, className: String) = run {
+    private fun MethodNode.toMethodData(idGenerator: IdGenerator?, className: String) = run {
+        val id = idGenerator?.generate(MethodData.key(className, name, desc)) ?: INITIAL_ID
         MethodData(id = id, access = access, className = className, methodName = name, desc = desc)
     }
 }

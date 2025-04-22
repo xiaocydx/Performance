@@ -41,12 +41,10 @@ internal abstract class GenerateJsonTask : DefaultTask() {
         require(mappingMethodFile.exists()) { "$mappingMethodFile not exists" }
         require(mappingSnapshotDir.exists()) { "$mappingSnapshotDir not exists" }
 
-        val mappingTimeMillis = mappingMethodFile.lastModified()
+        val gson = Gson()
         val mapping = mappingMethodFile.bufferedReader(Metadata.charset).useLines { lines ->
             lines.map { MethodData.fromOutput(it) }.associateBy { it.id }
         }
-
-        val gson = Gson()
         val listFiles = mappingSnapshotDir.listFiles()?.filter { it.isFile } ?: emptyList()
         val metricsFiles = listFiles.filter { it.name.startsWith("BlockMetrics") }
         val metricsList = metricsFiles.map { gson.fromJson(it.readText(), BlockMetrics::class.java) }
@@ -54,10 +52,9 @@ internal abstract class GenerateJsonTask : DefaultTask() {
         val jsonDir = File(mappingSnapshotDir, "json")
         jsonDir.mkdirs()
         metricsList.forEachIndexed { i, metrics ->
-            if (metrics.snapshot.isEmpty()) return@forEachIndexed
             val metricsFile = metricsFiles[i]
-            if (mappingTimeMillis > metrics.createTimeMillis) {
-                logger.lifecycle { "${metricsFile.name} [failure]: mappingTimeMillis > metrics.createTimeMillis" }
+            if (metrics.snapshot.isEmpty()) {
+                logger.lifecycle { "${metricsFile.name} [failure]: snapshot is empty" }
                 return@forEachIndexed
             }
 

@@ -16,7 +16,10 @@
 
 package com.xiaocydx.performance.plugin.processor
 
+import com.xiaocydx.performance.plugin.metadata.IdGenerator
 import com.xiaocydx.performance.plugin.metadata.Inspector
+import com.xiaocydx.performance.plugin.metadata.Metadata.Companion.INITIAL_ID
+import com.xiaocydx.performance.plugin.metadata.MethodData
 import com.xiaocydx.performance.plugin.metadata.writeTo
 import com.xiaocydx.performance.plugin.output.CacheOutput
 import com.xiaocydx.performance.plugin.output.JarOutput
@@ -40,6 +43,7 @@ internal class OutputProcessor(
     private val excludeClassFile: String,
     private val excludeMethodFile: String,
     private val mappingMethodFile: String,
+    private val mappingBaseFile: String,
     private val executor: ExecutorService
 ) : AbstractProcessor() {
     private val tasks = TaskCountDownLatch()
@@ -72,6 +76,28 @@ internal class OutputProcessor(
             logger.debug { "scanningCache $time" }
             scanning
         })
+    }
+
+    fun readMappingBase(): IdGenerator {
+        var initial = INITIAL_ID
+        var methodKeyToId: HashMap<String, Int>? = null
+        // 若mappingBaseFile为空，则读取上一次编译的mappingMethodFile
+        val file = File(mappingBaseFile.ifEmpty { mappingMethodFile })
+        if (file.exists()) {
+            methodKeyToId = HashMap()
+            val metadata = MethodData(
+                id = initial, access = 0,
+                className = "", methodName = "", desc = ""
+            )
+            file.bufferedReader().useLines { lines ->
+                lines.forEach {
+                    MethodData.fromOutput(it, metadata)
+                    methodKeyToId[metadata.key] = metadata.id
+                    if (metadata.id > initial) initial = metadata.id
+                }
+            }
+        }
+        return IdGenerator(initial, methodKeyToId)
     }
 
     fun cacheFile(entry: JarEntry): File? {

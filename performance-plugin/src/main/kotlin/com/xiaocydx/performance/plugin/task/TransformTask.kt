@@ -69,7 +69,7 @@ internal abstract class TransformTask : DefaultTask() {
             // Step1: ReadManifest
             val inspector: Inspector
             val output: OutputProcessor
-            val idGenerator = IdGenerator()
+            val idGenerator: IdGenerator
             var time = measureTime {
                 val dir = "${project.rootDir}${separator}outputs${separator}"
                 inspector = Inspector.create(File(ext.excludeManifest))
@@ -80,9 +80,11 @@ internal abstract class TransformTask : DefaultTask() {
                     excludeClassFile = ext.excludeClassFile.ifEmpty { "${dir}ExcludeClassList.text" },
                     excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${dir}ExcludeMethodList.text" },
                     mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${dir}MappingMethodList.text" },
+                    mappingBaseFile = ext.mappingBaseFile,
                     executor = executor
                 )
                 output.scanningCache()
+                idGenerator = output.readMappingBase()
             }
             logger.lifecycle { "ReadManifest $time" }
 

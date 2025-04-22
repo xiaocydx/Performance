@@ -16,7 +16,6 @@
 
 package com.xiaocydx.performance.plugin.metadata
 
-import com.xiaocydx.performance.plugin.metadata.Metadata.Companion.INITIAL_ID
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -37,10 +36,12 @@ internal interface Metadata {
     }
 }
 
-internal class IdGenerator(initial: Int = INITIAL_ID) {
+internal class IdGenerator(initial: Int, private val methodKeyToId: Map<String, Int>?) {
     private val id = AtomicInteger(initial)
 
-    fun generate() = id.incrementAndGet()
+    fun generate(key: String): Int {
+        return methodKeyToId?.get(key) ?: id.incrementAndGet()
+    }
 }
 
 internal fun <T : Metadata> MutableMap<String, T>.put(

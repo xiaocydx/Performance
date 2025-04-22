@@ -49,14 +49,16 @@ dependencies {
 
 performance {
     history {
-        val dir = "${rootDir}${separator}build-files"
+        val projectBuildDir = project.layout.buildDirectory.asFile.get()
+        val outputDir = "${projectBuildDir.absolutePath}${separator}performance"
+        val inputDir = "${rootDir}${separator}build-files"
         isTraceEnabled = true
         isRecordEnabled = true
-        excludeManifest = "${dir}${separator}exclude${separator}ExcludeManifest.text"
-        excludeClassFile = "${dir}${separator}exclude${separator}ExcludeClassList.text"
-        excludeMethodFile = "${dir}${separator}exclude${separator}ExcludeMethodList.text"
-        mappingMethodFile = "${dir}${separator}mapping${separator}MappingMethodList.text"
-        mappingSnapshotDir = "${dir}${separator}snapshot"
+        excludeManifest = "${inputDir}${separator}exclude${separator}ExcludeManifest.text"
+        excludeClassFile = "${outputDir}${separator}exclude${separator}ExcludeClassList.text"
+        excludeMethodFile = "${outputDir}${separator}exclude${separator}ExcludeMethodList.text"
+        mappingMethodFile = "${outputDir}${separator}mapping${separator}MappingMethodList.text"
+        mappingSnapshotDir = "${inputDir}${separator}snapshot"
         File(excludeManifest).takeIf { !it.exists() }?.let {
             it.parentFile.mkdirs()
             it.printWriter().use { writer ->

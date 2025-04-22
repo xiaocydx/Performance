@@ -23,12 +23,17 @@ import com.xiaocydx.performance.plugin.metadata.Metadata.Companion.SEPARATOR
  * @date 2025/4/15
  */
 internal class MethodData(
-    val id: Int,
-    val access: Int,
-    val className: String,
-    val methodName: String,
-    val desc: String
+    id: Int,
+    access: Int,
+    className: String,
+    methodName: String,
+    desc: String
 ) : Metadata {
+    var id = id; private set
+    var access = access; private set
+    var className = className; private set
+    var methodName = methodName; private set
+    var desc = desc; private set
 
     override val key: String
         get() = key(className, methodName, desc)
@@ -44,14 +49,22 @@ internal class MethodData(
             return "${className}${SEPARATOR}${methodName}${SEPARATOR}$desc"
         }
 
-        fun fromOutput(output: String): MethodData {
+        fun fromOutput(output: String, destination: MethodData? = null): MethodData {
             val property = output.split(SEPARATOR)
             val id = property[0].toInt()
             val access = property[1].toInt()
             val className = property[2]
-            val name = property[3]
+            val methodName = property[3]
             val desc = property[4]
-            return MethodData(id, access, className, name, desc)
+            if (destination != null) {
+                destination.id = id
+                destination.access = access
+                destination.className = className
+                destination.methodName = methodName
+                destination.desc = desc
+                return destination
+            }
+            return MethodData(id, access, className, methodName, desc)
         }
     }
 }
