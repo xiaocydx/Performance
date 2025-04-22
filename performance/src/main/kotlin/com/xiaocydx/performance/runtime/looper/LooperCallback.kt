@@ -65,6 +65,11 @@ internal interface DispatchContext {
      * [LooperCallback.dispatch]的[SystemClock.currentThreadTimeMillis]
      */
     val threadTimeMillis: Long
+
+    /**
+     * 是否来自`android.app.ActivityThread`
+     */
+    val isFromActivityThread: Boolean
 }
 
 internal enum class Scene {

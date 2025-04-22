@@ -16,7 +16,10 @@
 
 package com.xiaocydx.performance.runtime.looper
 
+import android.annotation.SuppressLint
+import android.os.Handler
 import android.os.SystemClock
+import com.xiaocydx.performance.runtime.Reflection
 
 /**
  * @author xcc
@@ -46,6 +49,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
             this.metadata = metadata
         }
         callback.dispatch(current)
+        dispatchActivityThreadMessage = false
     }
 
     private inline fun makeCurrent(block: DispatchContextImpl.() -> Unit) {
@@ -60,5 +64,35 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         override var metadata: Any? = null
         override var uptimeMillis = 0L
         override var threadTimeMillis = 0L
+        override val isFromActivityThread: Boolean
+            get() = dispatchActivityThreadMessage
+    }
+
+    @SuppressLint("PrivateApi")
+    private companion object : Reflection {
+        /**
+         * 反射替换的`callback`标记`true`，由[end]标识`false`，
+         * 确保`callback`被其他逻辑反射替换了，也能重置属性值。
+         */
+        var dispatchActivityThreadMessage = false
+
+        init {
+            runCatching {
+                val clazz = Class.forName("android.app.ActivityThread")
+                val sHandlerField = clazz.toSafe().declaredStaticFields.find("sMainThreadHandler")
+                sHandlerField.isAccessible = true
+                val handler = (sHandlerField.get(null) as? Handler) ?: return@runCatching
+
+                val mCallbackField = Handler::class.java.toSafe().declaredInstanceFields.find("mCallback")
+                mCallbackField.isAccessible = true
+                val original = mCallbackField.get(handler) as? Handler.Callback
+                val callback = Handler.Callback { msg ->
+                    // 当message.callback != null时，Handler.Callback不会触发
+                    dispatchActivityThreadMessage = true
+                    original?.handleMessage(msg) ?: false
+                }
+                mCallbackField.set(handler, callback)
+            }
+        }
     }
 }
