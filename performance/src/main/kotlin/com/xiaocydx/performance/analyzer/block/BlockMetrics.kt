@@ -1,5 +1,6 @@
 package com.xiaocydx.performance.analyzer.block
 
+import android.os.Process
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.Snapshot
 
@@ -10,6 +11,14 @@ import com.xiaocydx.performance.runtime.history.Snapshot
  * @date 2025/4/16
  */
 class BlockMetrics(
+    /**
+     * [Process.myTid]
+     */
+    val pid: Int,
+    /**
+     * [Process.myTid]
+     */
+    val tid: Int,
     /**
      * 卡顿场景
      */

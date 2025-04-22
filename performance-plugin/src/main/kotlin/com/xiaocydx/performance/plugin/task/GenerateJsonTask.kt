@@ -17,9 +17,11 @@
 package com.xiaocydx.performance.plugin.task
 
 import com.google.gson.Gson
+import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.PerformanceExtension
 import com.xiaocydx.performance.plugin.metadata.Metadata
 import com.xiaocydx.performance.plugin.metadata.MethodData
+import com.xiaocydx.performance.plugin.task.GenerateJsonTask.Record.Companion.ID_SLICE
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.TaskAction
 import java.io.File
@@ -29,6 +31,7 @@ import java.io.File
  * @date 2025/4/18
  */
 internal abstract class GenerateJsonTask : DefaultTask() {
+    private val logger = Logger(javaClass)
 
     @TaskAction
     fun taskAction() {
@@ -38,39 +41,71 @@ internal abstract class GenerateJsonTask : DefaultTask() {
         require(mappingMethodFile.exists()) { "$mappingMethodFile not exists" }
         require(mappingSnapshotDir.exists()) { "$mappingSnapshotDir not exists" }
 
+        val mappingTimeMillis = mappingMethodFile.lastModified()
         val mapping = mappingMethodFile.bufferedReader(Metadata.charset).useLines { lines ->
-            lines.map { MethodData.fromOutput(it) }.associateBy { it.id }.toMutableMap()
-        }
-        val slice = MethodData(
-            id = Record.ID_SLICE, access = 0,
-            className = "Record", methodName = "slice", desc = ""
-        )
-        mapping[slice.id] = slice
-
-        val listFiles = mappingSnapshotDir.listFiles()?.filter { it.isFile } ?: emptyList()
-        val records = listFiles.associate { file ->
-            val record = file.bufferedReader().useLines { lines ->
-                lines.map { Record(it.toLong()) }.toList()
-            }
-            file.name to record
+            lines.map { MethodData.fromOutput(it) }.associateBy { it.id }
         }
 
         val gson = Gson()
+        val listFiles = mappingSnapshotDir.listFiles()?.filter { it.isFile } ?: emptyList()
+        val metricsFiles = listFiles.filter { it.name.startsWith("BlockMetrics") }
+        val metricsList = metricsFiles.map { gson.fromJson(it.readText(), BlockMetrics::class.java) }
+
         val jsonDir = File(mappingSnapshotDir, "json")
-        jsonDir.takeIf { !it.exists() }?.mkdirs()
-        records.forEach {
-            val events = it.value.map { record ->
-                val methodData = requireNotNull(mapping[record.id]) { "id = ${record.id}" }
+        jsonDir.mkdirs()
+        metricsList.forEachIndexed { i, metrics ->
+            if (metrics.snapshot.isEmpty()) return@forEachIndexed
+            val metricsFile = metricsFiles[i]
+            if (mappingTimeMillis > metrics.createTimeMillis) {
+                logger.lifecycle { "${metricsFile.name} [failure]: mappingTimeMillis > metrics.createTimeMillis" }
+                return@forEachIndexed
+            }
+
+            val args = metrics.copy(snapshot = emptyList())
+            val events = metrics.snapshot.map {
+                val record = Record(it)
+                var methodData = mapping[record.id]
+                if (methodData == null) {
+                    require(record.id == ID_SLICE) { "id = ${record.id}" }
+                    methodData = MethodData(
+                        id = ID_SLICE, access = 0,
+                        className = "BlockMetrics",
+                        methodName = metrics.scene,
+                        desc = ""
+                    )
+                }
                 TraceEvent(
                     name = "${methodData.className}.${methodData.methodName}",
                     ph = if (record.isEnter) TraceEvent.B else TraceEvent.E,
-                    ts = record.timeMs * 1000 // to microsecond
+                    ts = record.timeMs * 1000, // to microsecond
+                    pid = metrics.pid.toLong(),
+                    tid = metrics.tid.toLong(),
+                    cat = metrics.scene,
+                    args = if (record.id == ID_SLICE) args else null
                 )
             }
-            File(jsonDir, "${it.key}.json").bufferedWriter()
-                .use { writer -> writer.write(gson.toJson(events)) }
+            val file = File(jsonDir, "${metricsFiles[i].name}.json")
+            file.bufferedWriter().use { it.write(gson.toJson(events)) }
+            logger.lifecycle { "${metricsFile.name} [success]: ${file.absolutePath}" }
         }
     }
+
+    private data class BlockMetrics(
+        val pid: Int = 0,
+        val tid: Int = 0,
+        val scene: String = "",
+        val lastActivity: String = "",
+        val priority: Int = 0,
+        val nice: Int = 0,
+        val createTimeMillis: Long = 0L,
+        val thresholdMillis: Long = 0L,
+        val wallDurationMillis: Long = 0L,
+        val cpuDurationMillis: Long = 0L,
+        val isRecordEnabled: Boolean = false,
+        val metadata: String = "",
+        val snapshot: List<Long> = emptyList(),
+        val stackTrace: List<String> = emptyList()
+    )
 
     @JvmInline
     private value class Record(val value: Long) {
@@ -98,14 +133,15 @@ internal abstract class GenerateJsonTask : DefaultTask() {
      * [Event Descriptions](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?tab=t.0#heading=h.uxpopqvbjezh)
      */
     private data class TraceEvent(
-        val name: String,
-        val ph: String,
-        val ts: Long,
-        val pid: Long = 0,
-        val tid: Long = 0,
+        val name: String = "",
+        val ph: String = "",
+        val ts: Long = 0L,
+        val pid: Long = 0L,
+        val tid: Long = 0L,
         val cat: String = "",
-        val args: String = ""
+        val args: Any? = null
     ) {
+
         companion object {
             const val B = "B" // begin
             const val E = "E" // end

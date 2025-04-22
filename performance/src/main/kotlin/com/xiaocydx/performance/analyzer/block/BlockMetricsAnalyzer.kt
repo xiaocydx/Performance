@@ -118,6 +118,8 @@ internal class BlockMetricsAnalyzer(
             val procStat = ProcStat.get(Process.myPid())
             SystemClock.uptimeMillis()
             receiver.receive(BlockMetrics(
+                pid = Process.myPid(),
+                tid = Process.myPid(), // 主线程的tid跟pid一致
                 scene = scene,
                 lastActivity = lastActivity,
                 priority = procStat.priority,

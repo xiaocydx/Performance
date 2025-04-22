@@ -53,10 +53,13 @@ class BlockMetricsWriter(
 
     private fun print(metrics: BlockMetrics): JSONObject = with(metrics) {
         val json = JSONObject().apply {
+            put("pid", pid)
+            put("tid", tid)
             put("scene", scene)
             put("lastActivity", lastActivity)
             put("priority", priority)
             put("nice", nice)
+            put("createTimeMillis", createTimeMillis)
             put("thresholdMillis", thresholdMillis)
             put("wallDurationMillis", wallDurationMillis)
             put("cpuDurationMillis", cpuDurationMillis)
