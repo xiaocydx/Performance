@@ -27,7 +27,6 @@ import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import java.io.File
-import java.io.File.separator
 
 internal class PerformancePlugin : Plugin<Project> {
 
@@ -38,8 +37,6 @@ internal class PerformancePlugin : Plugin<Project> {
         PerformanceExtension.inject(project)
         project.tasks.register("performanceGenerateJson", GenerateJsonTask::class.java)
 
-        val projectBuildDir = project.layout.buildDirectory.asFile.get()
-        val buildDir = "${projectBuildDir.absolutePath}${separator}performance"
         val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidExt.onVariants { variant ->
             val historyExt = PerformanceExtension.getHistory(project)
@@ -50,6 +47,7 @@ internal class PerformancePlugin : Plugin<Project> {
                 TransformTask::class.java
             )
             transformTaskProvider.configure {
+                val buildDir = PerformanceExtension.buildDir(project)
                 it.cacheDirectory.set(File(buildDir, variant.name))
             }
             variant.artifacts

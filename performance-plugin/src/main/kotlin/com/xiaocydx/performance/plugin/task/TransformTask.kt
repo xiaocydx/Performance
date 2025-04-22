@@ -37,7 +37,6 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import java.io.File
-import java.io.File.separator
 import java.util.concurrent.Executors
 import kotlin.time.measureTime
 
@@ -63,7 +62,7 @@ internal abstract class TransformTask : DefaultTask() {
 
     @TaskAction
     fun taskAction() {
-        val ext = PerformanceExtension.getHistory(project)
+        val ext = PerformanceExtension.getHistory(project).setDefaultProperty(project)
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
         try {
             // Step1: ReadManifest
@@ -71,15 +70,14 @@ internal abstract class TransformTask : DefaultTask() {
             val output: OutputProcessor
             val idGenerator: IdGenerator
             var time = measureTime {
-                val dir = "${project.rootDir}${separator}outputs${separator}"
                 inspector = Inspector.create(File(ext.excludeManifest))
                 output = OutputProcessor(
                     inspector = inspector,
                     jarOutput = JarOutput(outputJar),
                     cacheOutput = if (ext.isIncrementalEnabled) CacheOutput(cacheDirectory) else null,
-                    excludeClassFile = ext.excludeClassFile.ifEmpty { "${dir}ExcludeClassList.text" },
-                    excludeMethodFile = ext.excludeMethodFile.ifEmpty { "${dir}ExcludeMethodList.text" },
-                    mappingMethodFile = ext.mappingMethodFile.ifEmpty { "${dir}MappingMethodList.text" },
+                    excludeClassFile = ext.excludeClassFile,
+                    excludeMethodFile = ext.excludeMethodFile,
+                    mappingMethodFile = ext.mappingMethodFile,
                     mappingBaseFile = ext.mappingBaseFile,
                     executor = executor
                 )

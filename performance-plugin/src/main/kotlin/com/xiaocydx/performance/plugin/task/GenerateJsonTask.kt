@@ -36,20 +36,20 @@ internal abstract class GenerateJsonTask : DefaultTask() {
     @TaskAction
     fun taskAction() {
         val ext = PerformanceExtension.getHistory(project)
-        val mappingMethodFile = File(ext.mappingMethodFile)
-        val mappingSnapshotDir = File(ext.mappingSnapshotDir)
-        require(mappingMethodFile.exists()) { "$mappingMethodFile not exists" }
-        require(mappingSnapshotDir.exists()) { "$mappingSnapshotDir not exists" }
+        val mappingFile = File(ext.mappingMethodFile)
+        val snapshotDir = File(ext.snapshotDir)
+        require(mappingFile.exists()) { "$mappingFile not exists" }
+        require(snapshotDir.exists()) { "$snapshotDir not exists" }
 
         val gson = Gson()
-        val mapping = mappingMethodFile.bufferedReader(Metadata.charset).useLines { lines ->
+        val mapping = mappingFile.bufferedReader(Metadata.charset).useLines { lines ->
             lines.map { MethodData.fromOutput(it) }.associateBy { it.id }
         }
-        val listFiles = mappingSnapshotDir.listFiles()?.filter { it.isFile } ?: emptyList()
+        val listFiles = snapshotDir.listFiles()?.filter { it.isFile } ?: emptyList()
         val metricsFiles = listFiles.filter { it.name.startsWith("BlockMetrics") }
         val metricsList = metricsFiles.map { gson.fromJson(it.readText(), BlockMetrics::class.java) }
 
-        val jsonDir = File(mappingSnapshotDir, "json")
+        val jsonDir = File(snapshotDir, "json")
         jsonDir.mkdirs()
         metricsList.forEachIndexed { i, metrics ->
             val metricsFile = metricsFiles[i]

@@ -18,6 +18,9 @@ package com.xiaocydx.performance.plugin
 
 import org.gradle.api.Project
 import org.gradle.api.plugins.ExtensionAware
+import java.io.File
+import java.io.File.separator
+import java.io.PrintWriter
 
 /**
  * @author xcc
@@ -28,6 +31,11 @@ open class PerformanceExtension {
     internal companion object {
         private const val PERFORMANCE_NAME = "performance"
         private const val HISTORY_NAME = "history"
+
+        fun buildDir(project: Project): String {
+            val projectBuildDir = project.layout.buildDirectory.asFile.get()
+            return "${projectBuildDir.absolutePath}${separator}$PERFORMANCE_NAME"
+        }
 
         fun inject(project: Project) {
             val performance = project.extensions.create(PERFORMANCE_NAME, PerformanceExtension::class.java)
@@ -53,5 +61,38 @@ open class PerformanceHistoryExtension(
     @JvmField var excludeMethodFile: String = "",
     @JvmField var mappingMethodFile: String = "",
     @JvmField var mappingBaseFile: String = "",
-    @JvmField var mappingSnapshotDir: String = ""
-)
+    @JvmField var snapshotDir: String = ""
+) {
+
+    fun buildManifest(path: String, block: ExcludeManifest.() -> Unit): String {
+        val file = File(path)
+        file.parentFile.takeIf { !it.exists() }?.mkdirs()
+        file.printWriter().use { ExcludeManifest(it).apply(block) }
+        return path
+    }
+
+    internal fun setDefaultProperty(project: Project) = apply {
+        val buildDir = PerformanceExtension.buildDir(project)
+        excludeClassFile = excludeClassFile.ifEmpty {
+            "${buildDir}${separator}exclude${separator}ExcludeClassList.text"
+        }
+        excludeMethodFile = excludeMethodFile.ifEmpty {
+            "${buildDir}${separator}exclude${separator}ExcludeMethodList.text"
+        }
+        mappingMethodFile = mappingMethodFile.ifEmpty {
+            "${buildDir}${separator}mapping${separator}MappingMethodList.text"
+        }
+        if (snapshotDir.isNotEmpty()) File(snapshotDir).takeIf { !it.exists() }?.mkdirs()
+    }
+
+    class ExcludeManifest(private val writer: PrintWriter) {
+
+        fun addPackage(vararg value: String) = apply {
+            value.forEach { writer.println("-package $it") }
+        }
+
+        fun addClass(vararg value: String) = apply {
+            value.forEach { writer.println("-class $it") }
+        }
+    }
+}
