@@ -27,7 +27,9 @@ import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.ProcStat
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
@@ -79,31 +81,35 @@ internal class BlockMetricsAnalyzer(
 
         override fun dispatch(current: DispatchContext) {
             val thresholdMillis = config.receiver.thresholdMillis
-            if (current.isStart) {
-                handler.postDelayed(this, (thresholdMillis * 0.7).toLong())
-                startMark = History.startMark()
-                startUptimeMillis = current.uptimeMillis
-                startThreadTimeMillis = current.threadTimeMillis
-            } else {
-                handler.removeCallbacks(this)
-                val endMark = History.endMark()
-                val wallDurationMillis = current.uptimeMillis - startUptimeMillis
-                val cpuDurationMillis = current.threadTimeMillis - startThreadTimeMillis
-                if (wallDurationMillis > thresholdMillis) {
-                    handler.post(BlockTask(
-                        scene = current.scene.name,
-                        lastActivity = host.getLastActivity()?.javaClass?.name ?: "",
-                        startMark = startMark,
-                        endMark = endMark,
-                        thresholdMillis = thresholdMillis,
-                        wallDurationMillis = wallDurationMillis,
-                        cpuDurationMillis = cpuDurationMillis,
-                        isRecordEnabled = History.isRecordEnabled,
-                        metadata = current.metadata?.toString() ?: "",
-                        sampleState = consumeSampleState(),
-                        sampleStack = consumeSampleStack(),
-                        receiver = config.receiver
-                    ))
+            when (current) {
+                is Start -> {
+                    handler.postDelayed(this, (thresholdMillis * 0.7).toLong())
+                    startMark = History.startMark()
+                    startUptimeMillis = current.uptimeMillis
+                    startThreadTimeMillis = current.threadTimeMillis
+                }
+                is End -> {
+                    handler.removeCallbacks(this)
+                    val endMark = History.endMark()
+                    val wallDurationMillis = current.uptimeMillis - startUptimeMillis
+                    if (wallDurationMillis > thresholdMillis) {
+                        val endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
+                        val cpuDurationMillis = endThreadTimeMillis - startThreadTimeMillis
+                        handler.post(BlockTask(
+                            scene = current.scene.name,
+                            lastActivity = host.getLastActivity()?.javaClass?.name ?: "",
+                            startMark = startMark,
+                            endMark = endMark,
+                            thresholdMillis = thresholdMillis,
+                            wallDurationMillis = wallDurationMillis,
+                            cpuDurationMillis = cpuDurationMillis,
+                            isRecordEnabled = History.isRecordEnabled,
+                            metadata = current.metadata?.toString() ?: "",
+                            sampleState = consumeSampleState(),
+                            sampleStack = consumeSampleStack(),
+                            receiver = config.receiver
+                        ))
+                    }
                 }
             }
         }

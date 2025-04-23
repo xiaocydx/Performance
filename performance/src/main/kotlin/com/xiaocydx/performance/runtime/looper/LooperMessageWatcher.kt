@@ -27,11 +27,7 @@ import com.xiaocydx.performance.fake.toReal
 import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.runtime.gc.Cleaner
 
-/**
- * @author xcc
- * @date 2025/3/19
- */
-internal class LooperMessageWatcher private constructor(
+internal class LooperMessageWatcherApi private constructor(
     private val original: Printer?,
     private val mainLooper: Looper,
     private val dispatcher: LooperDispatcher
@@ -70,7 +66,7 @@ internal class LooperMessageWatcher private constructor(
                 val mLogging = fields.find("mLogging").apply { isAccessible = true }
                 mLogging.get(mainLooper) as? Printer
             }.getOrNull()
-            val watcher = LooperMessageWatcher(original, mainLooper, dispatcher)
+            val watcher = LooperMessageWatcherApi(original, mainLooper, dispatcher)
             mainLooper.setMessageLogging(watcher.printer)
             return watcher
         }
@@ -78,7 +74,7 @@ internal class LooperMessageWatcher private constructor(
 }
 
 @RequiresApi(29)
-internal class LooperMessageWatcher29 private constructor(
+internal class LooperMessageWatcherApi29 private constructor(
     original: Any?,
     private val mainLooper: Looper,
     private val dispatcher: LooperDispatcher
@@ -131,7 +127,7 @@ internal class LooperMessageWatcher29 private constructor(
             val sObserver = fields.find("sObserver").apply { isAccessible = true }
             val setObserver = methods.find("setObserver").apply { isAccessible = true }
             val original = sObserver.get(null)
-            val watcher = LooperMessageWatcher29(original, mainLooper, dispatcher)
+            val watcher = LooperMessageWatcherApi29(original, mainLooper, dispatcher)
             setObserver.invoke(null, watcher.realObserver)
             return watcher
         }

@@ -37,12 +37,7 @@ internal interface LooperCallback {
     fun dispatch(current: DispatchContext)
 }
 
-internal interface DispatchContext {
-
-    /**
-     * `true`-开始处理，`false`-结束处理
-     */
-    val isStart: Boolean
+internal sealed interface DispatchContext {
 
     /**
      * 处理的场景
@@ -50,9 +45,7 @@ internal interface DispatchContext {
     val scene: Scene
 
     /**
-     * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - [Message]。
-     * [Scene.IdleHandler]：[IdleHandler]。
-     * [Scene.NativeTouch]：[MotionEvent]。
+     * [scene]的元数据
      */
     val metadata: Any?
 
@@ -62,14 +55,34 @@ internal interface DispatchContext {
     val uptimeMillis: Long
 
     /**
-     * [LooperCallback.dispatch]的[SystemClock.currentThreadTimeMillis]
-     */
-    val threadTimeMillis: Long
-
-    /**
      * 是否来自`android.app.ActivityThread`
      */
     val isFromActivityThread: Boolean
+}
+
+internal interface Start : DispatchContext {
+
+    /**
+     * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - `null`。
+     * * [Scene.IdleHandler]：[IdleHandler]。
+     * * [Scene.NativeTouch]：[MotionEvent]。
+     */
+    override val metadata: Any?
+
+    /**
+     * [LooperCallback.dispatch]的[SystemClock.currentThreadTimeMillis]
+     */
+    val threadTimeMillis: Long
+}
+
+internal interface End : DispatchContext {
+
+    /**
+     * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - [Message]。
+     * * [Scene.IdleHandler]：[IdleHandler]。
+     * * [Scene.NativeTouch]：[MotionEvent]。
+     */
+    override val metadata: Any?
 }
 
 internal enum class Scene {
@@ -105,12 +118,15 @@ internal class CompositeLooperCallback : LooperCallback {
     }
 
     override fun dispatch(current: DispatchContext) {
-        if (current.isStart) {
-            dispatchingCallbacks = callbacks
-            dispatchCallbacks { it.dispatch(current) }
-        } else {
-            dispatchCallbacks { it.dispatch(current) }
-            dispatchingCallbacks = emptyList()
+        when (current) {
+            is Start -> {
+                dispatchingCallbacks = callbacks
+                dispatchCallbacks { it.dispatch(current) }
+            }
+            is End -> {
+                dispatchCallbacks { it.dispatch(current) }
+                dispatchingCallbacks = emptyList()
+            }
         }
     }
 

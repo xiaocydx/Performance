@@ -49,10 +49,10 @@ internal sealed class LooperWatcher {
                 log { "设置MainLooperMessageWatcher" }
                 while (true) {
                     val watcher = if (Build.VERSION.SDK_INT < 29) {
-                        LooperMessageWatcher.setup(mainLooper, dispatcher)
+                        LooperMessageWatcherApi.setup(mainLooper, dispatcher)
                     } else {
-                        runCatching { LooperMessageWatcher29.setupOrThrow(mainLooper, dispatcher) }
-                            .getOrNull() ?: LooperMessageWatcher.setup(mainLooper, dispatcher)
+                        runCatching { LooperMessageWatcherApi29.setupOrThrow(mainLooper, dispatcher) }
+                            .getOrNull() ?: LooperMessageWatcherApi.setup(mainLooper, dispatcher)
                     }
                     if (resetAfterGC) watcher.awaitGC() else break
                     log { "重新设置MainLooperMessageWatcher" }

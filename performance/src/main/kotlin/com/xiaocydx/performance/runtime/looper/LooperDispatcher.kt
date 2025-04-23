@@ -26,44 +26,45 @@ import com.xiaocydx.performance.runtime.Reflection
  * @date 2025/4/21
  */
 internal class LooperDispatcher(private val callback: LooperCallback) {
+    private val start = StartImpl()
+    private val end = EndImpl()
     private var dispatchingScene: Scene? = null
-    private val current = DispatchContextImpl()
 
     fun start(scene: Scene, metadata: Any?) {
         if (dispatchingScene != null) return
         dispatchingScene = scene
-        makeCurrent {
-            isStart = true
-            this.scene = scene
-            this.metadata = metadata
-        }
-        callback.dispatch(current)
+        start.scene = scene
+        start.metadata = metadata
+        start.uptimeMillis = SystemClock.uptimeMillis()
+        start.threadTimeMillis = SystemClock.currentThreadTimeMillis()
+        callback.dispatch(start)
+        start.metadata = null
     }
 
     fun end(scene: Scene, metadata: Any?) {
         if (dispatchingScene != scene) return
         dispatchingScene = null
-        makeCurrent {
-            isStart = false
-            this.scene = scene
-            this.metadata = metadata
-        }
-        callback.dispatch(current)
+        end.scene = scene
+        end.metadata = metadata
+        end.uptimeMillis = SystemClock.uptimeMillis()
+        callback.dispatch(end)
+        end.metadata = null
         dispatchActivityThreadMessage = false
     }
 
-    private inline fun makeCurrent(block: DispatchContextImpl.() -> Unit) {
-        current.apply(block)
-        current.uptimeMillis = SystemClock.uptimeMillis()
-        current.threadTimeMillis = SystemClock.currentThreadTimeMillis()
-    }
-
-    private class DispatchContextImpl : DispatchContext {
-        override var isStart = false
+    private class StartImpl : Start {
         override var scene = Scene.Message
         override var metadata: Any? = null
         override var uptimeMillis = 0L
         override var threadTimeMillis = 0L
+        override val isFromActivityThread: Boolean
+            get() = dispatchActivityThreadMessage
+    }
+
+    private class EndImpl : End {
+        override var scene = Scene.Message
+        override var metadata: Any? = null
+        override var uptimeMillis = 0L
         override val isFromActivityThread: Boolean
             get() = dispatchActivityThreadMessage
     }

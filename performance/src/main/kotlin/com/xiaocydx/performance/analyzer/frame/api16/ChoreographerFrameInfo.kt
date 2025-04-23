@@ -21,8 +21,10 @@ import androidx.annotation.MainThread
 import com.xiaocydx.performance.fake.FakeChoreographer
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.looper.DispatchContext
-import com.xiaocydx.performance.runtime.looper.Scene
+import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.Scene
+import com.xiaocydx.performance.runtime.looper.Start
 
 /**
  * @author xcc
@@ -100,7 +102,10 @@ internal class ChoreographerFrameInfo {
     private inner class DoFrameCallback : LooperCallback {
         override fun dispatch(current: DispatchContext) {
             if (current.scene != Scene.Message) return
-            if (current.isStart) markInputStart() else markFrameEnd()
+            when (current) {
+                is Start -> markInputStart()
+                is End -> markFrameEnd()
+            }
         }
     }
 
