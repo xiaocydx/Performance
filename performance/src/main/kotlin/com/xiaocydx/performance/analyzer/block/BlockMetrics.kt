@@ -60,11 +60,15 @@ class BlockMetrics(
      */
     val metadata: String,
     /**
-     * 调用栈快照
+     * 线程调用栈快照
      */
     val snapshot: Snapshot,
     /**
-     * 调用栈堆栈
+     * 线程采样状态
      */
-    val stackTrace: Array<StackTraceElement>?
+    val sampleState: String?,
+    /**
+     * 线程采样堆栈
+     */
+    val sampleStack: Array<StackTraceElement>?
 )

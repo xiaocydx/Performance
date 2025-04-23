@@ -46,13 +46,13 @@ class BlockMetricsWriter(
 
     override fun receive(metrics: BlockMetrics) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
-            val json = print(metrics)
-            write(metrics, json)
+            val json = write(metrics)
+            print(metrics, json)
         }
     }
 
-    private fun print(metrics: BlockMetrics): JSONObject = with(metrics) {
-        val json = JSONObject().apply {
+    private fun write(metrics: BlockMetrics): JSONObject = with(metrics) {
+        val dataJson = JSONObject().apply {
             put("pid", pid)
             put("tid", tid)
             put("scene", scene)
@@ -65,27 +65,31 @@ class BlockMetricsWriter(
             put("cpuDurationMillis", cpuDurationMillis)
             put("isRecordEnabled", isRecordEnabled)
             put("metadata", metadata)
+            put("snapshot", JSONArray().apply {
+                for (i in 0 until snapshot.size) put(snapshot[i].value)
+            })
+            put("sampleState", sampleState)
+            put("sampleStack", JSONArray().apply {
+                sampleStack?.forEach { put(it.toString()) }
+            })
         }
-        if (stackTrace != null) {
-            val cause = BlockMetricsStackTrace()
-            cause.stackTrace = stackTrace
+        val result = JSONObject()
+        result.put("tag", "BlockMetrics")
+        result.put("data", dataJson)
+        file(metrics).bufferedWriter().use { it.write(result.toString(2)) }
+        return dataJson
+    }
+
+    private fun print(metrics: BlockMetrics, json: JSONObject) {
+        json.remove("snapshot")
+        json.remove("sampleStack")
+        if (metrics.sampleStack != null) {
+            val cause = BlockMetricsSampleStack()
+            cause.stackTrace = metrics.sampleStack
             Log.e(TAG, json.toString(2), cause)
         } else {
             Log.e(TAG, json.toString(2))
         }
-        return json
-    }
-
-    private fun write(metrics: BlockMetrics, json: JSONObject) = with(metrics) {
-        if (!snapshot.isAvailable && stackTrace == null) return
-        val file = file(metrics)
-        json.put("snapshot", JSONArray().apply {
-            for (i in 0 until snapshot.size) put(snapshot[i].value)
-        })
-        json.put("stackTrace", JSONArray().apply {
-            stackTrace?.forEach { put(it.toString()) }
-        })
-        file.bufferedWriter().use { it.write(json.toString(2)) }
     }
 
     private fun file(metrics: BlockMetrics): File {
@@ -108,4 +112,4 @@ class BlockMetricsWriter(
     }
 }
 
-internal class BlockMetricsStackTrace : RuntimeException()
+internal class BlockMetricsSampleStack : RuntimeException()

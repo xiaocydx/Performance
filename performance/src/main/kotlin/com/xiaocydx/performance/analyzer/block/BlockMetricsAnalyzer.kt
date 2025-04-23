@@ -56,16 +56,25 @@ internal class BlockMetricsAnalyzer(
         private var startMark = 0L
         private var startUptimeMillis = 0L
         private var startThreadTimeMillis = 0L
-        @Volatile private var stackTrace: Array<StackTraceElement>? = null
+        @Volatile private var sampleState: String? = null
+        @Volatile private var sampleStack: Array<StackTraceElement>? = null
 
         override fun run() {
-            stackTrace = Looper.getMainLooper().thread.stackTrace
+            val thread = Looper.getMainLooper().thread
+            sampleState = thread.state.name
+            sampleStack = thread.stackTrace
         }
 
-        private fun consumeStackTrace(): Array<StackTraceElement>? {
-            val stackTrace = stackTrace ?: return null
-            this.stackTrace = null
-            return stackTrace
+        private fun consumeSampleState(): String? {
+            val sampleState = sampleState ?: return null
+            this.sampleState = null
+            return sampleState
+        }
+
+        private fun consumeSampleStack(): Array<StackTraceElement>? {
+            val sampleStack = sampleStack ?: return null
+            this.sampleStack = null
+            return sampleStack
         }
 
         override fun dispatch(current: DispatchContext) {
@@ -91,7 +100,8 @@ internal class BlockMetricsAnalyzer(
                         cpuDurationMillis = cpuDurationMillis,
                         isRecordEnabled = History.isRecordEnabled,
                         metadata = current.metadata?.toString() ?: "",
-                        stackTrace = consumeStackTrace(),
+                        sampleState = consumeSampleState(),
+                        sampleStack = consumeSampleStack(),
                         receiver = config.receiver
                     ))
                 }
@@ -109,7 +119,8 @@ internal class BlockMetricsAnalyzer(
         private val cpuDurationMillis: Long,
         private val isRecordEnabled: Boolean,
         private val metadata: String,
-        private val stackTrace: Array<StackTraceElement>?,
+        private val sampleState: String?,
+        private val sampleStack: Array<StackTraceElement>?,
         private val receiver: BlockMetricsReceiver
     ) : Runnable {
 
@@ -131,7 +142,8 @@ internal class BlockMetricsAnalyzer(
                 isRecordEnabled = isRecordEnabled,
                 metadata = metadata,
                 snapshot = snapshot,
-                stackTrace = stackTrace
+                sampleState = sampleState,
+                sampleStack = sampleStack
             ))
         }
     }
