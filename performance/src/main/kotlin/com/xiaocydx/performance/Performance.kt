@@ -24,7 +24,7 @@ import android.os.Looper
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.analyzer.anr.ANRAnalyzer
+import com.xiaocydx.performance.analyzer.anr.ANRMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
@@ -63,7 +63,7 @@ object Performance {
         host.application = application
         activityWatcher.init(application)
 
-        ANRAnalyzer(host).start()
+        ANRMetricsAnalyzer(host).start()
         IdleHandlerAnalyzer(host).start()
         config.blockConfig?.let { BlockMetricsAnalyzer(host, it).start() }
         config.frameConfig?.let { FrameMetricsAnalyzer.create(host, it).start() }

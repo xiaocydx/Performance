@@ -104,7 +104,7 @@ internal class BlockMetricsAnalyzer(
                             wallDurationMillis = wallDurationMillis,
                             cpuDurationMillis = cpuDurationMillis,
                             isRecordEnabled = History.isRecordEnabled,
-                            metadata = current.metadata?.toString() ?: "",
+                            metadata = current.metadata.toString(),
                             sampleState = consumeSampleState(),
                             sampleStack = consumeSampleStack(),
                             receiver = config.receiver

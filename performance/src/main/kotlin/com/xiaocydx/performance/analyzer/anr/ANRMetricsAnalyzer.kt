@@ -18,6 +18,10 @@ package com.xiaocydx.performance.analyzer.anr
 
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.End
+import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
@@ -25,17 +29,35 @@ import kotlinx.coroutines.launch
  * @author xcc
  * @date 2025/3/27
  */
-internal class ANRAnalyzer(host: Performance.Host) : Analyzer(host) {
+internal class ANRMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
 
     override fun init() {
         var watchDog: ANRWatchDog? = null
+        val chain = DispatchChain(capacity = 2000)
+        val callback = Callback(chain)
         coroutineScope.launch {
+            host.needHistory(this@ANRMetricsAnalyzer)
+            host.addCallback(callback)
             watchDog = ANRWatchDog(host.ams)
             watchDog!!.start()
             awaitCancellation()
         }.invokeOnCompletion {
+            host.removeCallback(callback)
             watchDog?.interrupt()
             watchDog = null
+            chain.clear()
+        }
+    }
+
+    private class Callback(private val chain: DispatchChain) : LooperCallback {
+        override fun dispatch(current: DispatchContext) {
+            when (current) {
+                is Start -> {
+                }
+                is End -> {
+                    chain.add(current.scene, current.metadata.toString())
+                }
+            }
         }
     }
 }
