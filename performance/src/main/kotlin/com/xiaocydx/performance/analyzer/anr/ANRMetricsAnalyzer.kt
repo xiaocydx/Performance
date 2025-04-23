@@ -50,13 +50,23 @@ internal class ANRMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
     }
 
     private class Callback(private val chain: DispatchChain) : LooperCallback {
+        private var startMark = 0L
+        private var startUptimeMillis = 0L
+
         override fun dispatch(current: DispatchContext) {
             when (current) {
                 is Start -> {
+                    startMark = current.mark
+                    startUptimeMillis = current.uptimeMillis
                 }
-                is End -> {
-                    chain.add(current.scene, current.metadata.toString())
-                }
+                is End -> chain.append(
+                    scene = current.scene,
+                    metadata = current.metadata.toString(),
+                    startMark = startMark,
+                    endMark = current.mark,
+                    startUptimeMillis = startUptimeMillis,
+                    endUptimeMillis = current.uptimeMillis
+                )
             }
         }
     }

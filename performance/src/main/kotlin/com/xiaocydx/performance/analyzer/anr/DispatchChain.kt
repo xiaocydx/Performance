@@ -34,17 +34,61 @@ internal class DispatchChain(private val capacity: Int) {
         tail.prev = head
     }
 
-    fun add(scene: Scene, metadata: String) {
+    fun append(
+        scene: Scene,
+        metadata: String,
+        startMark: Long,
+        endMark: Long,
+        startUptimeMillis: Long,
+        endUptimeMillis: Long
+    ) {
+        if (merge(scene, metadata, startMark, endMark, startUptimeMillis, endUptimeMillis)) return
         if (size == capacity) removeFirst()
         val node = pool.acquire() ?: Node()
+        node.count++
         node.scene = scene
         node.metadata = metadata
+        node.startMark = startMark
+        node.endMark = endMark
+        node.startUptimeMillis = startUptimeMillis
+        node.endUptimeMillis = endUptimeMillis
         addToLast(node)
+    }
+
+    private fun merge(
+        scene: Scene,
+        metadata: String,
+        startMark: Long,
+        endMark: Long,
+        startUptimeMillis: Long,
+        endUptimeMillis: Long
+    ): Boolean {
+        val last = lastOrNull() ?: return false
+        if (last.scene != scene) return false
+        // TODO: 阈值配置化
+        val lastDurationMillis = last.endUptimeMillis - last.startUptimeMillis
+        if (lastDurationMillis > 300) return false
+        // TODO: 补充单条阈值
+        val currDurationMillis = endUptimeMillis - startUptimeMillis
+        // TODO: 补充idle间隔的判断
+        // TODO: 补充ActivityThread消息的判断
+        last.count++
+        last.metadata = metadata
+        last.startMark = startMark
+        last.endMark = endMark
+        last.endUptimeMillis = endUptimeMillis
+        return true
     }
 
     fun clear() {
         head.next = tail
         tail.prev = head
+    }
+
+    private fun lastOrNull(): Node? {
+        val prev = tail.prev
+        if (prev == head) return null
+        return prev
     }
 
     private fun removeFirst() {
@@ -67,9 +111,19 @@ internal class DispatchChain(private val capacity: Int) {
         size++
     }
 
+    private fun toList(): List<Node> {
+        val outcome = mutableListOf<Node>()
+        var curr = head.next!!
+        while (curr != tail) {
+            outcome.add(curr)
+            curr = curr.next!!
+        }
+        return outcome
+    }
+
     private class Node {
-        var scene = Scene.Message
         var count = 0
+        var scene = Scene.Message
         var startMark = 0L
         var endMark = 0L
         var startUptimeMillis = 0L
@@ -81,8 +135,8 @@ internal class DispatchChain(private val capacity: Int) {
         var next: Node? = null
 
         fun reset() {
-            scene = Scene.Message
             count = 0
+            scene = Scene.Message
             startMark = 0L
             endMark = 0L
             startUptimeMillis = 0L
