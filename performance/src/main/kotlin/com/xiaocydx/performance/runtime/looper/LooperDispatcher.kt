@@ -41,14 +41,14 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         start.metadata = null
     }
 
-    fun end(scene: Scene, metadata: Any?) {
+    fun end(scene: Scene, metadata: Any) {
         if (dispatchingScene != scene) return
         dispatchingScene = null
         end.scene = scene
         end.metadata = metadata
         end.uptimeMillis = SystemClock.uptimeMillis()
         callback.dispatch(end)
-        end.metadata = null
+        end.metadata = Unit
         dispatchActivityThreadMessage = false
     }
 
@@ -63,7 +63,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
 
     private class EndImpl : End {
         override var scene = Scene.Message
-        override var metadata: Any? = null
+        override var metadata: Any = Unit
         override var uptimeMillis = 0L
         override val isFromActivityThread: Boolean
             get() = dispatchActivityThreadMessage

@@ -45,11 +45,6 @@ internal sealed interface DispatchContext {
     val scene: Scene
 
     /**
-     * [scene]的元数据
-     */
-    val metadata: Any?
-
-    /**
      * [LooperCallback.dispatch]的[SystemClock.uptimeMillis]
      */
     val uptimeMillis: Long
@@ -63,11 +58,12 @@ internal sealed interface DispatchContext {
 internal interface Start : DispatchContext {
 
     /**
+     * [scene]的元数据：
      * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - `null`。
      * * [Scene.IdleHandler]：[IdleHandler]。
      * * [Scene.NativeTouch]：[MotionEvent]。
      */
-    override val metadata: Any?
+    val metadata: Any?
 
     /**
      * [LooperCallback.dispatch]的[SystemClock.currentThreadTimeMillis]
@@ -78,11 +74,12 @@ internal interface Start : DispatchContext {
 internal interface End : DispatchContext {
 
     /**
+     * [scene]的元数据：
      * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - [Message]。
      * * [Scene.IdleHandler]：[IdleHandler]。
      * * [Scene.NativeTouch]：[MotionEvent]。
      */
-    override val metadata: Any?
+    val metadata: Any
 }
 
 internal enum class Scene {
