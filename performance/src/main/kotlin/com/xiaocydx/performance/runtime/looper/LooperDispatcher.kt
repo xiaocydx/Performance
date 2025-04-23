@@ -20,6 +20,8 @@ import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.SystemClock
 import com.xiaocydx.performance.runtime.Reflection
+import com.xiaocydx.performance.runtime.history.History
+import com.xiaocydx.performance.runtime.history.History.NO_MARK
 
 /**
  * @author xcc
@@ -29,14 +31,17 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     private val start = StartImpl()
     private val end = EndImpl()
     private var dispatchingScene: Scene? = null
+    private var dispatchingMark = NO_MARK
 
     fun start(scene: Scene, metadata: Any?) {
         if (dispatchingScene != null) return
         dispatchingScene = scene
+        start.mark = History.startMark()
         start.scene = scene
         start.metadata = metadata
         start.uptimeMillis = SystemClock.uptimeMillis()
         start.threadTimeMillis = SystemClock.currentThreadTimeMillis()
+        dispatchingMark = start.mark
         callback.dispatch(start)
         start.metadata = null
     }
@@ -44,6 +49,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     fun end(scene: Scene, metadata: Any) {
         if (dispatchingScene != scene) return
         dispatchingScene = null
+        end.mark = if (dispatchingMark > NO_MARK) History.endMark() else NO_MARK
         end.scene = scene
         end.metadata = metadata
         end.uptimeMillis = SystemClock.uptimeMillis()
@@ -53,6 +59,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     }
 
     private class StartImpl : Start {
+        override var mark = NO_MARK
         override var scene = Scene.Message
         override var metadata: Any? = null
         override var uptimeMillis = 0L
@@ -62,6 +69,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     }
 
     private class EndImpl : End {
+        override var mark = NO_MARK
         override var scene = Scene.Message
         override var metadata: Any = Unit
         override var uptimeMillis = 0L

@@ -46,6 +46,8 @@ internal object History {
     @get:MainThread
     var isRecordEnabled = false; private set
 
+    const val NO_MARK = -1L
+
     @MainThread
     fun init() {
         assert(isMainThread())
@@ -99,7 +101,7 @@ internal object History {
     @MainThread
     fun startMark(): Long {
         // 频繁调用不做MainThread断言，流程确保MainSafe
-        if (!isInitialized || !isRecordEnabled) return -1
+        if (!isInitialized || !isRecordEnabled) return NO_MARK
         recorder.enter(id = ID_SLICE, currentMs())
         return recorder.mark()
     }
@@ -107,7 +109,7 @@ internal object History {
     @MainThread
     fun endMark(): Long {
         // 频繁调用不做MainThread断言，流程确保MainSafe
-        if (!isInitialized || !isRecordEnabled) return -1
+        if (!isInitialized || !isRecordEnabled) return NO_MARK
         recorder.exit(id = ID_SLICE, currentMs())
         return recorder.mark()
     }
@@ -115,7 +117,7 @@ internal object History {
     @AnyThread
     fun latestMark(): Long {
         // volatile读，acquire recorder != null
-        if (!isRecorderCreated) return -1
+        if (!isRecorderCreated) return NO_MARK
         return recorder.mark()
     }
 

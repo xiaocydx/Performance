@@ -107,7 +107,7 @@ object Performance {
             callbacks.remove(callback)
         }
 
-        override fun needHistory(analyzer: Analyzer) {
+        override fun requireHistory(analyzer: Analyzer) {
             History.init()
         }
     }
@@ -137,7 +137,7 @@ object Performance {
         fun removeCallback(callback: LooperCallback)
 
         @MainThread
-        fun needHistory(analyzer: Analyzer)
+        fun requireHistory(analyzer: Analyzer)
     }
 
     data class Config(

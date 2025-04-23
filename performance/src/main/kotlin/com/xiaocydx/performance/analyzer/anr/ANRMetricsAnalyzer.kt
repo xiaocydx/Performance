@@ -36,7 +36,7 @@ internal class ANRMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
         val chain = DispatchChain(capacity = 2000)
         val callback = Callback(chain)
         coroutineScope.launch {
-            host.needHistory(this@ANRMetricsAnalyzer)
+            host.requireHistory(this@ANRMetricsAnalyzer)
             host.addCallback(callback)
             watchDog = ANRWatchDog(host.ams)
             watchDog!!.start()

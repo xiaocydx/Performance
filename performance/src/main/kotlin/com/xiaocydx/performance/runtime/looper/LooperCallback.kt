@@ -25,6 +25,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.assertMainThread
+import com.xiaocydx.performance.runtime.history.History
 
 /**
  * 主线程[Looper]的处理回调
@@ -58,6 +59,11 @@ internal sealed interface DispatchContext {
 internal interface Start : DispatchContext {
 
     /**
+     * [History.startMark]
+     */
+    val mark: Long
+
+    /**
      * [scene]的元数据：
      * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - `null`。
      * * [Scene.IdleHandler]：[IdleHandler]。
@@ -72,6 +78,11 @@ internal interface Start : DispatchContext {
 }
 
 internal interface End : DispatchContext {
+
+    /**
+     * [History.endMark]
+     */
+    val mark: Long
 
     /**
      * [scene]的元数据：

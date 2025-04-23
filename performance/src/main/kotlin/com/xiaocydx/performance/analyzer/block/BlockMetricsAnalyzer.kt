@@ -46,7 +46,7 @@ internal class BlockMetricsAnalyzer(
         val handler = Handler(host.dumpLooper)
         val callback = Callback(handler)
         coroutineScope.launch {
-            host.needHistory(this@BlockMetricsAnalyzer)
+            host.requireHistory(this@BlockMetricsAnalyzer)
             host.addCallback(callback)
             awaitCancellation()
         }.invokeOnCompletion {
@@ -84,13 +84,12 @@ internal class BlockMetricsAnalyzer(
             when (current) {
                 is Start -> {
                     handler.postDelayed(this, (thresholdMillis * 0.7).toLong())
-                    startMark = History.startMark()
+                    startMark = current.mark
                     startUptimeMillis = current.uptimeMillis
                     startThreadTimeMillis = current.threadTimeMillis
                 }
                 is End -> {
                     handler.removeCallbacks(this)
-                    val endMark = History.endMark()
                     val wallDurationMillis = current.uptimeMillis - startUptimeMillis
                     if (wallDurationMillis > thresholdMillis) {
                         val endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
@@ -99,7 +98,7 @@ internal class BlockMetricsAnalyzer(
                             scene = current.scene.name,
                             lastActivity = host.getLastActivity()?.javaClass?.name ?: "",
                             startMark = startMark,
-                            endMark = endMark,
+                            endMark = current.mark,
                             thresholdMillis = thresholdMillis,
                             wallDurationMillis = wallDurationMillis,
                             cpuDurationMillis = cpuDurationMillis,
