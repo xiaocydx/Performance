@@ -14,18 +14,26 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.block
+package com.xiaocydx.performance.analyzer.anr
+
+import androidx.annotation.IntRange
 
 /**
  * @author xcc
- * @date 2025/4/15
+ * @date 2025/4/24
  */
-data class BlockMetricsConfig(val receiver: BlockMetricsReceiver) {
+interface ANRMetricsReceiver {
 
-    internal fun checkProperty() {
-        val name = receiver.javaClass.name
-        require(receiver.thresholdMillis >= 1) {
-            "${name}.thresholdMillis < 1"
-        }
+    @get:IntRange(from = 0)
+    val idleThresholdMillis: Long
+        get() = DEFAULT_IDLE_THRESHOLD_MILLIS
+
+    @get:IntRange(from = 0)
+    val mergeThresholdMillis: Long
+        get() = DEFAULT_MERGE_THRESHOLD_MILLIS
+
+    companion object {
+        const val DEFAULT_IDLE_THRESHOLD_MILLIS = 16L
+        const val DEFAULT_MERGE_THRESHOLD_MILLIS = 300L
     }
 }

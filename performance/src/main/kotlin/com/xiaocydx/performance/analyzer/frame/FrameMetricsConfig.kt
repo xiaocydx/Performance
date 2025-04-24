@@ -24,7 +24,7 @@ data class FrameMetricsConfig(val receivers: List<FrameMetricsReceiver>) {
 
     internal fun checkProperty() {
         receivers.forEach { receiver ->
-            val name = receiver.javaClass.simpleName
+            val name = receiver.javaClass.name
             val threshold = receiver.droppedFramesThreshold
             require(receiver.intervalMillis >= 0) {
                 "${name}.intervalMillis < 0"

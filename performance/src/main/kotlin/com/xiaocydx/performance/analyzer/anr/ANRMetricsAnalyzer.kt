@@ -18,6 +18,7 @@ package com.xiaocydx.performance.analyzer.anr
 
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.runtime.SampleData
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -29,11 +30,18 @@ import kotlinx.coroutines.launch
  * @author xcc
  * @date 2025/3/27
  */
-internal class ANRMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
+internal class ANRMetricsAnalyzer(
+    host: Performance.Host,
+    private val config: ANRMetricsConfig
+) : Analyzer(host) {
 
     override fun init() {
         var watchDog: ANRWatchDog? = null
-        val chain = DispatchChain(capacity = 2000)
+        val chain = ANRMetricsChain(
+            capacity = 5000,
+            idleThresholdMillis = config.receiver.idleThresholdMillis,
+            mergeThresholdMillis = config.receiver.mergeThresholdMillis
+        )
         val callback = Callback(chain)
         coroutineScope.launch {
             host.requireHistory(this@ANRMetricsAnalyzer)
@@ -49,9 +57,16 @@ internal class ANRMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
         }
     }
 
-    private class Callback(private val chain: DispatchChain) : LooperCallback {
+    private class Callback(private val chain: ANRMetricsChain) : LooperCallback {
         private var startMark = 0L
         private var startUptimeMillis = 0L
+        @Volatile private var sampleData: SampleData? = null
+
+        private fun consumeSampleData(): SampleData? {
+            val sampleData = sampleData ?: return null
+            this.sampleData = null
+            return sampleData
+        }
 
         override fun dispatch(current: DispatchContext) {
             when (current) {
@@ -59,14 +74,20 @@ internal class ANRMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
                     startMark = current.mark
                     startUptimeMillis = current.uptimeMillis
                 }
-                is End -> chain.append(
-                    scene = current.scene,
-                    metadata = current.metadata.toString(),
-                    startMark = startMark,
-                    endMark = current.mark,
-                    startUptimeMillis = startUptimeMillis,
-                    endUptimeMillis = current.uptimeMillis
-                )
+                // TODO: 优化metadata的记录方式
+                is End -> {
+                    val sampleData = consumeSampleData()
+                    chain.append(
+                        isSingle = current.isFromActivityThread || sampleData != null,
+                        scene = current.scene,
+                        metadata = current.metadata.toString(),
+                        startMark = startMark,
+                        endMark = current.mark,
+                        startUptimeMillis = startUptimeMillis,
+                        endUptimeMillis = current.uptimeMillis,
+                        sampleData = sampleData
+                    )
+                }
             }
         }
     }

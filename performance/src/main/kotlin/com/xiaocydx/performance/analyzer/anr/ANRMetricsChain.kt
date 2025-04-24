@@ -17,13 +17,18 @@
 package com.xiaocydx.performance.analyzer.anr
 
 import androidx.core.util.Pools.SimplePool
+import com.xiaocydx.performance.runtime.SampleData
 import com.xiaocydx.performance.runtime.looper.Scene
 
 /**
  * @author xcc
  * @date 2025/4/23
  */
-internal class DispatchChain(private val capacity: Int) {
+internal class ANRMetricsChain(
+    private val capacity: Int,
+    private val idleThresholdMillis: Long,
+    private val mergeThresholdMillis: Long,
+) {
     private val pool = SimplePool<Node>(50)
     private val head = Node()
     private val tail = Node()
@@ -35,23 +40,29 @@ internal class DispatchChain(private val capacity: Int) {
     }
 
     fun append(
+        isSingle: Boolean,
         scene: Scene,
         metadata: String,
         startMark: Long,
         endMark: Long,
         startUptimeMillis: Long,
-        endUptimeMillis: Long
+        endUptimeMillis: Long,
+        sampleData: SampleData?
     ) {
-        if (merge(scene, metadata, startMark, endMark, startUptimeMillis, endUptimeMillis)) return
+        if (!isSingle && merge(scene, metadata, startMark, endMark,
+                    startUptimeMillis, endUptimeMillis, sampleData)) {
+            return
+        }
         if (size == capacity) removeFirst()
         val node = pool.acquire() ?: Node()
         node.count++
+        node.isSingle = isSingle
         node.scene = scene
-        node.metadata = metadata
         node.startMark = startMark
         node.endMark = endMark
         node.startUptimeMillis = startUptimeMillis
         node.endUptimeMillis = endUptimeMillis
+        node.metadata = metadata
         addToLast(node)
     }
 
@@ -61,22 +72,23 @@ internal class DispatchChain(private val capacity: Int) {
         startMark: Long,
         endMark: Long,
         startUptimeMillis: Long,
-        endUptimeMillis: Long
+        endUptimeMillis: Long,
+        sampleData: SampleData?
     ): Boolean {
-        val last = lastOrNull() ?: return false
-        if (last.scene != scene) return false
-        // TODO: 阈值配置化
+        val last = lastOrNull()
+        if (last == null || last.isSingle || last.scene != scene) return false
+        val idleDurationMillis = startUptimeMillis - last.endUptimeMillis
+        if (idleDurationMillis > idleThresholdMillis) return false
         val lastDurationMillis = last.endUptimeMillis - last.startUptimeMillis
-        if (lastDurationMillis > 300) return false
-        // TODO: 补充单条阈值
         val currDurationMillis = endUptimeMillis - startUptimeMillis
-        // TODO: 补充idle间隔的判断
-        // TODO: 补充ActivityThread消息的判断
+        if (lastDurationMillis + currDurationMillis > mergeThresholdMillis) return false
+
         last.count++
-        last.metadata = metadata
         last.startMark = startMark
         last.endMark = endMark
         last.endUptimeMillis = endUptimeMillis
+        last.metadata = metadata
+        last.sampleData = sampleData
         return true
     }
 
@@ -103,11 +115,11 @@ internal class DispatchChain(private val capacity: Int) {
     }
 
     private fun addToLast(node: Node) {
-        val next = head.next!!
-        next.prev = node
-        node.next = next
-        head.next = node
-        node.prev = head
+        val prev = tail.prev!!
+        node.next = tail
+        tail.prev = node
+        prev.next = node
+        node.prev = prev
         size++
     }
 
@@ -123,27 +135,27 @@ internal class DispatchChain(private val capacity: Int) {
 
     private class Node {
         var count = 0
+        var isSingle = false
         var scene = Scene.Message
         var startMark = 0L
         var endMark = 0L
         var startUptimeMillis = 0L
         var endUptimeMillis = 0L
         var metadata = ""
-        var sampleState: Thread.State? = null
-        var sampleStack: Array<StackTraceElement>? = null
+        var sampleData: SampleData? = null
         var prev: Node? = null
         var next: Node? = null
 
         fun reset() {
             count = 0
+            isSingle = false
             scene = Scene.Message
             startMark = 0L
             endMark = 0L
             startUptimeMillis = 0L
             endUptimeMillis = 0L
             metadata = ""
-            sampleState = null
-            sampleStack = null
+            sampleData = null
             prev = null
             next = null
         }

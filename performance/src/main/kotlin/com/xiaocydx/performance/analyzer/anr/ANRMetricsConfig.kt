@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.block
+package com.xiaocydx.performance.analyzer.anr
 
 /**
  * @author xcc
- * @date 2025/4/15
+ * @date 2025/4/24
  */
-data class BlockMetricsConfig(val receiver: BlockMetricsReceiver) {
+data class ANRMetricsConfig(val receiver: ANRMetricsReceiver) {
 
     internal fun checkProperty() {
         val name = receiver.javaClass.name
-        require(receiver.thresholdMillis >= 1) {
-            "${name}.thresholdMillis < 1"
+        require(receiver.idleThresholdMillis >= 0) {
+            "${name}.idleThresholdMillis < 0"
+        }
+        require(receiver.mergeThresholdMillis >= 0) {
+            "${name}.mergeThresholdMillis < 0"
         }
     }
 }
