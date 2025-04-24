@@ -25,6 +25,7 @@ import android.os.SystemClock
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.ProcStat
+import com.xiaocydx.performance.runtime.SampleData
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
@@ -55,28 +56,20 @@ internal class BlockMetricsAnalyzer(
     }
 
     private inner class Callback(private val handler: Handler) : Runnable, LooperCallback {
+        private val mainThread = Looper.getMainLooper().thread
         private var startMark = 0L
         private var startUptimeMillis = 0L
         private var startThreadTimeMillis = 0L
-        @Volatile private var sampleState: String? = null
-        @Volatile private var sampleStack: Array<StackTraceElement>? = null
+        @Volatile private var sampleData: SampleData? = null
 
         override fun run() {
-            val thread = Looper.getMainLooper().thread
-            sampleState = thread.state.name
-            sampleStack = thread.stackTrace
+            sampleData = SampleData.now(mainThread)
         }
 
-        private fun consumeSampleState(): String? {
-            val sampleState = sampleState ?: return null
-            this.sampleState = null
-            return sampleState
-        }
-
-        private fun consumeSampleStack(): Array<StackTraceElement>? {
-            val sampleStack = sampleStack ?: return null
-            this.sampleStack = null
-            return sampleStack
+        private fun consumeSampleData(): SampleData? {
+            val sampleData = sampleData ?: return null
+            this.sampleData = null
+            return sampleData
         }
 
         override fun dispatch(current: DispatchContext) {
@@ -104,8 +97,7 @@ internal class BlockMetricsAnalyzer(
                             cpuDurationMillis = cpuDurationMillis,
                             isRecordEnabled = History.isRecordEnabled,
                             metadata = current.metadata.toString(),
-                            sampleState = consumeSampleState(),
-                            sampleStack = consumeSampleStack(),
+                            sampleData = consumeSampleData(),
                             receiver = config.receiver
                         ))
                     }
@@ -124,12 +116,12 @@ internal class BlockMetricsAnalyzer(
         private val cpuDurationMillis: Long,
         private val isRecordEnabled: Boolean,
         private val metadata: String,
-        private val sampleState: String?,
-        private val sampleStack: Array<StackTraceElement>?,
+        private val sampleData: SampleData?,
         private val receiver: BlockMetricsReceiver
     ) : Runnable {
 
         override fun run() {
+            val createTimeMillis = System.currentTimeMillis()
             val snapshot = History.snapshot(startMark, endMark)
             val procStat = ProcStat.get(Process.myPid())
             SystemClock.uptimeMillis()
@@ -140,15 +132,14 @@ internal class BlockMetricsAnalyzer(
                 latestActivity = latestActivity,
                 priority = procStat.priority,
                 nice = procStat.nice,
-                createTimeMillis = System.currentTimeMillis(),
+                createTimeMillis = createTimeMillis,
                 thresholdMillis = thresholdMillis,
                 wallDurationMillis = wallDurationMillis,
                 cpuDurationMillis = cpuDurationMillis,
                 isRecordEnabled = isRecordEnabled,
                 metadata = metadata,
                 snapshot = snapshot,
-                sampleState = sampleState,
-                sampleStack = sampleStack
+                sampleData = sampleData,
             ))
         }
     }

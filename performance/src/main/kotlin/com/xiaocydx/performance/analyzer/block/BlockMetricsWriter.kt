@@ -68,10 +68,15 @@ class BlockMetricsWriter(
             put("snapshot", JSONArray().apply {
                 for (i in 0 until snapshot.size) put(snapshot[i].value)
             })
-            put("sampleState", sampleState)
-            put("sampleStack", JSONArray().apply {
-                sampleStack?.forEach { put(it.toString()) }
-            })
+            if (metrics.sampleData != null) {
+                put("sampleData", JSONObject().apply {
+                    put("uptimeMillis", metrics.sampleData.uptimeMillis)
+                    put("threadState", metrics.sampleData.threadState.name)
+                    put("threadStack", JSONArray().apply {
+                        metrics.sampleData.threadStack.forEach { put(it.toString()) }
+                    })
+                })
+            }
         }
         val result = JSONObject()
         result.put("tag", "BlockMetrics")
@@ -82,10 +87,10 @@ class BlockMetricsWriter(
 
     private fun print(metrics: BlockMetrics, json: JSONObject) {
         json.remove("snapshot")
-        json.remove("sampleStack")
-        if (metrics.sampleStack != null) {
+        (json.get("sampleData") as JSONObject).remove("threadStack")
+        if (metrics.sampleData != null) {
             val cause = BlockMetricsSampleStack()
-            cause.stackTrace = metrics.sampleStack
+            cause.stackTrace = metrics.sampleData.threadStack
             Log.e(TAG, json.toString(2), cause)
         } else {
             Log.e(TAG, json.toString(2))
