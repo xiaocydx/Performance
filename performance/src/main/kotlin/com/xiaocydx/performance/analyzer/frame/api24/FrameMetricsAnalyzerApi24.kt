@@ -40,23 +40,23 @@ internal class FrameMetricsAnalyzerApi24(
 ) : FrameMetricsAnalyzer(host) {
     private val frameMetricsHandler = Handler(host.defaultLooper)
 
-    override fun createListener(activity: Activity?): FrameMetricsListener {
+    override fun createListener(activity: Activity): FrameMetricsListener {
         return FrameMetricsListenerImpl(activity)
     }
 
-    private inner class FrameMetricsListenerImpl(activity: Activity?) :
+    private inner class FrameMetricsListenerImpl(activity: Activity) :
             FrameMetricsListener(activity, config),
             Window.OnFrameMetricsAvailableListener {
 
         @MainThread
         override fun attach() = apply {
-            val window = activityRef?.get()?.window ?: return@apply
+            val window = activityRef.get()?.window ?: return@apply
             window.addOnFrameMetricsAvailableListener(this, frameMetricsHandler)
         }
 
         @MainThread
         override fun detach() = apply {
-            activityRef?.get()?.window?.removeOnFrameMetricsAvailableListener(this)
+            activityRef.get()?.window?.removeOnFrameMetricsAvailableListener(this)
             forceMakeEnd()
         }
 

@@ -54,22 +54,22 @@ internal class FrameMetricsAnalyzerApi16(
         super.init()
     }
 
-    override fun createListener(activity: Activity?): FrameMetricsListener {
+    override fun createListener(activity: Activity): FrameMetricsListener {
         return FrameMetricsListenerImpl(activity)
     }
 
-    private inner class FrameMetricsListenerImpl(activity: Activity?) :
+    private inner class FrameMetricsListenerImpl(activity: Activity) :
             FrameMetricsListener(activity, config),
             ViewTreeObserver.OnPreDrawListener {
         private val frameInfo = FrameInfo()
 
         override fun attach() = apply {
-            val window = activityRef?.get()?.window ?: return@apply
+            val window = activityRef.get()?.window ?: return@apply
             window.decorView.viewTreeObserver.addOnPreDrawListener(this)
         }
 
         override fun detach() = apply {
-            val window = activityRef?.get()?.window ?: return@apply
+            val window = activityRef.get()?.window ?: return@apply
             window.decorView.viewTreeObserver.removeOnPreDrawListener(this)
             forceMakeEnd()
         }
@@ -88,7 +88,7 @@ internal class FrameMetricsAnalyzerApi16(
             // TODO: 补充isStopped拦截
             // TODO: 是否做调度？
             if (!frameInfo.merge(choreographerFrameInfo)) return
-            val window = activityRef?.get()?.window
+            val window = activityRef.get()?.window
             val refreshRate = window?.getRefreshRate(defaultRefreshRate) ?: defaultRefreshRate
             val isFirstDrawFrame = frameInfo.isFirstDrawFrame
             val timeMillis = measureTimeMillis {

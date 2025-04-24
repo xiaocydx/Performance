@@ -22,6 +22,7 @@ import androidx.appcompat.app.AlertDialog
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.activity.ActivityKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -36,7 +37,7 @@ internal class IdleHandlerAnalyzer(host: Performance.Host) : Analyzer(host) {
 
     override fun init() {
         coroutineScope.launch {
-            var checkKey = 0
+            var checkKey: ActivityKey? = null
             var checkJob: Job? = null
             host.activityEvent.collect {
                 when (it) {
@@ -63,8 +64,8 @@ internal class IdleHandlerAnalyzer(host: Performance.Host) : Analyzer(host) {
         }
     }
 
-    private fun showTimeoutDialog(key: Int) {
-        val activity = host.getActivity(key) ?: return
+    private fun showTimeoutDialog(key: ActivityKey?) {
+        val activity = key?.let(host::getActivity) ?: return
         AlertDialog.Builder(activity)
             .setTitle("AwaitActivityResumedIdle")
             .setMessage("timeout")

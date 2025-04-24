@@ -26,6 +26,7 @@ import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.activity.ActivityKey
 import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 
@@ -34,7 +35,7 @@ import java.lang.ref.WeakReference
  * @date 2025/4/5
  */
 internal abstract class FrameMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
-    protected val frameMetricsListeners = HashMap<Int, FrameMetricsListener>()
+    protected val frameMetricsListeners = HashMap<ActivityKey, FrameMetricsListener>()
     @Volatile protected var defaultRefreshRate = 60.0f; private set
 
     @CallSuper
@@ -70,7 +71,7 @@ internal abstract class FrameMetricsAnalyzer(host: Performance.Host) : Analyzer(
         }
     }
 
-    protected abstract fun createListener(activity: Activity?): FrameMetricsListener
+    protected abstract fun createListener(activity: Activity): FrameMetricsListener
 
     protected fun Window.getRefreshRate(default: Float): Float {
         var refreshRate = default
@@ -81,10 +82,10 @@ internal abstract class FrameMetricsAnalyzer(host: Performance.Host) : Analyzer(
         return refreshRate
     }
 
-    protected abstract class FrameMetricsListener(activity: Activity?, config: FrameMetricsConfig) {
-        protected val activityRef = activity?.let(::WeakReference)
-        protected val activityKey = activity?.hashCode()?.toLong() ?: 0L
-        protected val activityName = activity?.javaClass?.simpleName ?: ""
+    protected abstract class FrameMetricsListener(activity: Activity, config: FrameMetricsConfig) {
+        protected val activityRef = WeakReference(activity)
+        protected val activityKey = ActivityKey(activity)
+        protected val activityName = activity.javaClass.name ?: ""
         protected val frameMetricsAggregators = config.receivers.map(::FrameMetricsAggregator)
 
         abstract fun attach(): FrameMetricsListener

@@ -133,7 +133,7 @@ internal abstract class GenerateTask : DefaultTask() {
         val pid: Int = 0,
         val tid: Int = 0,
         val scene: String = "",
-        val lastActivity: String = "",
+        val latestActivity: String = "",
         val priority: Int = 0,
         val nice: Int = 0,
         val createTimeMillis: Long = 0L,

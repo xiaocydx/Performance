@@ -38,13 +38,13 @@ internal class FrameMetricsAggregator(
     private var refreshRates = 0f
 
     override val intervalMillis = receiver.intervalMillis
-    override var targetKey = 0L; private set
+    override var targetKey: Any = Unit; private set
     override var targetName = ""; private set
     override var renderedFrames = 0; private set
     override var avgFps = 0f; private set
     override var avgRefreshRate = 0f; private set
 
-    fun makeStart(targetKey: Long, targetName: String, isFirstDrawFrame: Boolean) {
+    fun makeStart(targetKey: Any, targetName: String, isFirstDrawFrame: Boolean) {
         if (startMillis != 0L) return
         if (receiver.skipFirstFrame && isFirstDrawFrame) return
         startMillis = SystemClock.uptimeMillis()
@@ -123,7 +123,7 @@ internal class FrameMetricsAggregator(
         startMillis = 0L
         totalNanos = 0f
         refreshRates = 0f
-        targetKey = 0
+        targetKey = Unit
         targetName = ""
         renderedFrames = 0
         avgFps = 0f

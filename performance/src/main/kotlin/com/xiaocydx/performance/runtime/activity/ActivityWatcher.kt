@@ -29,9 +29,10 @@ import kotlinx.coroutines.flow.asSharedFlow
  * @date 2025/3/20
  */
 internal class ActivityWatcher {
-    private val map = HashMap<Int, Activity>()
-    private val list = mutableListOf<Activity>()
+    private val map = HashMap<ActivityKey, Activity>()
     private val _event = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
+    private var latestKey: ActivityKey? = null
+
     val event = _event.asSharedFlow()
 
     @MainThread
@@ -42,7 +43,6 @@ internal class ActivityWatcher {
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
                     val event = ActivityEvent.Created(activity)
                     map[event.activityKey] = activity
-                    list.add(activity)
                     _event.tryEmit(event)
                 }
 
@@ -51,7 +51,9 @@ internal class ActivityWatcher {
                 }
 
                 override fun onActivityResumed(activity: Activity) {
-                    _event.tryEmit(ActivityEvent.Resumed(activity))
+                    val event = ActivityEvent.Resumed(activity)
+                    latestKey = event.activityKey
+                    _event.tryEmit(event)
                 }
 
                 override fun onActivityPaused(activity: Activity) {
@@ -64,8 +66,8 @@ internal class ActivityWatcher {
 
                 override fun onActivityDestroyed(activity: Activity) {
                     val event = ActivityEvent.Destroyed(activity)
+                    if (event.activityKey == latestKey) latestKey = null
                     map.remove(event.activityKey)
-                    list.remove(activity)
                     _event.tryEmit(event)
                 }
 
@@ -75,14 +77,14 @@ internal class ActivityWatcher {
     }
 
     @MainThread
-    fun getActivity(key: Int): Activity? {
+    fun getActivity(key: ActivityKey): Activity? {
         assertMainThread()
         return map[key]
     }
 
     @MainThread
-    fun getLastActivity(): Activity? {
+    fun getLatestActivity(): Activity? {
         assertMainThread()
-        return list.lastOrNull()
+        return latestKey?.let(::getActivity)
     }
 }

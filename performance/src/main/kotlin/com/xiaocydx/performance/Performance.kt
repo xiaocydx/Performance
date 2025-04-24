@@ -31,6 +31,7 @@ import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
+import com.xiaocydx.performance.runtime.activity.ActivityKey
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
@@ -91,12 +92,12 @@ object Performance {
             return CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Main.immediate)
         }
 
-        override fun getActivity(key: Int): Activity? {
+        override fun getActivity(key: ActivityKey): Activity? {
             return activityWatcher.getActivity(key)
         }
 
-        override fun getLastActivity(): Activity? {
-            return activityWatcher.getLastActivity()
+        override fun getLatestActivity(): Activity? {
+            return activityWatcher.getLatestActivity()
         }
 
         override fun addCallback(callback: LooperCallback) {
@@ -125,10 +126,10 @@ object Performance {
         fun createMainScope(): CoroutineScope
 
         @MainThread
-        fun getActivity(key: Int): Activity?
+        fun getActivity(key: ActivityKey): Activity?
 
         @MainThread
-        fun getLastActivity(): Activity?
+        fun getLatestActivity(): Activity?
 
         @MainThread
         fun addCallback(callback: LooperCallback)

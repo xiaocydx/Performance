@@ -26,7 +26,7 @@ class BlockMetrics(
     /**
      * 最后启动的Activity
      */
-    val lastActivity: String,
+    val latestActivity: String,
     /**
      * 主线程priority值
      */

@@ -96,7 +96,7 @@ internal class BlockMetricsAnalyzer(
                         val cpuDurationMillis = endThreadTimeMillis - startThreadTimeMillis
                         handler.post(BlockTask(
                             scene = current.scene.name,
-                            lastActivity = host.getLastActivity()?.javaClass?.name ?: "",
+                            latestActivity = host.getLatestActivity()?.javaClass?.name ?: "",
                             startMark = startMark,
                             endMark = current.mark,
                             thresholdMillis = thresholdMillis,
@@ -116,7 +116,7 @@ internal class BlockMetricsAnalyzer(
 
     private class BlockTask(
         private val scene: String,
-        private val lastActivity: String,
+        private val latestActivity: String,
         private val startMark: Long,
         private val endMark: Long,
         private val thresholdMillis: Long,
@@ -137,7 +137,7 @@ internal class BlockMetricsAnalyzer(
                 pid = Process.myPid(),
                 tid = Process.myPid(), // 主线程的tid跟pid一致
                 scene = scene,
-                lastActivity = lastActivity,
+                latestActivity = latestActivity,
                 priority = procStat.priority,
                 nice = procStat.nice,
                 createTimeMillis = System.currentTimeMillis(),

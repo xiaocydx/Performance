@@ -56,7 +56,7 @@ class BlockMetricsWriter(
             put("pid", pid)
             put("tid", tid)
             put("scene", scene)
-            put("lastActivity", lastActivity)
+            put("latestActivity", latestActivity)
             put("priority", priority)
             put("nice", nice)
             put("createTimeMillis", createTimeMillis)

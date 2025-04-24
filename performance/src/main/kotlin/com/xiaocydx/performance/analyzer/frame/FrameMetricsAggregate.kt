@@ -30,12 +30,12 @@ import com.xiaocydx.performance.analyzer.frame.DroppedFrames.Total
 interface FrameMetricsAggregate {
 
     /**
-     * 目标Key，目前只有Activity，`targetKey = activity.hashCode()`
+     * 目标Key，目前只有Activity，`targetKey = ActivityKey(activity)`
      */
-    val targetKey: Long
+    val targetKey: Any
 
     /**
-     * 目标名称，目前只有Activity，`targetName = activity.javaClass.simpleName`
+     * 目标名称，目前只有Activity，`targetName = activity.javaClass.name`
      */
     val targetName: String
 
@@ -167,7 +167,7 @@ class FrameMetricsVisitor : FrameMetricsAggregate {
     internal val droppedFrames = IntArray(droppedSize)
     internal val droppedDuration = Array(droppedSize) { LongArray(FrameDuration.entries.size) }
 
-    override var targetKey = 0L; internal set
+    override var targetKey: Any = Unit; internal set
     override var targetName = ""; internal set
     override var intervalMillis = 0L; internal set
     override var renderedFrames = 0; internal set

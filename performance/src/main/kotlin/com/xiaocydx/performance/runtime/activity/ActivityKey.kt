@@ -20,16 +20,12 @@ import android.app.Activity
 
 /**
  * @author xcc
- * @date 2025/3/27
+ * @date 2025/4/24
  */
-internal sealed class ActivityEvent(activity: Activity) {
-    val activityKey = ActivityKey(activity)
-    val activityClass = activity::class.java
+data class ActivityKey(val name: String, val value: Int) {
 
-    class Created(activity: Activity) : ActivityEvent(activity)
-    class Started(activity: Activity) : ActivityEvent(activity)
-    class Resumed(activity: Activity) : ActivityEvent(activity)
-    class Paused(activity: Activity) : ActivityEvent(activity)
-    class Stopped(activity: Activity) : ActivityEvent(activity)
-    class Destroyed(activity: Activity) : ActivityEvent(activity)
+    constructor(activity: Activity) : this(
+        name = activity.javaClass.name ?: "",
+        value = activity.hashCode()
+    )
 }
