@@ -16,12 +16,17 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
+import android.os.MessageQueue
+import android.view.MotionEvent
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.SampleData
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.Scene.IdleHandler
+import com.xiaocydx.performance.runtime.looper.Scene.Message
+import com.xiaocydx.performance.runtime.looper.Scene.NativeTouch
 import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -58,8 +63,7 @@ internal class ANRMetricsAnalyzer(
     }
 
     private class Callback(private val chain: ANRMetricsChain) : LooperCallback {
-        private var startMark = 0L
-        private var startUptimeMillis = 0L
+        private val params = ANRMetricsChain.Params()
         @Volatile private var sampleData: SampleData? = null
 
         private fun consumeSampleData(): SampleData? {
@@ -70,23 +74,41 @@ internal class ANRMetricsAnalyzer(
 
         override fun dispatch(current: DispatchContext) {
             when (current) {
-                is Start -> {
+                is Start -> params.apply {
                     startMark = current.mark
                     startUptimeMillis = current.uptimeMillis
                 }
-                // TODO: 优化metadata的记录方式
                 is End -> {
                     val sampleData = consumeSampleData()
-                    chain.append(
-                        isSingle = current.isFromActivityThread || sampleData != null,
-                        scene = current.scene,
-                        metadata = current.metadata.toString(),
-                        startMark = startMark,
-                        endMark = current.mark,
-                        startUptimeMillis = startUptimeMillis,
-                        endUptimeMillis = current.uptimeMillis,
-                        sampleData = sampleData
-                    )
+                    params.apply {
+                        scene = current.scene
+                        isSingle = current.isFromActivityThread || sampleData != null
+                        endMark = current.mark
+                        endUptimeMillis = current.uptimeMillis
+                        this.sampleData = sampleData
+                    }
+                    when (current.scene) {
+                        Message -> params.apply {
+                            val message = current.metadata as android.os.Message
+                            what = message.what
+                            targetName = message.target?.javaClass?.name ?: "" // null is barrier
+                            callbackName = message.callback?.javaClass?.name ?: ""
+                            arg1 = message.arg1
+                            arg2 = message.arg2
+                        }
+                        IdleHandler -> params.apply {
+                            val idleHandler = current.metadata as MessageQueue.IdleHandler
+                            idleHandlerName = idleHandler.javaClass.name
+                        }
+                        NativeTouch -> params.apply {
+                            val motionEvent = current.metadata as MotionEvent
+                            action = motionEvent.action
+                            x = motionEvent.x
+                            y = motionEvent.y
+                        }
+                    }
+                    chain.append(params)
+                    params.reset()
                 }
             }
         }

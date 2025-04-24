@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
+import androidx.annotation.CallSuper
 import androidx.core.util.Pools.SimplePool
 import com.xiaocydx.performance.runtime.SampleData
 import com.xiaocydx.performance.runtime.looper.Scene
@@ -39,56 +40,28 @@ internal class ANRMetricsChain(
         tail.prev = head
     }
 
-    fun append(
-        isSingle: Boolean,
-        scene: Scene,
-        metadata: String,
-        startMark: Long,
-        endMark: Long,
-        startUptimeMillis: Long,
-        endUptimeMillis: Long,
-        sampleData: SampleData?
-    ) {
-        if (!isSingle && merge(scene, metadata, startMark, endMark,
-                    startUptimeMillis, endUptimeMillis, sampleData)) {
-            return
-        }
+    fun append(params: Params) {
+        if (merge(params)) return
         if (size == capacity) removeFirst()
         val node = pool.acquire() ?: Node()
-        node.count++
-        node.isSingle = isSingle
-        node.scene = scene
-        node.startMark = startMark
-        node.endMark = endMark
-        node.startUptimeMillis = startUptimeMillis
-        node.endUptimeMillis = endUptimeMillis
-        node.metadata = metadata
+        node.set(params)
         addToLast(node)
     }
 
-    private fun merge(
-        scene: Scene,
-        metadata: String,
-        startMark: Long,
-        endMark: Long,
-        startUptimeMillis: Long,
-        endUptimeMillis: Long,
-        sampleData: SampleData?
-    ): Boolean {
+    private fun merge(params: Params): Boolean {
+        if (params.isSingle) return false
         val last = lastOrNull()
-        if (last == null || last.isSingle || last.scene != scene) return false
-        val idleDurationMillis = startUptimeMillis - last.endUptimeMillis
+        if (last == null || last.isSingle || last.scene != params.scene) return false
+        val idleDurationMillis = params.startUptimeMillis - last.endUptimeMillis
         if (idleDurationMillis > idleThresholdMillis) return false
         val lastDurationMillis = last.endUptimeMillis - last.startUptimeMillis
-        val currDurationMillis = endUptimeMillis - startUptimeMillis
+        val currDurationMillis = params.endUptimeMillis - params.startUptimeMillis
         if (lastDurationMillis + currDurationMillis > mergeThresholdMillis) return false
 
         last.count++
-        last.startMark = startMark
-        last.endMark = endMark
-        last.endUptimeMillis = endUptimeMillis
-        last.metadata = metadata
-        last.sampleData = sampleData
+        last.idleDurationMillis += idleDurationMillis
+        last.endUptimeMillis = params.endUptimeMillis
+        last.setLatest(params)
         return true
     }
 
@@ -133,31 +106,82 @@ internal class ANRMetricsChain(
         return outcome
     }
 
-    private class Node {
-        var count = 0
-        var isSingle = false
-        var scene = Scene.Message
-        var startMark = 0L
-        var endMark = 0L
-        var startUptimeMillis = 0L
-        var endUptimeMillis = 0L
-        var metadata = ""
-        var sampleData: SampleData? = null
+    private class Node : Params() {
+        var count = 1
+        var idleDurationMillis = 0L
         var prev: Node? = null
         var next: Node? = null
 
-        fun reset() {
-            count = 0
-            isSingle = false
-            scene = Scene.Message
-            startMark = 0L
-            endMark = 0L
-            startUptimeMillis = 0L
-            endUptimeMillis = 0L
-            metadata = ""
-            sampleData = null
+        override fun reset() {
+            super.reset()
+            count = 1
+            idleDurationMillis = 0L
             prev = null
             next = null
         }
+    }
+
+    open class Params {
+        var scene = Scene.Message
+        var isSingle = false
+        var startUptimeMillis = 0L
+        var endUptimeMillis = 0L
+
+        var startMark = 0L
+        var endMark = 0L
+        var sampleData: SampleData? = null
+
+        //region Metadata
+        // scene = Scene.Message
+        var what = 0
+        var targetName = ""
+        var callbackName = ""
+        var arg1 = 0
+        var arg2 = 0
+
+        //scene = IdleHandler
+        var idleHandlerName = ""
+
+        //scene = NativeTouch
+        var action = 0
+        var x = 0f
+        var y = 0f
+        //endregion
+
+        @CallSuper
+        open fun reset() {
+            set(emptyParams)
+        }
+
+        fun set(params: Params) {
+            scene = params.scene
+            isSingle = params.isSingle
+            startUptimeMillis = params.startUptimeMillis
+            endUptimeMillis = params.endUptimeMillis
+            setLatest(params)
+        }
+
+        fun setLatest(params: Params) {
+            startMark = params.startMark
+            endMark = params.endMark
+            sampleData = params.sampleData
+            what = params.what
+            targetName = params.targetName
+            callbackName = params.callbackName
+            arg1 = params.arg1
+            arg2 = params.arg2
+            idleHandlerName = params.idleHandlerName
+            action = params.action
+            x = params.x
+            y = params.y
+        }
+
+        fun metadata(): String {
+            return TODO()
+        }
+    }
+
+    private companion object {
+        val emptyParams = Params()
     }
 }
