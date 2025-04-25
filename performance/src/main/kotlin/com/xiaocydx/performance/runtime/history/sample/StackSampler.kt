@@ -24,11 +24,11 @@ import android.os.Looper
  */
 internal class StackSampler(
     private val capacity: Int,
-    sampleLooper: Looper,
-    sampleIntervalMillis: Long
-): Sampler(sampleLooper, sampleIntervalMillis) {
-    private val thread = Looper.getMainLooper().thread
-    override fun onSample() {
+    looper: Looper,
+    intervalMillis: Long
+) : Sampler(looper, intervalMillis) {
+
+    override fun sample() {
         TODO("Not yet implemented")
     }
 }

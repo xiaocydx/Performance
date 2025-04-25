@@ -18,37 +18,86 @@ package com.xiaocydx.performance.runtime.history.sample
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
+import androidx.annotation.WorkerThread
 
 /**
  * @author xcc
  * @date 2025/4/25
  */
-@MainThread
-internal sealed class Sampler(
-    private val sampleLooper: Looper,
-    private val sampleIntervalMillis: Long
-) {
-    private val handler = Handler(sampleLooper)
-    private val action = Runnable { sample() }
-    private var isStart = false
+internal sealed class Sampler(looper: Looper, private val intervalMillis: Long) {
+    private val handler = Handler(looper)
+    private val sampleTask = SampleTask()
+    @Volatile private var stopUptimeMillis = 0L
+    @Volatile private var sampleUptimeMillis = 0L
 
-    fun start() {
-        if (isStart) return
-        isStart = true
-        handler.postDelayed(action, sampleIntervalMillis)
+    protected val mainThread = Looper.getMainLooper().thread
+
+    @MainThread
+    fun start(uptimeMillis: Long) {
+        stopUptimeMillis = Long.MAX_VALUE
+        resetSampleUptime(uptimeMillis)
+        sampleTask.startIfNecessary()
+        // 代替每次调用handler.postDelayed(sampleTask, intervalMillis)
     }
 
-    fun stop() {
-        if (!isStart) return
-        isStart = false
-        handler.removeCallbacks(action)
+    @MainThread
+    fun stop(uptimeMillis: Long) {
+        stopUptimeMillis = uptimeMillis
+        // 代替每次调用handler.removeCallbacks(sampleTask)
     }
 
-    private fun sample() {
-        onSample()
-        handler.postDelayed(action, sampleIntervalMillis)
+    @AnyThread
+    private fun resetSampleUptime(uptimeMillis: Long) {
+        sampleUptimeMillis = (uptimeMillis + intervalMillis).coerceAtLeast(sampleUptimeMillis)
     }
 
-    protected abstract fun onSample()
+    @WorkerThread
+    protected abstract fun sample()
+
+    private inner class SampleTask : Runnable {
+        @Volatile private var isStarted = false
+
+        @MainThread
+        fun startIfNecessary() {
+            if (isStarted) return
+            isStarted = true
+            handler.postDelayed(this, intervalMillis)
+        }
+
+        @WorkerThread
+        override fun run() {
+            var currentTime = SystemClock.uptimeMillis()
+            var stopTime = stopUptimeMillis
+            if (currentTime <= stopTime) {
+                isStarted = false
+                return
+            }
+
+            var sampleTime = sampleUptimeMillis
+            if (currentTime < sampleTime) {
+                handler.postDelayed(this, sampleTime - currentTime)
+                return
+            }
+
+            sample()
+
+            currentTime = SystemClock.uptimeMillis()
+            stopTime = stopUptimeMillis
+            if (currentTime <= stopTime) {
+                isStarted = false
+                return
+            }
+
+            sampleTime = sampleUptimeMillis
+            if (currentTime < sampleTime) {
+                handler.postDelayed(this, sampleTime - currentTime)
+            } else {
+                resetSampleUptime(currentTime)
+                handler.postDelayed(this, intervalMillis)
+            }
+        }
+    }
 }
