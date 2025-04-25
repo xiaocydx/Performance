@@ -37,6 +37,7 @@ import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
+import com.xiaocydx.performance.runtime.history.Snapshot
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
 import com.xiaocydx.performance.runtime.looper.LooperCallback
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
@@ -89,6 +90,8 @@ object Performance {
 
         override val activityEvent get() = activityWatcher.event
 
+        override val isRecordEnabled get() = History.isRecordEnabled
+
         override fun createMainScope(): CoroutineScope {
             return CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Main.immediate)
         }
@@ -112,6 +115,10 @@ object Performance {
         override fun requireHistory(analyzer: Analyzer) {
             History.init()
         }
+
+        override fun snapshot(startMark: Long, endMark: Long): Snapshot {
+            return History.snapshot(startMark, endMark)
+        }
     }
 
     internal interface Host {
@@ -123,6 +130,8 @@ object Performance {
         val ams: ActivityManager
 
         val activityEvent: SharedFlow<ActivityEvent>
+
+        val isRecordEnabled: Boolean
 
         fun createMainScope(): CoroutineScope
 
@@ -140,6 +149,8 @@ object Performance {
 
         @MainThread
         fun requireHistory(analyzer: Analyzer)
+
+        fun snapshot(startMark: Long, endMark: Long): Snapshot
     }
 
     data class Config(

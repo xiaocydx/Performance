@@ -36,3 +36,19 @@ class SampleData private constructor(
         )
     }
 }
+
+internal class SampleTask(private val thread: Thread) : Runnable {
+    @Volatile
+    private var sampleData: SampleData? = null
+
+    override fun run() {
+        sampleData = SampleData.now(thread)
+    }
+
+    fun consume(startUptimeMillis: Long, endUptimeMillis: Long): SampleData? {
+        val sampleData = sampleData ?: return null
+        this.sampleData = null
+        if (sampleData.uptimeMillis !in startUptimeMillis..endUptimeMillis) return null
+        return sampleData
+    }
+}
