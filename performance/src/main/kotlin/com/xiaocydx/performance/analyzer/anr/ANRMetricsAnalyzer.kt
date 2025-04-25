@@ -18,10 +18,10 @@ package com.xiaocydx.performance.analyzer.anr
 
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.SampleData
+import com.xiaocydx.performance.runtime.history.sample.SampleData
 import com.xiaocydx.performance.runtime.history.History
-import com.xiaocydx.performance.runtime.history.Segment
-import com.xiaocydx.performance.runtime.history.SegmentChain
+import com.xiaocydx.performance.runtime.history.segment.Merger
+import com.xiaocydx.performance.runtime.history.segment.Segment
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -44,7 +44,7 @@ internal class ANRMetricsAnalyzer(
     override fun init() {
         coroutineScope.launch {
             host.requireHistory(this@ANRMetricsAnalyzer)
-            val callback = Callback(requireNotNull(History.segmentChain(
+            val callback = Callback(requireNotNull(History.merger(
                 idleThresholdMillis = config.receiver.idleThresholdMillis,
                 mergeThresholdMillis = config.receiver.mergeThresholdMillis
             )))
@@ -99,7 +99,7 @@ internal class ANRMetricsAnalyzer(
         }
     }
 
-    private inner class Callback(private val chain: SegmentChain) : LooperCallback {
+    private inner class Callback(private val merger: Merger) : LooperCallback {
         private val segment = Segment()
         @Volatile private var sampleData: SampleData? = null
 
@@ -115,7 +115,7 @@ internal class ANRMetricsAnalyzer(
             if (current is End) {
                 // TODO: 减少consumeSampleData()的调用
                 segment.sampleData = consumeSampleData()
-                chain.consume(segment)
+                merger.consume(segment)
             }
         }
     }

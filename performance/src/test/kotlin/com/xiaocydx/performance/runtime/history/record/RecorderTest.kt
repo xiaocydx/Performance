@@ -16,10 +16,10 @@
 
 @file:Suppress("TestFunctionName")
 
-package com.xiaocydx.performance.runtime.history
+package com.xiaocydx.performance.runtime.history.record
 
 import com.google.common.truth.Truth.assertThat
-import com.xiaocydx.performance.runtime.history.Node.Companion.ROOT_ID
+import com.xiaocydx.performance.runtime.history.record.Node.Companion.ROOT_ID
 import org.junit.Test
 
 /**

@@ -37,7 +37,7 @@ import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
-import com.xiaocydx.performance.runtime.history.Snapshot
+import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
 import com.xiaocydx.performance.runtime.looper.LooperCallback
 import com.xiaocydx.performance.runtime.looper.LooperWatcher

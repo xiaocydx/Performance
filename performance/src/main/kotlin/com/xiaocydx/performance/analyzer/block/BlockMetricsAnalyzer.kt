@@ -24,9 +24,9 @@ import android.os.Process
 import android.os.SystemClock
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.ProcStat
-import com.xiaocydx.performance.runtime.SampleData
-import com.xiaocydx.performance.runtime.SampleTask
+import com.xiaocydx.performance.runtime.history.sample.ProcStat
+import com.xiaocydx.performance.runtime.history.sample.SampleData
+import com.xiaocydx.performance.runtime.history.sample.SampleTask
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback

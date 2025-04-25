@@ -25,8 +25,11 @@ import android.os.Trace
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.BytecodeApi
-import com.xiaocydx.performance.runtime.history.Record.Companion.ID_MAX
-import com.xiaocydx.performance.runtime.history.Record.Companion.ID_SLICE
+import com.xiaocydx.performance.runtime.history.record.Record.Companion.ID_MAX
+import com.xiaocydx.performance.runtime.history.record.Record.Companion.ID_SLICE
+import com.xiaocydx.performance.runtime.history.record.Recorder
+import com.xiaocydx.performance.runtime.history.record.Snapshot
+import com.xiaocydx.performance.runtime.history.segment.Merger
 
 /**
  * @author xcc
@@ -136,9 +139,9 @@ internal object History {
         }
     }
 
-    fun segmentChain(idleThresholdMillis: Long, mergeThresholdMillis: Long): SegmentChain? {
+    fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger? {
         if (!isInitialized) return null
-        return SegmentChain(capacity = 5 * 1000, idleThresholdMillis, mergeThresholdMillis)
+        return Merger(capacity = 2 * 1000, idleThresholdMillis, mergeThresholdMillis)
     }
 
     @SuppressLint("UnclosedTrace")

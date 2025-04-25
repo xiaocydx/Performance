@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.runtime
+package com.xiaocydx.performance.runtime.history.sample
 
 import android.os.SystemClock
 
@@ -25,6 +25,7 @@ import android.os.SystemClock
 class SampleData private constructor(
     val uptimeMillis: Long,
     val threadState: Thread.State,
+    // TODO: 改成List
     val threadStack: Array<StackTraceElement>
 ) {
 
