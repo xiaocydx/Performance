@@ -136,6 +136,11 @@ internal object History {
         }
     }
 
+    fun segmentChain(idleThresholdMillis: Long, mergeThresholdMillis: Long): SegmentChain? {
+        if (!isInitialized) return null
+        return SegmentChain(capacity = 5 * 1000, idleThresholdMillis, mergeThresholdMillis)
+    }
+
     @SuppressLint("UnclosedTrace")
     private fun createRecorder() {
         Trace.beginSection("HistoryCreateRecorder")

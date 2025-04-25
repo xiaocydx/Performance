@@ -66,10 +66,10 @@ internal class BlockMetricsAnalyzer(
             sampleData = SampleData.now(mainThread)
         }
 
-        private fun consumeSampleData(): SampleData? {
+        private fun consumeSampleData(uptimeMillis: Long): SampleData? {
             val sampleData = sampleData ?: return null
             this.sampleData = null
-            return sampleData
+            return sampleData.takeIf { it.uptimeMillis <= uptimeMillis }
         }
 
         override fun dispatch(current: DispatchContext) {
@@ -97,7 +97,7 @@ internal class BlockMetricsAnalyzer(
                             cpuDurationMillis = cpuDurationMillis,
                             isRecordEnabled = History.isRecordEnabled,
                             metadata = current.metadata.toString(),
-                            sampleData = consumeSampleData(),
+                            sampleData = consumeSampleData(current.uptimeMillis),
                             receiver = config.receiver
                         ))
                     }
@@ -124,7 +124,6 @@ internal class BlockMetricsAnalyzer(
             val createTimeMillis = System.currentTimeMillis()
             val snapshot = History.snapshot(startMark, endMark)
             val procStat = ProcStat.get(Process.myPid())
-            SystemClock.uptimeMillis()
             receiver.receive(BlockMetrics(
                 pid = Process.myPid(),
                 tid = Process.myPid(), // 主线程的tid跟pid一致

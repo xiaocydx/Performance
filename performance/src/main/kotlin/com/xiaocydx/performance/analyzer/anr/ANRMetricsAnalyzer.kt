@@ -16,11 +16,12 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
-import android.os.MessageQueue
-import android.view.MotionEvent
 import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.SampleData
+import com.xiaocydx.performance.runtime.history.History
+import com.xiaocydx.performance.runtime.history.Segment
+import com.xiaocydx.performance.runtime.history.SegmentChain
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -41,29 +42,65 @@ internal class ANRMetricsAnalyzer(
 ) : Analyzer(host) {
 
     override fun init() {
-        var watchDog: ANRWatchDog? = null
-        val chain = ANRMetricsChain(
-            capacity = 5000,
-            idleThresholdMillis = config.receiver.idleThresholdMillis,
-            mergeThresholdMillis = config.receiver.mergeThresholdMillis
-        )
-        val callback = Callback(chain)
         coroutineScope.launch {
             host.requireHistory(this@ANRMetricsAnalyzer)
+            val callback = Callback(requireNotNull(History.segmentChain(
+                idleThresholdMillis = config.receiver.idleThresholdMillis,
+                mergeThresholdMillis = config.receiver.mergeThresholdMillis
+            )))
             host.addCallback(callback)
-            watchDog = ANRWatchDog(host.ams)
-            watchDog!!.start()
-            awaitCancellation()
-        }.invokeOnCompletion {
-            host.removeCallback(callback)
-            watchDog?.interrupt()
-            watchDog = null
-            chain.clear()
+            val watchDog = ANRWatchDog(host.ams)
+            watchDog.start()
+            try {
+                awaitCancellation()
+            } finally {
+                watchDog.interrupt()
+                host.removeCallback(callback)
+            }
         }
     }
 
-    private class Callback(private val chain: ANRMetricsChain) : LooperCallback {
-        private val params = ANRMetricsChain.Params()
+    private fun Segment.collectFrom(current: DispatchContext) {
+        when (current) {
+            is Start -> {
+                scene = current.scene
+                startMark = current.mark
+                startUptimeMillis = current.uptimeMillis
+                startThreadTimeMillis = current.threadTimeMillis
+            }
+            is End -> {
+                endMark = current.mark
+                endUptimeMillis = current.uptimeMillis
+                when (current.scene) {
+                    Message -> {
+                        current.metadata.asMessageLog()?.let {
+                            log = it
+                            return
+                        }
+                        val message = current.metadata.asMessage()!!
+                        what = message.what
+                        targetName = message.target?.javaClass?.name ?: "" // null is barrier
+                        callbackName = message.callback?.javaClass?.name ?: ""
+                        arg1 = message.arg1
+                        arg2 = message.arg2
+                    }
+                    IdleHandler -> {
+                        val idleHandler = current.metadata.asIdleHandler()!!
+                        idleHandlerName = idleHandler.javaClass.name ?: ""
+                    }
+                    NativeTouch -> {
+                        val motionEvent = current.metadata.asMotionEvent()!!
+                        action = motionEvent.action
+                        x = motionEvent.x
+                        y = motionEvent.y
+                    }
+                }
+            }
+        }
+    }
+
+    private inner class Callback(private val chain: SegmentChain) : LooperCallback {
+        private val segment = Segment()
         @Volatile private var sampleData: SampleData? = null
 
         private fun consumeSampleData(): SampleData? {
@@ -73,43 +110,12 @@ internal class ANRMetricsAnalyzer(
         }
 
         override fun dispatch(current: DispatchContext) {
-            when (current) {
-                is Start -> params.apply {
-                    startMark = current.mark
-                    startUptimeMillis = current.uptimeMillis
-                }
-                is End -> {
-                    val sampleData = consumeSampleData()
-                    params.apply {
-                        scene = current.scene
-                        isSingle = current.isFromActivityThread || sampleData != null
-                        endMark = current.mark
-                        endUptimeMillis = current.uptimeMillis
-                        this.sampleData = sampleData
-                    }
-                    // when (current.scene) {
-                    //     Message -> params.apply {
-                    //         val message = current.metadata as android.os.Message
-                    //         what = message.what
-                    //         targetName = message.target?.javaClass?.name ?: "" // null is barrier
-                    //         callbackName = message.callback?.javaClass?.name ?: ""
-                    //         arg1 = message.arg1
-                    //         arg2 = message.arg2
-                    //     }
-                    //     IdleHandler -> params.apply {
-                    //         val idleHandler = current.metadata as MessageQueue.IdleHandler
-                    //         idleHandlerName = idleHandler.javaClass.name
-                    //     }
-                    //     NativeTouch -> params.apply {
-                    //         val motionEvent = current.metadata as MotionEvent
-                    //         action = motionEvent.action
-                    //         x = motionEvent.x
-                    //         y = motionEvent.y
-                    //     }
-                    // }
-                    // chain.append(params)
-                    // params.reset()
-                }
+            // collectFrom() time << 1ms
+            segment.collectFrom(current)
+            if (current is End) {
+                // TODO: 减少consumeSampleData()的调用
+                segment.sampleData = consumeSampleData()
+                chain.consume(segment)
             }
         }
     }
