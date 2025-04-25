@@ -69,7 +69,7 @@ internal interface Start : DispatchContext {
      * * [Scene.IdleHandler]：[IdleHandler]。
      * * [Scene.NativeTouch]：[MotionEvent]。
      */
-    val metadata: Any?
+    val metadata: Metadata
 
     /**
      * [LooperCallback.dispatch]的[SystemClock.currentThreadTimeMillis]
@@ -90,11 +90,21 @@ internal interface End : DispatchContext {
      * * [Scene.IdleHandler]：[IdleHandler]。
      * * [Scene.NativeTouch]：[MotionEvent]。
      */
-    val metadata: Any
+    val metadata: Metadata
 }
 
 internal enum class Scene {
     Message, IdleHandler, NativeTouch
+}
+
+internal interface Metadata {
+    fun asMessageLog(): String?
+
+    fun asMessage(): Message?
+
+    fun asIdleHandler(): IdleHandler?
+
+    fun asMotionEvent(): MotionEvent?
 }
 
 @MainThread

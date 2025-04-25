@@ -87,28 +87,28 @@ internal class ANRMetricsAnalyzer(
                         endUptimeMillis = current.uptimeMillis
                         this.sampleData = sampleData
                     }
-                    when (current.scene) {
-                        Message -> params.apply {
-                            val message = current.metadata as android.os.Message
-                            what = message.what
-                            targetName = message.target?.javaClass?.name ?: "" // null is barrier
-                            callbackName = message.callback?.javaClass?.name ?: ""
-                            arg1 = message.arg1
-                            arg2 = message.arg2
-                        }
-                        IdleHandler -> params.apply {
-                            val idleHandler = current.metadata as MessageQueue.IdleHandler
-                            idleHandlerName = idleHandler.javaClass.name
-                        }
-                        NativeTouch -> params.apply {
-                            val motionEvent = current.metadata as MotionEvent
-                            action = motionEvent.action
-                            x = motionEvent.x
-                            y = motionEvent.y
-                        }
-                    }
-                    chain.append(params)
-                    params.reset()
+                    // when (current.scene) {
+                    //     Message -> params.apply {
+                    //         val message = current.metadata as android.os.Message
+                    //         what = message.what
+                    //         targetName = message.target?.javaClass?.name ?: "" // null is barrier
+                    //         callbackName = message.callback?.javaClass?.name ?: ""
+                    //         arg1 = message.arg1
+                    //         arg2 = message.arg2
+                    //     }
+                    //     IdleHandler -> params.apply {
+                    //         val idleHandler = current.metadata as MessageQueue.IdleHandler
+                    //         idleHandlerName = idleHandler.javaClass.name
+                    //     }
+                    //     NativeTouch -> params.apply {
+                    //         val motionEvent = current.metadata as MotionEvent
+                    //         action = motionEvent.action
+                    //         x = motionEvent.x
+                    //         y = motionEvent.y
+                    //     }
+                    // }
+                    // chain.append(params)
+                    // params.reset()
                 }
             }
         }

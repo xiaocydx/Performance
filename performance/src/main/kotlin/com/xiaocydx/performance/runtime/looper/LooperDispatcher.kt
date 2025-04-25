@@ -18,7 +18,10 @@ package com.xiaocydx.performance.runtime.looper
 
 import android.annotation.SuppressLint
 import android.os.Handler
+import android.os.Message
+import android.os.MessageQueue.IdleHandler
 import android.os.SystemClock
+import android.view.MotionEvent
 import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.History.NO_MARK
@@ -38,12 +41,12 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         dispatchingScene = scene
         start.mark = History.startMark()
         start.scene = scene
-        start.metadata = metadata
         start.uptimeMillis = SystemClock.uptimeMillis()
         start.threadTimeMillis = SystemClock.currentThreadTimeMillis()
+        start.metadata.value = metadata
         dispatchingMark = start.mark
         callback.dispatch(start)
-        start.metadata = null
+        start.metadata.value = null
     }
 
     fun end(scene: Scene, metadata: Any) {
@@ -51,19 +54,19 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         dispatchingScene = null
         end.mark = if (dispatchingMark > NO_MARK) History.endMark() else NO_MARK
         end.scene = scene
-        end.metadata = metadata
         end.uptimeMillis = SystemClock.uptimeMillis()
+        end.metadata.value = metadata
         callback.dispatch(end)
-        end.metadata = Unit
+        end.metadata.value = null
         dispatchActivityThreadMessage = false
     }
 
     private class StartImpl : Start {
         override var mark = NO_MARK
         override var scene = Scene.Message
-        override var metadata: Any? = null
         override var uptimeMillis = 0L
         override var threadTimeMillis = 0L
+        override val metadata = MetadataImpl()
         override val isFromActivityThread: Boolean
             get() = dispatchActivityThreadMessage
     }
@@ -71,10 +74,29 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     private class EndImpl : End {
         override var mark = NO_MARK
         override var scene = Scene.Message
-        override var metadata: Any = Unit
         override var uptimeMillis = 0L
+        override val metadata = MetadataImpl()
         override val isFromActivityThread: Boolean
             get() = dispatchActivityThreadMessage
+    }
+
+    private class MetadataImpl(var value: Any? = null) : Metadata {
+
+        override fun asMessageLog() = value as? String
+
+        override fun asMessage() = value as? Message
+
+        override fun asIdleHandler() = value as? IdleHandler
+
+        override fun asMotionEvent() = value as? MotionEvent
+
+        override fun toString(): String {
+            asMessageLog()?.let { return it }
+            asMessage()?.let { return it.toString() }
+            asIdleHandler()?.let { return "IdleHandler { name=${it.javaClass.name ?: ""} }" }
+            asMotionEvent()?.let { return it.toString() }
+            return "Metadata { value=null }"
+        }
     }
 
     @SuppressLint("PrivateApi")
