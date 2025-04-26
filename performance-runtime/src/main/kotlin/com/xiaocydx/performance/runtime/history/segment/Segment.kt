@@ -16,10 +16,8 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
-import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
-import com.xiaocydx.performance.runtime.looper.Scene
 import com.xiaocydx.performance.runtime.looper.Scene.IdleHandler
 import com.xiaocydx.performance.runtime.looper.Scene.Message
 import com.xiaocydx.performance.runtime.looper.Scene.NativeTouch
@@ -31,13 +29,16 @@ import com.xiaocydx.performance.runtime.looper.Start
  */
 internal class Segment {
     var isSingle = false
-    var scene = Scene.Message
+    var needRecord = false
+    var needSample = false
+
+    //region collectFrom DispatchContext
+    var scene = Message
     var startMark = 0L
     var startUptimeMillis = 0L
     var startThreadTimeMillis = 0L
     var endMark = 0L
     var endUptimeMillis = 0L
-    var sample: Sample? = null
 
     //region Metadata
     // scene = Scene.Message
@@ -56,6 +57,7 @@ internal class Segment {
     var x = 0f
     var y = 0f
     //endregion
+    //endregion
 
     fun reset() {
         copyFrom(emptySegment)
@@ -63,13 +65,15 @@ internal class Segment {
 
     fun copyFrom(segment: Segment) {
         isSingle = segment.isSingle
+        needRecord = segment.needRecord
+        needSample = segment.needSample
+
         scene = segment.scene
         startMark = segment.startMark
         startUptimeMillis = segment.startUptimeMillis
         startThreadTimeMillis = segment.startThreadTimeMillis
         endMark = segment.endMark
         endUptimeMillis = segment.endUptimeMillis
-        sample = segment.sample
 
         what = segment.what
         targetName = segment.targetName

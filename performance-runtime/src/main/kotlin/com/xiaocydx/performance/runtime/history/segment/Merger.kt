@@ -16,8 +16,6 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
-import androidx.annotation.VisibleForTesting
-
 /**
  * @author xcc
  * @date 2025/4/23
@@ -30,11 +28,11 @@ internal class Merger(
     private val deque = ArrayDeque<Element>(capacity)
 
     fun consume(segment: Segment) {
-        if (!merge(segment)) add(segment)
+        if (!merge(segment)) append(segment)
         segment.reset()
     }
 
-    private fun add(segment: Segment) {
+    private fun append(segment: Segment) {
         val element = if (deque.size == capacity) deque.removeFirst() else Element()
         element.init(segment)
         deque.add(element)
@@ -42,38 +40,47 @@ internal class Merger(
 
     private fun merge(segment: Segment): Boolean {
         if (segment.isSingle) return false
-        val last = deque.lastOrNull()
-        if (last == null || last.isSingle || last.scene != segment.scene) return false
+        val element = deque.lastOrNull()
+        if (element == null || element.isSingle || element.scene != segment.scene) return false
 
-        val idleDuration = segment.startUptimeMillis - last.endUptimeMillis
+        val idleDuration = segment.startUptimeMillis - element.endUptimeMillis
         if (idleDuration > idleThresholdMillis) return false
 
-        val lastDuration = last.endUptimeMillis - last.startUptimeMillis
+        val lastDuration = element.endUptimeMillis - element.startUptimeMillis
         val currDuration = segment.endUptimeMillis - segment.startUptimeMillis
         if (lastDuration + currDuration > mergeThresholdMillis) return false
 
-        last.merge(segment, idleDuration)
+        element.merge(segment, idleDuration)
         return true
     }
 
-    @VisibleForTesting
-    fun toList(): List<Element> {
+    fun peek(): List<Element> {
         return deque.toList()
     }
 
-    @VisibleForTesting
+    fun peek(startUptimeMillis: Long, endUptimeMillis: Long): List<Element> {
+        val outcome = mutableListOf<Element>()
+        for (i in deque.lastIndex downTo 0) {
+            val element = deque[i]
+            if (element.startUptimeMillis > endUptimeMillis) continue
+            if (element.endUptimeMillis < startUptimeMillis) break
+            outcome.add(element)
+        }
+        outcome.reverse()
+        return outcome
+    }
+
     class Element {
-        private val end = Segment()
+        val last = Segment()
         var count = 1; private set
         var startMark = 0L; private set
         var startUptimeMillis = 0L; private set
         var startThreadTimeMillis = 0L; private set
         var idleDurationMillis = 0L; private set
 
-        // TODO: 补充移除end，还原prev的处理
-        val isSingle get() = end.isSingle
-        val scene get() = end.scene
-        val endUptimeMillis get() = end.endUptimeMillis
+        val isSingle get() = last.isSingle
+        val scene get() = last.scene
+        val endUptimeMillis get() = last.endUptimeMillis
 
         fun init(segment: Segment) {
             count = 1
@@ -81,13 +88,13 @@ internal class Merger(
             startUptimeMillis = segment.startUptimeMillis
             startThreadTimeMillis = segment.startThreadTimeMillis
             idleDurationMillis = 0L
-            end.copyFrom(segment)
+            last.copyFrom(segment)
         }
 
         fun merge(segment: Segment, idleDuration: Long) {
             count++
             idleDurationMillis += idleDuration
-            end.copyFrom(segment)
+            last.copyFrom(segment)
         }
     }
 }

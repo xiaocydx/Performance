@@ -144,14 +144,14 @@ internal object History {
     fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger? {
         assert(isMainThread())
         if (!isInitialized) return null
-        return Merger(capacity = 2 * 1000, idleThresholdMillis, mergeThresholdMillis)
+        return Merger(capacity = 200, idleThresholdMillis, mergeThresholdMillis)
     }
 
     @MainThread
     fun sampler(looper: Looper, intervalMillis: Long): Sampler? {
         assert(isMainThread())
         if (!isInitialized) return null
-        return Sampler(capacity = 100, looper = looper, intervalMillis = intervalMillis)
+        return Sampler(capacity = 200, looper = looper, intervalMillis = intervalMillis)
     }
 
     @SuppressLint("UnclosedTrace")

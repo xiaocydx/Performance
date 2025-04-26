@@ -24,6 +24,7 @@ import android.app.Application
 import android.os.Build
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.Process.THREAD_PRIORITY_BACKGROUND
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
@@ -185,7 +186,7 @@ object Performance {
             History.init()
             var sampleThread = sampleThread
             if (sampleThread == null) {
-                sampleThread = HandlerThread("PerformanceSampleThread")
+                sampleThread = HandlerThread("PerformanceSampleThread", THREAD_PRIORITY_BACKGROUND)
                 sampleThread.start()
                 sampler = requireHistory(History.sampler(
                     looper = sampleThread.looper,

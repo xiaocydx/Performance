@@ -14,15 +14,24 @@
  * limitations under the License.
  */
 
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER", "CANNOT_OVERRIDE_INVISIBLE_MEMBER")
+
 package com.xiaocydx.performance.analyzer.anr
 
 import android.app.ActivityManager
 import android.app.ActivityManager.ProcessErrorStateInfo
-import android.os.Debug
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.Process
-import android.os.SystemClock
+import android.os.Process.THREAD_PRIORITY_BACKGROUND
+import androidx.annotation.AnyThread
+import androidx.annotation.MainThread
+import androidx.annotation.WorkerThread
+import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.End
+import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.Start
 
 /**
  * @author xcc
@@ -30,71 +39,121 @@ import android.os.SystemClock
  */
 internal class ANRWatchDog(
     private val ams: ActivityManager,
-    private val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS
-) : Thread("PerformanceANRWatchDog") {
-    private val handler = Handler(Looper.getMainLooper())
-    private val detection = Detection()
+    private val intervalMillis: Long = 5000L
+) : LooperCallback {
+    private val anrTask = ANRTask()
+    private val detectionTask = DetectionTask()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val watchDogThread = HandlerThread("PerformanceANRWatchDog", THREAD_PRIORITY_BACKGROUND)
+    private lateinit var watchHandler: Handler
+    private var anrAction: (() -> Unit)? = null
+    private var startUptimeMillis = 0L
 
-    override fun run() {
-        while (!isInterrupted) {
-            detection.post()
-            try {
-                sleep(intervalMillis)
-            } catch (e: InterruptedException) {
-                return
+    fun start(anrAction: () -> Unit) {
+        this.anrAction = anrAction
+        watchDogThread.start()
+        watchHandler = Handler(watchDogThread.looper)
+        detectionTask.post()
+        anrTask.post(intervalMillis)
+    }
+
+    fun stop() {
+        watchDogThread.interrupt()
+        watchDogThread.quit()
+    }
+
+    override fun dispatch(current: DispatchContext) {
+        when (current) {
+            is Start -> {
+                startUptimeMillis = current.uptimeMillis
             }
+            is End -> {
+                if (current.uptimeMillis - startUptimeMillis >= intervalMillis) {
+                    detectionTask.remove()
+                    anrTask.direct()
+                }
+            }
+        }
+    }
 
-            // FIXME: 命中不了
-            if (detection.completeMillis == 0L) {
-                if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) continue
-                var count = 3
+    private inner class DetectionTask : Runnable {
+        @Volatile var isPost = false
+        @Volatile var isComplete = false; private set
+
+        @AnyThread
+        fun post() {
+            if (isPost) return
+            isPost = true
+            isComplete = false
+            mainHandler.post(this)
+        }
+
+        @AnyThread
+        fun remove() {
+            if (!isPost) return
+            isPost = false
+            isComplete = false
+            mainHandler.removeCallbacks(this)
+        }
+
+        @MainThread
+        override fun run() {
+            isPost = false
+            isComplete = true
+        }
+    }
+
+    private inner class ANRTask : Runnable {
+        private var pid = 0
+        @Volatile var isPost = false
+        @Volatile var isRunning = false; private set
+
+        @AnyThread
+        fun post(delayMillis: Long) {
+            if (isPost) return
+            isPost = true
+            watchHandler.postDelayed(this, delayMillis)
+        }
+
+        @AnyThread
+        fun remove() {
+            if (!isPost) return
+            isPost = false
+            watchHandler.removeCallbacks(this)
+        }
+
+        @AnyThread
+        fun direct() {
+            if (anrTask.isRunning) return
+            remove()
+            post(delayMillis = 0)
+        }
+
+        @WorkerThread
+        override fun run() {
+            isPost = false
+            isRunning = true
+            if (!detectionTask.isComplete) {
+                if (pid == 0) pid = Process.myPid()
+                var retryCount = 6
                 var processErrorStateInfo: ProcessErrorStateInfo? = null
-                val pid = Process.myPid()
-                while (count > 0) {
-                    count--
+                while (retryCount > 0) {
+                    retryCount--
                     val processesInErrorState = ams.processesInErrorState
                     processErrorStateInfo = processesInErrorState?.find { it.pid == pid }
                     if (processErrorStateInfo != null) break
                     try {
-                        sleep(1000)
+                        Thread.sleep(500)
                     } catch (e: InterruptedException) {
                         return
                     }
                 }
-                processErrorStateInfo?.let {
-                    println("ANRWatchDog  ${it.shortMsg}, ${it.longMsg},")
-                }
+                val anrAction = anrAction
+                if (processErrorStateInfo != null) anrAction?.invoke()
             }
+            isRunning = false
+            detectionTask.post()
+            post(intervalMillis)
         }
-    }
-
-    override fun interrupt() {
-        super.interrupt()
-        detection.remove()
-    }
-
-    private inner class Detection : Runnable {
-        @Volatile private var isPost = false
-        @Volatile var completeMillis = 0L; private set
-
-        fun post() {
-            if (isPost) return
-            isPost = true
-            completeMillis = 0L
-            handler.post(this)
-        }
-
-        fun remove() {
-            handler.removeCallbacks(this)
-        }
-
-        override fun run() {
-            isPost = false
-            completeMillis = SystemClock.uptimeMillis()
-        }
-    }
-
-    private companion object {
-        const val DEFAULT_INTERVAL_MILLIS = 5000L
     }
 }
