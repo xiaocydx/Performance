@@ -16,7 +16,7 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
-import com.xiaocydx.performance.runtime.history.sample.SampleData
+import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.looper.Scene
 
 /**
@@ -31,7 +31,7 @@ internal class Segment {
     var startThreadTimeMillis = 0L
     var endMark = 0L
     var endUptimeMillis = 0L
-    var sampleData: SampleData? = null
+    var sample: Sample? = null
 
     //region Metadata
     // scene = Scene.Message
@@ -63,7 +63,7 @@ internal class Segment {
         startThreadTimeMillis = segment.startThreadTimeMillis
         endMark = segment.endMark
         endUptimeMillis = segment.endUptimeMillis
-        sampleData = segment.sampleData
+        sample = segment.sample
 
         what = segment.what
         targetName = segment.targetName

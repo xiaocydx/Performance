@@ -109,12 +109,18 @@ internal interface Metadata {
 
 @MainThread
 internal class CompositeLooperCallback : LooperCallback {
+    private var first: LooperCallback? = null
     private var callbacks = mutableListOf<LooperCallback>()
+    private var dispatchingFirst: LooperCallback? = null
     private var dispatchingCallbacks = emptyList<LooperCallback>()
     private var isImmutable = false
 
     fun immutable() {
         isImmutable = true
+    }
+
+    fun setFirst(callback: LooperCallback?) {
+        first = callback
     }
 
     fun add(callback: LooperCallback) {
@@ -138,18 +144,20 @@ internal class CompositeLooperCallback : LooperCallback {
     override fun dispatch(current: DispatchContext) {
         when (current) {
             is Start -> {
+                dispatchingFirst = first
                 dispatchingCallbacks = callbacks
                 dispatchCallbacks { it.dispatch(current) }
             }
             is End -> {
                 dispatchCallbacks { it.dispatch(current) }
                 dispatchingCallbacks = emptyList()
+                dispatchingFirst = null
             }
         }
     }
 
     private inline fun dispatchCallbacks(action: (LooperCallback) -> Unit) {
-        val callbacks = dispatchingCallbacks
-        for (i in 0 until callbacks.size) action(callbacks[i])
+        dispatchingFirst?.apply(action)
+        for (i in 0 until dispatchingCallbacks.size) action(callbacks[i])
     }
 }

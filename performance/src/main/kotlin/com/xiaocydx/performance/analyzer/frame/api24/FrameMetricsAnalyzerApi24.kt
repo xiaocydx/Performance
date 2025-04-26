@@ -23,7 +23,7 @@ import android.view.Window
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresApi
 import androidx.annotation.WorkerThread
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.log
@@ -35,7 +35,7 @@ import kotlin.system.measureTimeMillis
  */
 @RequiresApi(24)
 internal class FrameMetricsAnalyzerApi24(
-    host: Performance.Host,
+    host: Host,
     private val config: FrameMetricsConfig,
 ) : FrameMetricsAnalyzer(host) {
     private val frameMetricsHandler = Handler(host.defaultLooper)

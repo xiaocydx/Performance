@@ -18,7 +18,7 @@ package com.xiaocydx.performance.analyzer.frame.api16
 
 import android.app.Activity
 import android.view.ViewTreeObserver
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.log
@@ -31,7 +31,7 @@ import kotlin.system.measureTimeMillis
  * @date 2025/4/5
  */
 internal class FrameMetricsAnalyzerApi16(
-    host: Performance.Host,
+    host: Host,
     private val config: FrameMetricsConfig,
 ) : FrameMetricsAnalyzer(host) {
     private val choreographerFrameInfo = ChoreographerFrameInfo()

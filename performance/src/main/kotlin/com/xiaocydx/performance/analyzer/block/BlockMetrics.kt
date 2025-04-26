@@ -17,9 +17,9 @@
 package com.xiaocydx.performance.analyzer.block
 
 import android.os.Process
-import com.xiaocydx.performance.runtime.history.sample.SampleData
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.record.Snapshot
+import com.xiaocydx.performance.runtime.history.sample.Sample
 
 /**
  * 卡顿指标
@@ -77,11 +77,11 @@ class BlockMetrics(
      */
     val metadata: String,
     /**
-     * 线程调用栈快照
+     * 调用栈快照
      */
     val snapshot: Snapshot,
     /**
-     * 线程采样数据
+     * 采样数据集合
      */
-    val sampleData: SampleData?
+    val sampleList: List<Sample>
 )

@@ -20,7 +20,7 @@ import android.os.Build
 import android.os.Looper
 import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.log
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import kotlinx.coroutines.flow.filterIsInstance
@@ -53,7 +53,7 @@ internal sealed class LooperWatcher {
 
         @MainThread
         fun init(
-            host: Performance.Host,
+            host: Host,
             callback: LooperCallback,
             resetAfterGC: Boolean = true
         ) {

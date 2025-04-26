@@ -22,34 +22,17 @@ import android.os.SystemClock
  * @author xcc
  * @date 2025/4/24
  */
-class SampleData private constructor(
+class Sample private constructor(
     val uptimeMillis: Long,
     val threadState: Thread.State,
-    // TODO: 改成List
-    val threadStack: Array<StackTraceElement>
+    val threadStack: List<StackTraceElement>
 ) {
 
     companion object {
-        fun now(thread: Thread) = SampleData(
+        fun current(thread: Thread) = Sample(
             uptimeMillis = SystemClock.uptimeMillis(),
             threadState = thread.state,
-            threadStack = thread.stackTrace ?: emptyArray()
+            threadStack = thread.stackTrace.toList()
         )
-    }
-}
-
-internal class SampleTask(private val thread: Thread) : Runnable {
-    @Volatile
-    private var sampleData: SampleData? = null
-
-    override fun run() {
-        sampleData = SampleData.now(thread)
-    }
-
-    fun consume(startUptimeMillis: Long, endUptimeMillis: Long): SampleData? {
-        val sampleData = sampleData ?: return null
-        this.sampleData = null
-        if (sampleData.uptimeMillis !in startUptimeMillis..endUptimeMillis) return null
-        return sampleData
     }
 }

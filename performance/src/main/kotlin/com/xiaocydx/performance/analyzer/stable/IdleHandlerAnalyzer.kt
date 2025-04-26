@@ -19,7 +19,7 @@ package com.xiaocydx.performance.analyzer.stable
 import android.os.Looper
 import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityKey
@@ -33,7 +33,7 @@ import kotlin.coroutines.resume
  * @author xcc
  * @date 2025/3/20
  */
-internal class IdleHandlerAnalyzer(host: Performance.Host) : Analyzer(host) {
+internal class IdleHandlerAnalyzer(host: Host) : Analyzer(host) {
 
     override fun init() {
         coroutineScope.launch {

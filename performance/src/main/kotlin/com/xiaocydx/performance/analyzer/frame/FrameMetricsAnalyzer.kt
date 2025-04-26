@@ -21,7 +21,7 @@ import android.os.Build
 import android.view.Window
 import androidx.annotation.CallSuper
 import androidx.core.view.doOnAttach
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
@@ -34,7 +34,7 @@ import java.lang.ref.WeakReference
  * @author xcc
  * @date 2025/4/5
  */
-internal abstract class FrameMetricsAnalyzer(host: Performance.Host) : Analyzer(host) {
+internal abstract class FrameMetricsAnalyzer(host: Host) : Analyzer(host) {
     protected val frameMetricsListeners = HashMap<ActivityKey, FrameMetricsListener>()
     @Volatile protected var defaultRefreshRate = 60.0f; private set
 
@@ -102,7 +102,7 @@ internal abstract class FrameMetricsAnalyzer(host: Performance.Host) : Analyzer(
     companion object {
 
         fun create(
-            host: Performance.Host,
+            host: Host,
             config: FrameMetricsConfig,
         ) = if (Build.VERSION.SDK_INT >= 24) {
             FrameMetricsAnalyzerApi24(host, config)

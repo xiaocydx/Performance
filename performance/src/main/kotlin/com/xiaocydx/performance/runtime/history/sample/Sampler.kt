@@ -22,6 +22,7 @@ import android.os.SystemClock
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
+import com.xiaocydx.performance.log
 
 /**
  * @author xcc
@@ -30,28 +31,30 @@ import androidx.annotation.WorkerThread
 internal sealed class Sampler(looper: Looper, private val intervalMillis: Long) {
     private val handler = Handler(looper)
     private val sampleTask = SampleTask()
-    @Volatile private var stopUptimeMillis = 0L
+    private val name = javaClass.simpleName ?: ""
+
     @Volatile private var sampleUptimeMillis = 0L
+    @Volatile private var stopUptimeMillis = 0L
 
     protected val mainThread = Looper.getMainLooper().thread
 
     @MainThread
     fun start(uptimeMillis: Long) {
+        resetSampleTime(uptimeMillis, fromTask = false)
         stopUptimeMillis = Long.MAX_VALUE
-        resetSampleUptime(uptimeMillis)
         sampleTask.startIfNecessary()
-        // 代替每次调用handler.postDelayed(sampleTask, intervalMillis)
     }
 
     @MainThread
     fun stop(uptimeMillis: Long) {
         stopUptimeMillis = uptimeMillis
-        // 代替每次调用handler.removeCallbacks(sampleTask)
     }
 
     @AnyThread
-    private fun resetSampleUptime(uptimeMillis: Long) {
-        sampleUptimeMillis = (uptimeMillis + intervalMillis).coerceAtLeast(sampleUptimeMillis)
+    private fun resetSampleTime(uptimeMillis: Long, fromTask: Boolean) {
+        val nextSampleTime = uptimeMillis + intervalMillis
+        sampleUptimeMillis = nextSampleTime.coerceAtLeast(sampleUptimeMillis)
+        log { "$name reset fromTask = $fromTask" }
     }
 
     @WorkerThread
@@ -64,40 +67,46 @@ internal sealed class Sampler(looper: Looper, private val intervalMillis: Long) 
         fun startIfNecessary() {
             if (isStarted) return
             isStarted = true
+            log { "$name start task" }
             handler.postDelayed(this, intervalMillis)
         }
 
         @WorkerThread
         override fun run() {
             var currentTime = SystemClock.uptimeMillis()
-            var stopTime = stopUptimeMillis
-            if (currentTime <= stopTime) {
-                isStarted = false
-                return
-            }
+            if (delay(currentTime)) return
+            if (stop(currentTime)) return
 
-            var sampleTime = sampleUptimeMillis
-            if (currentTime < sampleTime) {
-                handler.postDelayed(this, sampleTime - currentTime)
-                return
-            }
-
+            log { "$name begin" }
             sample()
+            log { "$name end" }
 
             currentTime = SystemClock.uptimeMillis()
-            stopTime = stopUptimeMillis
-            if (currentTime <= stopTime) {
-                isStarted = false
-                return
-            }
+            if (delay(currentTime)) return
+            if (stop(currentTime)) return
 
-            sampleTime = sampleUptimeMillis
-            if (currentTime < sampleTime) {
-                handler.postDelayed(this, sampleTime - currentTime)
-            } else {
-                resetSampleUptime(currentTime)
-                handler.postDelayed(this, intervalMillis)
+            resetSampleTime(currentTime, fromTask = true)
+            handler.postDelayed(this, intervalMillis)
+        }
+
+        private fun delay(currentTime: Long): Boolean {
+            val sampleTime = sampleUptimeMillis
+            if (currentTime < sampleUptimeMillis) {
+                val delayMillis = sampleTime - currentTime
+                handler.postDelayed(this, delayMillis)
+                log { "$name delay ${delayMillis}ms" }
+                return true
             }
+            return false
+        }
+
+        private fun stop(currentTime: Long): Boolean {
+            val isStop = currentTime >= stopUptimeMillis
+            if (isStop) {
+                isStarted = false
+                log { "$name stop task" }
+            }
+            return isStop
         }
     }
 }

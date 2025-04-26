@@ -16,10 +16,8 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.history.sample.SampleData
-import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.history.segment.Segment
 import com.xiaocydx.performance.runtime.looper.DispatchContext
@@ -37,17 +35,17 @@ import kotlinx.coroutines.launch
  * @date 2025/3/27
  */
 internal class ANRMetricsAnalyzer(
-    host: Performance.Host,
+    host: Host,
     private val config: ANRMetricsConfig
 ) : Analyzer(host) {
 
     override fun init() {
         coroutineScope.launch {
-            host.requireHistory(this@ANRMetricsAnalyzer)
-            val callback = Callback(requireNotNull(History.merger(
+            host.registerHistory(this@ANRMetricsAnalyzer)
+            val callback = Callback(host.merger(
                 idleThresholdMillis = config.receiver.idleThresholdMillis,
                 mergeThresholdMillis = config.receiver.mergeThresholdMillis
-            )))
+            ))
             host.addCallback(callback)
             val watchDog = ANRWatchDog(host.ams)
             watchDog.start()
@@ -101,20 +99,11 @@ internal class ANRMetricsAnalyzer(
 
     private inner class Callback(private val merger: Merger) : LooperCallback {
         private val segment = Segment()
-        @Volatile private var sampleData: SampleData? = null
-
-        private fun consumeSampleData(): SampleData? {
-            val sampleData = sampleData ?: return null
-            this.sampleData = null
-            return sampleData
-        }
 
         override fun dispatch(current: DispatchContext) {
             // collectFrom() time << 1ms
             segment.collectFrom(current)
             if (current is End) {
-                // TODO: 减少consumeSampleData()的调用
-                segment.sampleData = consumeSampleData()
                 merger.consume(segment)
             }
         }

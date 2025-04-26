@@ -17,6 +17,8 @@
 package com.xiaocydx.performance.runtime.history.sample
 
 import android.os.Looper
+import androidx.annotation.AnyThread
+import androidx.annotation.WorkerThread
 
 /**
  * @author xcc
@@ -27,8 +29,26 @@ internal class StackSampler(
     looper: Looper,
     intervalMillis: Long
 ) : Sampler(looper, intervalMillis) {
+    private val deque = ArrayDeque<Sample>(capacity)
 
+    @WorkerThread
     override fun sample() {
-        TODO("Not yet implemented")
+        val sample = Sample.current(mainThread)
+        synchronized(deque) {
+            if (deque.size == capacity) deque.removeFirst()
+            deque.add(sample)
+        }
+    }
+
+    @AnyThread
+    fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
+        if (startUptimeMillis > endUptimeMillis) return emptyList()
+        val outcome = mutableListOf<Sample>()
+        synchronized(deque) {
+            deque.forEach {
+                if (it.uptimeMillis in startUptimeMillis..endUptimeMillis) outcome.add(it)
+            }
+        }
+        return outcome
     }
 }

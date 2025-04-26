@@ -19,6 +19,7 @@ package com.xiaocydx.performance.analyzer.block
 import android.app.Application
 import android.util.Log
 import com.xiaocydx.performance.analyzer.block.BlockMetricsReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
+import com.xiaocydx.performance.runtime.history.sample.Sample
 import kotlinx.coroutines.Dispatchers
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,8 +47,7 @@ class BlockMetricsWriter(
 
     override fun receive(metrics: BlockMetrics) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
-            val json = write(metrics)
-            print(metrics, json)
+            print(metrics, write(metrics))
         }
     }
 
@@ -68,15 +68,9 @@ class BlockMetricsWriter(
             put("snapshot", JSONArray().apply {
                 for (i in 0 until snapshot.size) put(snapshot[i].value)
             })
-            if (metrics.sampleData != null) {
-                put("sampleData", JSONObject().apply {
-                    put("uptimeMillis", metrics.sampleData.uptimeMillis)
-                    put("threadState", metrics.sampleData.threadState.name)
-                    put("threadStack", JSONArray().apply {
-                        metrics.sampleData.threadStack.forEach { put(it.toString()) }
-                    })
-                })
-            }
+            put("sampleList", JSONArray().apply {
+                metrics.sampleList.forEach { sample -> put(sample.toJSONObject()) }
+            })
         }
         val result = JSONObject()
         result.put("tag", "BlockMetrics")
@@ -87,13 +81,13 @@ class BlockMetricsWriter(
 
     private fun print(metrics: BlockMetrics, json: JSONObject) {
         json.remove("snapshot")
-        (json.get("sampleData") as JSONObject).remove("threadStack")
-        if (metrics.sampleData != null) {
+        json.remove("sampleList")
+        Log.e(TAG, json.toString(2))
+        for (i in metrics.sampleList.lastIndex downTo 0) {
+            val sample = metrics.sampleList[i]
             val cause = BlockMetricsSampleStack()
-            cause.stackTrace = metrics.sampleData.threadStack
-            Log.e(TAG, json.toString(2), cause)
-        } else {
-            Log.e(TAG, json.toString(2))
+            cause.stackTrace = sample.threadStack.toTypedArray()
+            Log.e(TAG, "Sample${i + 1} { threadState=${sample.threadState} }", cause)
         }
     }
 
@@ -112,9 +106,17 @@ class BlockMetricsWriter(
         return file
     }
 
+    private fun Sample.toJSONObject() = JSONObject().apply {
+        put("uptimeMillis", uptimeMillis)
+        put("threadState", threadState.name)
+        put("threadStack", JSONArray().apply {
+            threadStack.forEach { put(it.toString()) }
+        })
+    }
+
     private companion object {
         const val TAG = "BlockMetricsWriter"
     }
 }
 
-internal class BlockMetricsSampleStack : RuntimeException()
+internal class BlockMetricsSampleStack() : RuntimeException()

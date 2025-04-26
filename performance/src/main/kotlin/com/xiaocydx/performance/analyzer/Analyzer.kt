@@ -16,7 +16,7 @@
 
 package com.xiaocydx.performance.analyzer
 
-import com.xiaocydx.performance.Performance
+import com.xiaocydx.performance.Host
 import kotlinx.coroutines.cancelChildren
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @author xcc
  * @date 2025/4/4
  */
-internal abstract class Analyzer(protected val host: Performance.Host) {
+internal abstract class Analyzer(protected val host: Host) {
     private val isStarted = AtomicBoolean(false)
     protected val coroutineScope = host.createMainScope()
 

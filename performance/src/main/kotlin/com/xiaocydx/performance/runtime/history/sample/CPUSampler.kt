@@ -22,9 +22,12 @@ import android.os.Looper
  * @author xcc
  * @date 2025/4/25
  */
-internal class CPUSampler(looper: Looper, intervalMillis: Long) : Sampler(looper, intervalMillis) {
+internal class CPUSampler(
+    private val capacity: Int,
+    looper: Looper,
+    intervalMillis: Long
+) : Sampler(looper, intervalMillis) {
 
     override fun sample() {
-        TODO("Not yet implemented")
     }
 }

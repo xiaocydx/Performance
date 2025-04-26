@@ -20,10 +20,11 @@ import android.os.Trace
 import android.util.Log
 
 internal const val DEBUG_TAG = "Performance"
-internal const val DEBUG_ENABLED = true
+internal const val DEBUG_ENABLED = false
 internal const val DEBUG_LOG = DEBUG_ENABLED
 internal const val DEBUG_TRACE = DEBUG_ENABLED
 
+// TODO: 整理日志
 internal inline fun log(message: () -> String) {
     if (DEBUG_LOG) Log.d(DEBUG_TAG, message())
 }

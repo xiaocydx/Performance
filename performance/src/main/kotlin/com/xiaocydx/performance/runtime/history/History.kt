@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE")
-
 package com.xiaocydx.performance.runtime.history
 
 import android.annotation.SuppressLint
@@ -29,6 +27,8 @@ import com.xiaocydx.performance.runtime.history.record.Record.Companion.ID_MAX
 import com.xiaocydx.performance.runtime.history.record.Record.Companion.ID_SLICE
 import com.xiaocydx.performance.runtime.history.record.Recorder
 import com.xiaocydx.performance.runtime.history.record.Snapshot
+import com.xiaocydx.performance.runtime.history.sample.CPUSampler
+import com.xiaocydx.performance.runtime.history.sample.StackSampler
 import com.xiaocydx.performance.runtime.history.segment.Merger
 
 /**
@@ -84,7 +84,7 @@ internal object History {
         if (!isRecordEnabled) {
             createRecorder()
             isRecordEnabled = true
-            // volatile写，release recorder != null
+            // volatile write: release (Safe Publication)
             isRecorderCreated = true
         }
         recorder.enter(id, currentMs())
@@ -119,16 +119,18 @@ internal object History {
 
     @AnyThread
     fun latestMark(): Long {
-        // volatile读，acquire recorder != null
-        if (!isRecorderCreated) return NO_MARK
-        return recorder.mark()
+        if (isRecorderCreated) {
+            // volatile read: acquire (Safe Publication)
+            return recorder.mark()
+        }
+        return NO_MARK
     }
 
     @AnyThread
     fun snapshot(startMark: Long, endMark: Long): Snapshot {
         return when {
             startMark < 0 || endMark < 0 -> Snapshot(longArrayOf())
-            // volatile读，acquire recorder != null
+            // volatile read: (Safe Publication)
             !isRecorderCreated -> Snapshot(longArrayOf())
             // 短时间内[startMark, endMark]的数据不被覆盖，可视为不可变。
             // 当调用snapshot(startMark, latestMark())时，不稳定的结果：
@@ -139,9 +141,25 @@ internal object History {
         }
     }
 
+    @MainThread
     fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger? {
+        assert(isMainThread())
         if (!isInitialized) return null
         return Merger(capacity = 2 * 1000, idleThresholdMillis, mergeThresholdMillis)
+    }
+
+    @MainThread
+    fun cpuSampler(looper: Looper, intervalMillis: Long): CPUSampler? {
+        assert(isMainThread())
+        if (!isInitialized) return null
+        return CPUSampler(capacity = 100, looper, intervalMillis)
+    }
+
+    @MainThread
+    fun stackSampler(looper: Looper, intervalMillis: Long): StackSampler? {
+        assert(isMainThread())
+        if (!isInitialized) return null
+        return StackSampler(capacity = 100, looper, intervalMillis)
     }
 
     @SuppressLint("UnclosedTrace")
@@ -151,10 +169,12 @@ internal object History {
         Trace.endSection()
     }
 
+    @Suppress("NOTHING_TO_INLINE")
     private inline fun isMainThread(): Boolean {
         return Thread.currentThread().id == mainThreadId
     }
 
+    @Suppress("NOTHING_TO_INLINE")
     private inline fun currentMs(): Long {
         // 调用一次耗时是2000 ~ 3000ns，
         // 调用至少333次才产生ms级的影响，

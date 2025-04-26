@@ -20,7 +20,7 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
 import android.os.HandlerThread
-import android.os.Looper
+import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
 import com.xiaocydx.performance.analyzer.Analyzer
@@ -31,20 +31,25 @@ import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
-import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityKey
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.record.Snapshot
+import com.xiaocydx.performance.runtime.history.sample.CPUSampler
+import com.xiaocydx.performance.runtime.history.sample.Sample
+import com.xiaocydx.performance.runtime.history.sample.StackSampler
+import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
+import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
+import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * @author xcc
@@ -52,7 +57,6 @@ import kotlinx.coroutines.flow.SharedFlow
  */
 object Performance {
     private val host = HostImpl()
-    private val activityWatcher = ActivityWatcher()
     private var isInitialized = false
 
     @MainThread
@@ -62,35 +66,46 @@ object Performance {
         isInitialized = true
         config.checkProperty()
 
+        host.init(application)
         ReferenceQueueDaemon().start()
-        host.application = application
-        activityWatcher.init(application)
 
         IdleHandlerAnalyzer(host).start()
         config.frameConfig?.let { FrameMetricsAnalyzer.create(host, it).start() }
         config.blockConfig?.let { BlockMetricsAnalyzer(host, it).start() }
         config.anrConfig?.let { ANRMetricsAnalyzer(host, it).start() }
-
-        host.callbacks.immutable()
-        LooperWatcher.init(host, callback = host.callbacks)
+        LooperWatcher.init(host, callback = host.getCallback())
     }
 
     private class HostImpl : Host {
         private val parentJob = SupervisorJob()
         private val dumpThread by lazy { HandlerThread("PerformanceDumpThread").apply { start() } }
         private val defaultThread by lazy { HandlerThread("PerformanceDefaultThread").apply { start() } }
-        val callbacks = CompositeLooperCallback()
-        lateinit var application: Application
+
+        private val callbacks = CompositeLooperCallback()
+        private val activityWatcher = ActivityWatcher()
+        private val analyzers = mutableListOf<Analyzer>()
+        private lateinit var application: Application
+
+        @Volatile
+        private var sampleThread: HandlerThread? = null
+        private lateinit var cpuSampler: CPUSampler
+        private lateinit var stackSampler: StackSampler
 
         override val dumpLooper by lazy { dumpThread.looper!! }
-
         override val defaultLooper by lazy { defaultThread.looper!! }
-
         override val ams by lazy { application.getSystemService(ACTIVITY_SERVICE) as ActivityManager }
-
         override val activityEvent get() = activityWatcher.event
-
         override val isRecordEnabled get() = History.isRecordEnabled
+
+        fun init(application: Application) {
+            this.application = application
+            activityWatcher.init(application)
+        }
+
+        fun getCallback(): LooperCallback {
+            callbacks.immutable()
+            return callbacks
+        }
 
         override fun createMainScope(): CoroutineScope {
             return CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Main.immediate)
@@ -112,45 +127,75 @@ object Performance {
             callbacks.remove(callback)
         }
 
-        override fun requireHistory(analyzer: Analyzer) {
+        override fun registerHistory(analyzer: Analyzer) {
+            if (analyzers.contains(analyzer)) return
+            val beforeEmpty = analyzers.isEmpty()
+            analyzers.add(analyzer)
+
             History.init()
+            var sampleThread = sampleThread
+            if (sampleThread == null) {
+                sampleThread = HandlerThread("PerformanceSampleThread")
+                sampleThread.start()
+                val intervalMillis = 500L
+                cpuSampler = requireNotNull(
+                    value = History.cpuSampler(sampleThread.looper, intervalMillis),
+                    lazyMessage = { "History.init() failure" }
+                )
+                stackSampler = requireNotNull(
+                    value = History.stackSampler(sampleThread.looper, intervalMillis),
+                    lazyMessage = { "History.init() failure" }
+                )
+                // volatile write: release (Safe Publication)
+                this.sampleThread = sampleThread
+            }
+
+            if (beforeEmpty) {
+                callbacks.setFirst(object : LooperCallback {
+                    override fun dispatch(current: DispatchContext) {
+                        when (current) {
+                            is Start -> {
+                                cpuSampler.start(current.uptimeMillis)
+                                stackSampler.start(current.uptimeMillis)
+                            }
+                            is End -> {
+                                cpuSampler.stop(current.uptimeMillis)
+                                stackSampler.stop(current.uptimeMillis)
+                            }
+                        }
+                    }
+                })
+            }
+        }
+
+        override fun unregisterHistory(analyzer: Analyzer) {
+            if (analyzers.remove(analyzer) && analyzers.isEmpty()) {
+                // TODO: 2025/4/26 cancel History.init()
+                val uptimeMillis = SystemClock.uptimeMillis()
+                callbacks.setFirst(callback = null)
+                cpuSampler.stop(uptimeMillis)
+                stackSampler.stop(uptimeMillis)
+            }
+        }
+
+        override fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger {
+            return requireNotNull(
+                value = History.merger(idleThresholdMillis, mergeThresholdMillis),
+                lazyMessage = { "History.init() failure" }
+            )
+        }
+
+        override fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
+            if (sampleThread != null) {
+                // volatile read: acquire (Safe Publication)
+                return stackSampler.sampleList(startUptimeMillis, endUptimeMillis)
+            }
+            return emptyList()
         }
 
         override fun snapshot(startMark: Long, endMark: Long): Snapshot {
             return History.snapshot(startMark, endMark)
         }
-    }
-
-    internal interface Host {
-
-        val dumpLooper: Looper
-
-        val defaultLooper: Looper
-
-        val ams: ActivityManager
-
-        val activityEvent: SharedFlow<ActivityEvent>
-
-        val isRecordEnabled: Boolean
-
-        fun createMainScope(): CoroutineScope
-
-        @MainThread
-        fun getActivity(key: ActivityKey): Activity?
-
-        @MainThread
-        fun getLatestActivity(): Activity?
-
-        @MainThread
-        fun addCallback(callback: LooperCallback)
-
-        @MainThread
-        fun removeCallback(callback: LooperCallback)
-
-        @MainThread
-        fun requireHistory(analyzer: Analyzer)
-
-        fun snapshot(startMark: Long, endMark: Long): Snapshot
     }
 
     data class Config(
