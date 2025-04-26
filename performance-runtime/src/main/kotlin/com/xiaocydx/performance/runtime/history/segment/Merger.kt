@@ -22,7 +22,7 @@ import androidx.annotation.VisibleForTesting
  * @author xcc
  * @date 2025/4/23
  */
-internal class Merger internal constructor(
+internal class Merger(
     private val capacity: Int,
     private val idleThresholdMillis: Long,
     private val mergeThresholdMillis: Long,

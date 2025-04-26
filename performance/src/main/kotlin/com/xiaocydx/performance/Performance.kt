@@ -28,6 +28,7 @@ import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.analyzer.SampleConfig
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsConfig
 import com.xiaocydx.performance.analyzer.block.BlockMetricsAnalyzer
@@ -79,17 +80,17 @@ object Performance {
         isInitialized = true
         config.checkProperty()
 
-        host.init(application)
+        host.init(application, config)
         ReferenceQueueDaemon().start()
 
         IdleHandlerAnalyzer(host).start()
         config.frameConfig?.let { FrameMetricsAnalyzer.create(host, it).start() }
         config.blockConfig?.let { BlockMetricsAnalyzer(host, it).start() }
         config.anrConfig?.let { ANRMetricsAnalyzer(host, it).start() }
-        installLooperWatcher()
+        setupLooperWatcher()
     }
 
-    private fun installLooperWatcher() {
+    private fun setupLooperWatcher() {
         val mainQueue = Looper.myQueue()
         val mainLooper = Looper.getMainLooper()
         val dispatcher = LooperDispatcher(host.getCallback())
@@ -134,6 +135,7 @@ object Performance {
         private val activityWatcher = ActivityWatcher()
         private val analyzers = mutableListOf<Analyzer>()
         private lateinit var application: Application
+        private lateinit var config: Config
 
         @Volatile
         private var sampleThread: HandlerThread? = null
@@ -146,8 +148,9 @@ object Performance {
         override val activityEvent get() = activityWatcher.event
         override val isRecordEnabled get() = History.isRecordEnabled
 
-        fun init(application: Application) {
+        fun init(application: Application, config: Config) {
             this.application = application
+            this.config = config
             activityWatcher.init(application)
         }
 
@@ -186,15 +189,14 @@ object Performance {
             if (sampleThread == null) {
                 sampleThread = HandlerThread("PerformanceSampleThread")
                 sampleThread.start()
-                val intervalMillis = 500L
-                cpuSampler = requireNotNull(
-                    value = History.cpuSampler(sampleThread.looper, intervalMillis),
-                    lazyMessage = { "History.init() failure" }
-                )
-                stackSampler = requireNotNull(
-                    value = History.stackSampler(sampleThread.looper, intervalMillis),
-                    lazyMessage = { "History.init() failure" }
-                )
+                cpuSampler = requireHistory(History.cpuSampler(
+                    looper = sampleThread.looper,
+                    intervalMillis = config.sampleConfig.cpuIntervalMillis
+                ))
+                stackSampler = requireHistory(History.stackSampler(
+                    looper = sampleThread.looper,
+                    intervalMillis = config.sampleConfig.stackIntervalMillis
+                ))
                 // volatile write: release (Safe Publication)
                 this.sampleThread = sampleThread
             }
@@ -226,10 +228,7 @@ object Performance {
         }
 
         override fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger {
-            return requireNotNull(
-                value = History.merger(idleThresholdMillis, mergeThresholdMillis),
-                lazyMessage = { "History.init() failure" }
-            )
+            return requireHistory(History.merger(idleThresholdMillis, mergeThresholdMillis))
         }
 
         override fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
@@ -243,9 +242,14 @@ object Performance {
         override fun snapshot(startMark: Long, endMark: Long): Snapshot {
             return History.snapshot(startMark, endMark)
         }
+
+        private fun <T : Any> requireHistory(value: T?): T {
+            return requireNotNull(value) { "History.init() failure" }
+        }
     }
 
     data class Config(
+        val sampleConfig: SampleConfig = SampleConfig(),
         val frameConfig: FrameMetricsConfig? = null,
         val blockConfig: BlockMetricsConfig? = null,
         val anrConfig: ANRMetricsConfig? = null
