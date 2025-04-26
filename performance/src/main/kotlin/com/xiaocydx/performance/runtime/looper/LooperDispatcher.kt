@@ -67,8 +67,9 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         override var uptimeMillis = 0L
         override var threadTimeMillis = 0L
         override val metadata = MetadataImpl()
-        override val isFromActivityThread: Boolean
-            get() = dispatchActivityThreadMessage
+        override fun isFrom(source: Source) = when (source) {
+            Source.ActivityThread -> dispatchActivityThreadMessage
+        }
     }
 
     private class EndImpl : End {
@@ -76,8 +77,9 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         override var scene = Scene.Message
         override var uptimeMillis = 0L
         override val metadata = MetadataImpl()
-        override val isFromActivityThread: Boolean
-            get() = dispatchActivityThreadMessage
+        override fun isFrom(source: Source) = when (source) {
+            Source.ActivityThread -> dispatchActivityThreadMessage
+        }
     }
 
     private class MetadataImpl(var value: Any? = null) : Metadata {

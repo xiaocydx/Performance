@@ -42,7 +42,6 @@ import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.sample.StackSampler
 import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
-import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
@@ -151,20 +150,18 @@ object Performance {
             }
 
             if (beforeEmpty) {
-                callbacks.setFirst(object : LooperCallback {
-                    override fun dispatch(current: DispatchContext) {
-                        when (current) {
-                            is Start -> {
-                                cpuSampler.start(current.uptimeMillis)
-                                stackSampler.start(current.uptimeMillis)
-                            }
-                            is End -> {
-                                cpuSampler.stop(current.uptimeMillis)
-                                stackSampler.stop(current.uptimeMillis)
-                            }
+                callbacks.setFirst { current ->
+                    when (current) {
+                        is Start -> {
+                            cpuSampler.start(current.uptimeMillis)
+                            stackSampler.start(current.uptimeMillis)
+                        }
+                        is End -> {
+                            cpuSampler.stop(current.uptimeMillis)
+                            stackSampler.stop(current.uptimeMillis)
                         }
                     }
-                })
+                }
             }
         }
 

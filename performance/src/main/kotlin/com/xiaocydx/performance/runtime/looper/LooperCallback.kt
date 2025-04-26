@@ -33,7 +33,7 @@ import com.xiaocydx.performance.runtime.history.History
  * @author xcc
  * @date 2025/3/27
  */
-internal interface LooperCallback {
+internal fun interface LooperCallback {
 
     fun dispatch(current: DispatchContext)
 }
@@ -51,9 +51,9 @@ internal sealed interface DispatchContext {
     val uptimeMillis: Long
 
     /**
-     * 是否来自`android.app.ActivityThread`
+     * 是否来自[source]
      */
-    val isFromActivityThread: Boolean
+    fun isFrom(source: Source): Boolean
 }
 
 internal interface Start : DispatchContext {
@@ -95,6 +95,10 @@ internal interface End : DispatchContext {
 
 internal enum class Scene {
     Message, IdleHandler, NativeTouch
+}
+
+internal enum class Source {
+    ActivityThread, // Choreographer, ViewRootImpl
 }
 
 internal interface Metadata {
