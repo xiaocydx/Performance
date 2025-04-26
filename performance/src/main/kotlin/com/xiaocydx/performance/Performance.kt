@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
 package com.xiaocydx.performance
 
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
+import android.os.Build
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
@@ -31,6 +35,7 @@ import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
+import com.xiaocydx.performance.runtime.activity.ActivityEvent
 import com.xiaocydx.performance.runtime.activity.ActivityKey
 import com.xiaocydx.performance.runtime.activity.ActivityWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
@@ -44,11 +49,20 @@ import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.LooperDispatcher
+import com.xiaocydx.performance.runtime.looper.LooperIdleHandlerWatcher
+import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi
+import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi29
+import com.xiaocydx.performance.runtime.looper.LooperNativeTouchWatcher
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
 import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * @author xcc
@@ -72,7 +86,43 @@ object Performance {
         config.frameConfig?.let { FrameMetricsAnalyzer.create(host, it).start() }
         config.blockConfig?.let { BlockMetricsAnalyzer(host, it).start() }
         config.anrConfig?.let { ANRMetricsAnalyzer(host, it).start() }
-        LooperWatcher.init(host, callback = host.getCallback())
+        installLooperWatcher()
+    }
+
+    private fun installLooperWatcher() {
+        val mainQueue = Looper.myQueue()
+        val mainLooper = Looper.getMainLooper()
+        val dispatcher = LooperDispatcher(host.getCallback())
+        val scope = host.createMainScope()
+        scope.launch {
+            while (true) {
+                val watcher = if (Build.VERSION.SDK_INT < 29) {
+                    LooperMessageWatcherApi.setup(mainLooper, dispatcher)
+                } else {
+                    runCatching { LooperMessageWatcherApi29.setupOrThrow(mainLooper, dispatcher) }
+                        .getOrNull() ?: LooperMessageWatcherApi.setup(mainLooper, dispatcher)
+                }
+                watcher.awaitGC()
+            }
+        }
+
+        scope.launch {
+            while (true) {
+                val watcher = LooperIdleHandlerWatcher.setup(mainQueue, dispatcher)
+                watcher.awaitGC()
+            }
+        }
+
+        scope.launch {
+            host.activityEvent.filterIsInstance<ActivityEvent.Created>().collect {
+                val activity = host.getActivity(it.activityKey) ?: return@collect
+                LooperNativeTouchWatcher.setup(activity.window, dispatcher)
+            }
+        }
+    }
+
+    private suspend fun LooperWatcher.awaitGC() {
+        suspendCancellableCoroutine { cont -> trackGC { cont.resume(Unit) } }
     }
 
     private class HostImpl : Host {

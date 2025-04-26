@@ -4,12 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "com.xiaocydx.performance"
+    namespace = "com.xiaocydx.performance.runtime"
     compileSdk = 34
 
     defaultConfig {
         minSdk = 21
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
@@ -28,8 +30,8 @@ android {
 }
 
 dependencies {
-    api(project(":performance-runtime"))
+    implementation(project(":performance-fake"))
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    testImplementation("com.google.truth:truth:1.1.3")
 }

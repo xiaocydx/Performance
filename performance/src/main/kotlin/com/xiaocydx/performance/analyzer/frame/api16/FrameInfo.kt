@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
 package com.xiaocydx.performance.analyzer.frame.api16
+
+import com.xiaocydx.performance.runtime.choreographer.ChoreographerFrameInfo
 
 /**
  * @author xcc

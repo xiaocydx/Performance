@@ -22,7 +22,7 @@ import android.view.Choreographer
  * @author xcc
  * @date 2025/4/7
  */
-class FakeChoreographer(private val choreographer: Choreographer) {
+internal class FakeChoreographer(private val choreographer: Choreographer) {
     private val mLock = mLockField?.get(choreographer)
 
     fun checkStubAvailable(): Boolean {

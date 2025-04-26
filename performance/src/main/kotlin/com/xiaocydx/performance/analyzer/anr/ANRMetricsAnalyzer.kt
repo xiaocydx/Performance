@@ -14,19 +14,18 @@
  * limitations under the License.
  */
 
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER", "CANNOT_OVERRIDE_INVISIBLE_MEMBER")
+
 package com.xiaocydx.performance.analyzer.anr
 
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.history.segment.Segment
+import com.xiaocydx.performance.runtime.history.segment.collectFrom
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
-import com.xiaocydx.performance.runtime.looper.Scene.IdleHandler
-import com.xiaocydx.performance.runtime.looper.Scene.Message
-import com.xiaocydx.performance.runtime.looper.Scene.NativeTouch
-import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
@@ -54,45 +53,6 @@ internal class ANRMetricsAnalyzer(
             } finally {
                 watchDog.interrupt()
                 host.removeCallback(callback)
-            }
-        }
-    }
-
-    private fun Segment.collectFrom(current: DispatchContext) {
-        when (current) {
-            is Start -> {
-                scene = current.scene
-                startMark = current.mark
-                startUptimeMillis = current.uptimeMillis
-                startThreadTimeMillis = current.threadTimeMillis
-            }
-            is End -> {
-                endMark = current.mark
-                endUptimeMillis = current.uptimeMillis
-                when (current.scene) {
-                    Message -> {
-                        current.metadata.asMessageLog()?.let {
-                            log = it
-                            return
-                        }
-                        val message = current.metadata.asMessage()!!
-                        what = message.what
-                        targetName = message.target?.javaClass?.name ?: "" // null is barrier
-                        callbackName = message.callback?.javaClass?.name ?: ""
-                        arg1 = message.arg1
-                        arg2 = message.arg2
-                    }
-                    IdleHandler -> {
-                        val idleHandler = current.metadata.asIdleHandler()!!
-                        idleHandlerName = idleHandler.javaClass.name ?: ""
-                    }
-                    NativeTouch -> {
-                        val motionEvent = current.metadata.asMotionEvent()!!
-                        action = motionEvent.action
-                        x = motionEvent.x
-                        y = motionEvent.y
-                    }
-                }
             }
         }
     }

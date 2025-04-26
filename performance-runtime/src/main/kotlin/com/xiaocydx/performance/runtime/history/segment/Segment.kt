@@ -17,7 +17,13 @@
 package com.xiaocydx.performance.runtime.history.segment
 
 import com.xiaocydx.performance.runtime.history.sample.Sample
+import com.xiaocydx.performance.runtime.looper.DispatchContext
+import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.Scene
+import com.xiaocydx.performance.runtime.looper.Scene.IdleHandler
+import com.xiaocydx.performance.runtime.looper.Scene.Message
+import com.xiaocydx.performance.runtime.looper.Scene.NativeTouch
+import com.xiaocydx.performance.runtime.looper.Start
 
 /**
  * @author xcc
@@ -78,5 +84,44 @@ internal class Segment {
 
     private companion object {
         val emptySegment = Segment()
+    }
+}
+
+internal fun Segment.collectFrom(current: DispatchContext) {
+    when (current) {
+        is Start -> {
+            scene = current.scene
+            startMark = current.mark
+            startUptimeMillis = current.uptimeMillis
+            startThreadTimeMillis = current.threadTimeMillis
+        }
+        is End -> {
+            endMark = current.mark
+            endUptimeMillis = current.uptimeMillis
+            when (current.scene) {
+                Message -> {
+                    current.metadata.asMessageLog()?.let {
+                        log = it
+                        return
+                    }
+                    val message = current.metadata.asMessage()!!
+                    what = message.what
+                    targetName = message.target?.javaClass?.name ?: "" // null is barrier
+                    callbackName = message.callback?.javaClass?.name ?: ""
+                    arg1 = message.arg1
+                    arg2 = message.arg2
+                }
+                IdleHandler -> {
+                    val idleHandler = current.metadata.asIdleHandler()!!
+                    idleHandlerName = idleHandler.javaClass.name ?: ""
+                }
+                NativeTouch -> {
+                    val motionEvent = current.metadata.asMotionEvent()!!
+                    action = motionEvent.action
+                    x = motionEvent.x
+                    y = motionEvent.y
+                }
+            }
+        }
     }
 }

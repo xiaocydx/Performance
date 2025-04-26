@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.frame.api16
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
+package com.xiaocydx.performance.runtime.choreographer
 
 import android.view.Choreographer
 import androidx.annotation.MainThread
@@ -103,7 +105,7 @@ internal class ChoreographerFrameInfo {
         override fun dispatch(current: DispatchContext) {
             if (current.scene != Scene.Message) return
             when (current) {
-                is Start -> markInputStart()
+                is Start -> markFrameStart()
                 is End -> markFrameEnd()
             }
         }

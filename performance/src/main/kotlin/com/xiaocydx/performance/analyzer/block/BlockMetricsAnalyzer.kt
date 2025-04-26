@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress("ReplaceManualRangeWithIndicesCalls")
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER", "CANNOT_OVERRIDE_INVISIBLE_MEMBER")
 
 package com.xiaocydx.performance.analyzer.block
 

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
 package com.xiaocydx.performance.analyzer.frame.api24
 
 import android.app.Activity
@@ -26,7 +28,7 @@ import androidx.annotation.WorkerThread
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
-import com.xiaocydx.performance.log
+import com.xiaocydx.performance.runtime.Logger
 import kotlin.system.measureTimeMillis
 
 /**
@@ -38,6 +40,7 @@ internal class FrameMetricsAnalyzerApi24(
     host: Host,
     private val config: FrameMetricsConfig,
 ) : FrameMetricsAnalyzer(host) {
+    private val logger = Logger(javaClass)
     private val frameMetricsHandler = Handler(host.defaultLooper)
 
     override fun createListener(activity: Activity): FrameMetricsListener {
@@ -79,7 +82,7 @@ internal class FrameMetricsAnalyzerApi24(
                 dispatchAggregators { it.makeEnd(ignoreIntervalMillis = false) }
             }
             if (timeMillis > 1) {
-                log { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
+                logger.debug { "FrameMetricsListener dispatchAggregators timeMillis = $timeMillis" }
             }
         }
     }

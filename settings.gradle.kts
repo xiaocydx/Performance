@@ -23,6 +23,7 @@ dependencyResolutionManagement {
 rootProject.name = "Performance"
 include(":app")
 include(":performance")
+include(":performance-runtime")
 include(":performance-fake")
 include(":performance-stub")
 include(":performance-plugin")
