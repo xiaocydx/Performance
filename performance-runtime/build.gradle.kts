@@ -31,7 +31,7 @@ android {
 
 dependencies {
     implementation(project(":performance-fake"))
-    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.appcompat:appcompat:1.2.0")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
     testImplementation("com.google.truth:truth:1.1.3")
 }

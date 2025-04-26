@@ -22,9 +22,9 @@ import android.app.Activity
 import android.os.Build
 import android.view.Window
 import androidx.annotation.CallSuper
-import androidx.core.view.doOnAttach
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.analyzer.doOnAttach
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
 import com.xiaocydx.performance.runtime.activity.ActivityEvent

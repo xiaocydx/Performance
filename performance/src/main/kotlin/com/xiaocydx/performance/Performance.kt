@@ -44,8 +44,8 @@ import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.record.Snapshot
-import com.xiaocydx.performance.runtime.history.sample.Sampler
 import com.xiaocydx.performance.runtime.history.sample.Sample
+import com.xiaocydx.performance.runtime.history.sample.Sampler
 import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
 import com.xiaocydx.performance.runtime.looper.End
@@ -60,6 +60,7 @@ import com.xiaocydx.performance.runtime.looper.Start
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -144,13 +145,13 @@ object Performance {
         override val dumpLooper by lazy { dumpThread.looper!! }
         override val defaultLooper by lazy { defaultThread.looper!! }
         override val ams by lazy { application.getSystemService(ACTIVITY_SERVICE) as ActivityManager }
-        override val activityEvent get() = activityWatcher.event
+        override val activityEvent = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
         override val isRecordEnabled get() = History.isRecordEnabled
 
         fun init(application: Application, config: Config) {
             this.application = application
             this.config = config
-            activityWatcher.init(application)
+            activityWatcher.init(application, send = activityEvent::tryEmit)
         }
 
         fun getCallback(): LooperCallback {

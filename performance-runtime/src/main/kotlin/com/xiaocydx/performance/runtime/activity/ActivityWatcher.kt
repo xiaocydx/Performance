@@ -21,8 +21,6 @@ import android.app.Application
 import android.os.Bundle
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.assertMainThread
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * @author xcc
@@ -30,45 +28,42 @@ import kotlinx.coroutines.flow.asSharedFlow
  */
 internal class ActivityWatcher {
     private val map = HashMap<ActivityKey, Activity>()
-    private val _event = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
     private var latestKey: ActivityKey? = null
 
-    val event = _event.asSharedFlow()
-
     @MainThread
-    fun init(application: Application) {
+    fun init(application: Application, send: (ActivityEvent) -> Unit) {
         assertMainThread()
         application.registerActivityLifecycleCallbacks(
             object : Application.ActivityLifecycleCallbacks {
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
                     val event = ActivityEvent.Created(activity)
                     map[event.activityKey] = activity
-                    _event.tryEmit(event)
+                    send(event)
                 }
 
                 override fun onActivityStarted(activity: Activity) {
-                    _event.tryEmit(ActivityEvent.Started(activity))
+                    send(ActivityEvent.Started(activity))
                 }
 
                 override fun onActivityResumed(activity: Activity) {
                     val event = ActivityEvent.Resumed(activity)
                     latestKey = event.activityKey
-                    _event.tryEmit(event)
+                    send(event)
                 }
 
                 override fun onActivityPaused(activity: Activity) {
-                    _event.tryEmit(ActivityEvent.Paused(activity))
+                    send(ActivityEvent.Paused(activity))
                 }
 
                 override fun onActivityStopped(activity: Activity) {
-                    _event.tryEmit(ActivityEvent.Stopped(activity))
+                    send(ActivityEvent.Stopped(activity))
                 }
 
                 override fun onActivityDestroyed(activity: Activity) {
                     val event = ActivityEvent.Destroyed(activity)
                     if (event.activityKey == latestKey) latestKey = null
                     map.remove(event.activityKey)
-                    _event.tryEmit(event)
+                    send(event)
                 }
 
                 override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
