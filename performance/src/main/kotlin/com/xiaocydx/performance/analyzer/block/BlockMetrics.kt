@@ -46,14 +46,6 @@ class BlockMetrics(
      */
     val latestActivity: String,
     /**
-     * 主线程priority值
-     */
-    val priority: Int,
-    /**
-     * 主线程nice值
-     */
-    val nice: Int,
-    /**
      * 创建时间
      */
     val createTimeMillis: Long,

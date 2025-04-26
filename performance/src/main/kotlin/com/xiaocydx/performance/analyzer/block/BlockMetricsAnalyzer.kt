@@ -23,7 +23,7 @@ import android.os.Process
 import android.os.SystemClock
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.history.sample.ProcStat
+import com.xiaocydx.performance.runtime.history.sample.ProcSysStat
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -110,14 +110,12 @@ internal class BlockMetricsAnalyzer(
             val createTimeMillis = System.currentTimeMillis()
             val snapshot = host.snapshot(startMark, endMark)
             val sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
-            val procStat = ProcStat.get(Process.myPid())
+            ProcSysStat.read()
             receiver.receive(BlockMetrics(
                 pid = Process.myPid(),
                 tid = Process.myPid(), // 主线程的tid跟pid一致
                 scene = scene,
                 latestActivity = latestActivity,
-                priority = procStat.priority,
-                nice = procStat.nice,
                 createTimeMillis = createTimeMillis,
                 thresholdMillis = thresholdMillis,
                 wallDurationMillis = endUptimeMillis - startUptimeMillis,

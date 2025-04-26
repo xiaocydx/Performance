@@ -19,6 +19,7 @@ package com.xiaocydx.performance.analyzer.block
 import android.app.Application
 import android.util.Log
 import com.xiaocydx.performance.analyzer.block.BlockMetricsReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
+import com.xiaocydx.performance.runtime.history.sample.CPUData
 import com.xiaocydx.performance.runtime.history.sample.Sample
 import kotlinx.coroutines.Dispatchers
 import org.json.JSONArray
@@ -57,8 +58,6 @@ class BlockMetricsWriter(
             put("tid", tid)
             put("scene", scene)
             put("latestActivity", latestActivity)
-            put("priority", priority)
-            put("nice", nice)
             put("createTimeMillis", createTimeMillis)
             put("thresholdMillis", thresholdMillis)
             put("wallDurationMillis", wallDurationMillis)
@@ -87,7 +86,10 @@ class BlockMetricsWriter(
             val sample = metrics.sampleList[i]
             val cause = BlockMetricsSampleStack()
             cause.stackTrace = sample.threadStack.toTypedArray()
-            Log.e(TAG, "Sample${i + 1} { threadState=${sample.threadState} }", cause)
+            val msg = sample.copy(threadStack = emptyList()).toString()
+                .replace("Sample", "Sample${i + 1}")
+                .replace(", threadStack=[]", "")
+            Log.e(TAG, msg, cause)
         }
     }
 
@@ -108,10 +110,23 @@ class BlockMetricsWriter(
 
     private fun Sample.toJSONObject() = JSONObject().apply {
         put("uptimeMillis", uptimeMillis)
-        put("threadState", threadState.name)
+        put("intervalMillis", intervalMillis)
+        put("priority", priority)
+        put("nice", nice)
+        cpuData?.let { put("cpuData", it.toJSONObject()) }
+        put("threadState", threadState)
         put("threadStack", JSONArray().apply {
             threadStack.forEach { put(it.toString()) }
         })
+    }
+
+    private fun CPUData.toJSONObject() = JSONObject().apply {
+        put("cpu", cpu)
+        put("user", user)
+        put("system", system)
+        put("idle", idle)
+        put("iowait", iowait)
+        put("app", app)
     }
 
     private companion object {

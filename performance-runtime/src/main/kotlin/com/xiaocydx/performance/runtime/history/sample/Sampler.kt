@@ -18,6 +18,7 @@ package com.xiaocydx.performance.runtime.history.sample
 
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.SystemClock
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
@@ -28,15 +29,19 @@ import com.xiaocydx.performance.runtime.Logger
  * @author xcc
  * @date 2025/4/25
  */
-internal sealed class Sampler(looper: Looper, private val intervalMillis: Long) {
+internal class Sampler(
+    looper: Looper,
+    private val capacity: Int,
+    private val intervalMillis: Long
+) {
     private val handler = Handler(looper)
     private val sampleTask = SampleTask()
     private val logger = Logger(javaClass)
+    private val mainThread = Looper.getMainLooper().thread
+    private val sampleDeque = ArrayDeque<Sample>(capacity)
 
     @Volatile private var sampleUptimeMillis = 0L
     @Volatile private var stopUptimeMillis = 0L
-
-    protected val mainThread = Looper.getMainLooper().thread
 
     @MainThread
     fun start(uptimeMillis: Long) {
@@ -57,10 +62,29 @@ internal sealed class Sampler(looper: Looper, private val intervalMillis: Long) 
         logger.debug { "reset fromTask = $fromTask" }
     }
 
-    @WorkerThread
-    protected abstract fun sample()
+    @AnyThread
+    fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
+        if (startUptimeMillis > endUptimeMillis) return emptyList()
+        val outcome = mutableListOf<Sample>()
+        synchronized(sampleDeque) {
+            sampleDeque.forEach {
+                if (it.uptimeMillis in startUptimeMillis..endUptimeMillis) outcome.add(it)
+            }
+        }
+        return outcome
+    }
+
+    private fun addSample(sample: Sample) {
+        synchronized(sampleDeque) {
+            if (sampleDeque.size == capacity) sampleDeque.removeFirst()
+            sampleDeque.add(sample)
+        }
+    }
 
     private inner class SampleTask : Runnable {
+        private var pid = 0
+        private var lastSysStat: ProcSysStat? = null
+        private var lastPidStat: ProcPidStat? = null
         @Volatile private var isStarted = false
 
         @MainThread
@@ -107,6 +131,45 @@ internal sealed class Sampler(looper: Looper, private val intervalMillis: Long) 
                 logger.debug { "stop task" }
             }
             return isStop
+        }
+
+        private fun sample() {
+            val uptimeMillis = SystemClock.uptimeMillis()
+            val threadState = mainThread.state.toString()
+            val threadStack = mainThread.stackTrace.toList()
+
+            if (pid == 0) pid = Process.myPid()
+            val sysStat = ProcSysStat.read()
+            val pidStat = ProcPidStat.read(pid)
+            val lastSysStat = lastSysStat
+            val lastPidStat = lastPidStat
+
+            var cpuData: CPUData? = null
+            if (sysStat.isAvailable
+                    && pidStat.isAvailable
+                    && lastSysStat?.isAvailable == true
+                    && lastPidStat?.isAvailable == true) {
+                val total = sysStat.total - lastSysStat.total
+                cpuData = CPUData(
+                    cpu = "${(total - (sysStat.idle - lastSysStat.idle)) * 100f / total}%",
+                    user = "${(sysStat.user - lastSysStat.user) * 100f / total}%",
+                    system = "${(sysStat.system - lastSysStat.system) * 100f / total}%",
+                    idle = "${(sysStat.idle - lastSysStat.idle) * 100f / total}%",
+                    iowait = "${(sysStat.iowait - lastSysStat.iowait) * 100f / total}%",
+                    app = "${(pidStat.total - lastPidStat.total) * 100f / total}%"
+                )
+            }
+
+            var priority = ""
+            var nice = ""
+            if (pidStat.isAvailable) {
+                priority = pidStat.priority.toString()
+                nice = pidStat.nice.toString()
+            }
+
+            this.lastSysStat = sysStat
+            this.lastPidStat = pidStat
+            addSample(Sample(uptimeMillis, intervalMillis, priority, nice, cpuData, threadState, threadStack))
         }
     }
 }

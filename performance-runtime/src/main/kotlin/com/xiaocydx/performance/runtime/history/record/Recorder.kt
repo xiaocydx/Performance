@@ -45,7 +45,7 @@ internal class Recorder(private val capacity: Int) {
         if (!Mark.checkRange(start, latest)
                 || !Mark.checkRange(end, latest)
                 || !Mark.checkRange(start, end)) {
-            return Snapshot(longArrayOf())
+            return Snapshot()
         }
 
         val outcome: LongArray
@@ -61,11 +61,7 @@ internal class Recorder(private val capacity: Int) {
             System.arraycopy(buffer, 0, outcome, firstSize, secondSize)
         }
 
-        return if (outcome.isNotEmpty() && outcome[0] == 0L) {
-            Snapshot(longArrayOf())
-        } else {
-            Snapshot(outcome)
-        }
+        return if (outcome.isNotEmpty() && outcome[0] == 0L) Snapshot() else Snapshot(outcome)
     }
 
     private fun record(id: Int, timeMs: Long, isEnter: Boolean) {

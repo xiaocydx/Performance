@@ -43,9 +43,8 @@ import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.record.Snapshot
-import com.xiaocydx.performance.runtime.history.sample.CPUSampler
+import com.xiaocydx.performance.runtime.history.sample.Sampler
 import com.xiaocydx.performance.runtime.history.sample.Sample
-import com.xiaocydx.performance.runtime.history.sample.StackSampler
 import com.xiaocydx.performance.runtime.history.segment.Merger
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
 import com.xiaocydx.performance.runtime.looper.End
@@ -139,8 +138,7 @@ object Performance {
 
         @Volatile
         private var sampleThread: HandlerThread? = null
-        private lateinit var cpuSampler: CPUSampler
-        private lateinit var stackSampler: StackSampler
+        private lateinit var sampler: Sampler
 
         override val dumpLooper by lazy { dumpThread.looper!! }
         override val defaultLooper by lazy { defaultThread.looper!! }
@@ -189,13 +187,9 @@ object Performance {
             if (sampleThread == null) {
                 sampleThread = HandlerThread("PerformanceSampleThread")
                 sampleThread.start()
-                cpuSampler = requireHistory(History.cpuSampler(
+                sampler = requireHistory(History.sampler(
                     looper = sampleThread.looper,
-                    intervalMillis = config.sampleConfig.cpuIntervalMillis
-                ))
-                stackSampler = requireHistory(History.stackSampler(
-                    looper = sampleThread.looper,
-                    intervalMillis = config.sampleConfig.stackIntervalMillis
+                    intervalMillis = config.sampleConfig.intervalMillis
                 ))
                 // volatile write: release (Safe Publication)
                 this.sampleThread = sampleThread
@@ -204,14 +198,8 @@ object Performance {
             if (beforeEmpty) {
                 callbacks.setFirst { current ->
                     when (current) {
-                        is Start -> {
-                            cpuSampler.start(current.uptimeMillis)
-                            stackSampler.start(current.uptimeMillis)
-                        }
-                        is End -> {
-                            cpuSampler.stop(current.uptimeMillis)
-                            stackSampler.stop(current.uptimeMillis)
-                        }
+                        is Start -> sampler.start(current.uptimeMillis)
+                        is End -> sampler.stop(current.uptimeMillis)
                     }
                 }
             }
@@ -222,8 +210,7 @@ object Performance {
                 // TODO: 2025/4/26 cancel History.init()
                 val uptimeMillis = SystemClock.uptimeMillis()
                 callbacks.setFirst(callback = null)
-                cpuSampler.stop(uptimeMillis)
-                stackSampler.stop(uptimeMillis)
+                sampler.stop(uptimeMillis)
             }
         }
 
@@ -234,7 +221,7 @@ object Performance {
         override fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
             if (sampleThread != null) {
                 // volatile read: acquire (Safe Publication)
-                return stackSampler.sampleList(startUptimeMillis, endUptimeMillis)
+                return sampler.sampleList(startUptimeMillis, endUptimeMillis)
             }
             return emptyList()
         }
@@ -256,6 +243,7 @@ object Performance {
     ) {
 
         internal fun checkProperty() {
+            sampleConfig.checkProperty()
             frameConfig?.checkProperty()
             blockConfig?.checkProperty()
             anrConfig?.checkProperty()

@@ -21,7 +21,6 @@ package com.xiaocydx.performance.runtime.looper
 import android.os.Looper
 import android.os.Message
 import android.os.MessageQueue.IdleHandler
-import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.assertMainThread
@@ -40,19 +39,10 @@ internal fun interface LooperCallback {
 
 internal sealed interface DispatchContext {
 
-    /**
-     * 处理的场景
-     */
     val scene: Scene
 
-    /**
-     * [LooperCallback.dispatch]的[SystemClock.uptimeMillis]
-     */
     val uptimeMillis: Long
 
-    /**
-     * 是否来自[source]
-     */
     fun isFrom(source: Source): Boolean
 }
 
@@ -71,9 +61,6 @@ internal interface Start : DispatchContext {
      */
     val metadata: Metadata
 
-    /**
-     * [LooperCallback.dispatch]的[SystemClock.currentThreadTimeMillis]
-     */
     val threadTimeMillis: Long
 }
 
@@ -102,6 +89,7 @@ internal enum class Source {
 }
 
 internal interface Metadata {
+
     fun asMessageLog(): String?
 
     fun asMessage(): Message?

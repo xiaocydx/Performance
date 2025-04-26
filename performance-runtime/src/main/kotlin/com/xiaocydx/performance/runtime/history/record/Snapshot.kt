@@ -24,7 +24,7 @@ import com.xiaocydx.performance.runtime.history.record.Node.Companion.ROOT_ID
  * @date 2025/4/25
  */
 @JvmInline
-value class Snapshot internal constructor(private val value: LongArray) {
+value class Snapshot internal constructor(private val value: LongArray = longArrayOf()) {
 
     val size: Int
         get() = value.size

@@ -24,13 +24,10 @@ import androidx.annotation.IntRange
  */
 data class SampleConfig(
     @IntRange(from = 1)
-    val cpuIntervalMillis: Long = 500,
-    @IntRange(from = 1)
-    val stackIntervalMillis: Long = 500
+    val intervalMillis: Long = 500,
 ) {
 
     internal fun checkProperty() {
-        require(cpuIntervalMillis >= 1) { "cpuIntervalMillis < 1" }
-        require(stackIntervalMillis >= 1) { "stackIntervalMillis < 1" }
+        require(intervalMillis >= 1) { "intervalMillis < 1" }
     }
 }

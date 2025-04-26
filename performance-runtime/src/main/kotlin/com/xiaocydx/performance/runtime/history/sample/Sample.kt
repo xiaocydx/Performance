@@ -16,23 +16,25 @@
 
 package com.xiaocydx.performance.runtime.history.sample
 
-import android.os.SystemClock
-
 /**
  * @author xcc
  * @date 2025/4/24
  */
-class Sample private constructor(
+data class Sample(
     val uptimeMillis: Long,
-    val threadState: Thread.State,
+    val intervalMillis: Long,
+    val priority: String,
+    val nice: String,
+    val cpuData: CPUData?,
+    val threadState: String,
     val threadStack: List<StackTraceElement>
-) {
+)
 
-    companion object {
-        fun current(thread: Thread) = Sample(
-            uptimeMillis = SystemClock.uptimeMillis(),
-            threadState = thread.state,
-            threadStack = thread.stackTrace.toList()
-        )
-    }
-}
+data class CPUData(
+    val cpu: String,
+    val user: String,
+    val system: String,
+    val idle: String,
+    val iowait: String,
+    val app: String
+)

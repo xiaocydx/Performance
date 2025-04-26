@@ -27,8 +27,7 @@ import com.xiaocydx.performance.runtime.history.record.Record.Companion.ID_MAX
 import com.xiaocydx.performance.runtime.history.record.Record.Companion.ID_SLICE
 import com.xiaocydx.performance.runtime.history.record.Recorder
 import com.xiaocydx.performance.runtime.history.record.Snapshot
-import com.xiaocydx.performance.runtime.history.sample.CPUSampler
-import com.xiaocydx.performance.runtime.history.sample.StackSampler
+import com.xiaocydx.performance.runtime.history.sample.Sampler
 import com.xiaocydx.performance.runtime.history.segment.Merger
 
 /**
@@ -129,9 +128,9 @@ internal object History {
     @AnyThread
     fun snapshot(startMark: Long, endMark: Long): Snapshot {
         return when {
-            startMark < 0 || endMark < 0 -> Snapshot(longArrayOf())
+            startMark < 0 || endMark < 0 -> Snapshot()
             // volatile read: (Safe Publication)
-            !isRecorderCreated -> Snapshot(longArrayOf())
+            !isRecorderCreated -> Snapshot()
             // 短时间内[startMark, endMark]的数据不被覆盖，可视为不可变。
             // 当调用snapshot(startMark, latestMark())时，不稳定的结果：
             // 1. latestMark()未读到最新值，buffer未读到最新值，可接受的结果。
@@ -149,17 +148,10 @@ internal object History {
     }
 
     @MainThread
-    fun cpuSampler(looper: Looper, intervalMillis: Long): CPUSampler? {
+    fun sampler(looper: Looper, intervalMillis: Long): Sampler? {
         assert(isMainThread())
         if (!isInitialized) return null
-        return CPUSampler(capacity = 100, looper, intervalMillis)
-    }
-
-    @MainThread
-    fun stackSampler(looper: Looper, intervalMillis: Long): StackSampler? {
-        assert(isMainThread())
-        if (!isInitialized) return null
-        return StackSampler(capacity = 100, looper, intervalMillis)
+        return Sampler(capacity = 100, looper = looper, intervalMillis = intervalMillis)
     }
 
     @SuppressLint("UnclosedTrace")
