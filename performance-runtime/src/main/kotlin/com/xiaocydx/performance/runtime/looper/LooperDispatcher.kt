@@ -39,9 +39,10 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     fun start(scene: Scene, metadata: Any?) {
         if (dispatchingScene != null) return
         dispatchingScene = scene
-        start.mark = History.startMark()
+        val uptimeMillis = SystemClock.uptimeMillis()
+        start.mark = History.startMark(uptimeMillis)
         start.scene = scene
-        start.uptimeMillis = SystemClock.uptimeMillis()
+        start.uptimeMillis = uptimeMillis
         start.threadTimeMillis = SystemClock.currentThreadTimeMillis()
         start.metadata.value = metadata
         dispatchingMark = start.mark
@@ -52,9 +53,10 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     fun end(scene: Scene, metadata: Any) {
         if (dispatchingScene != scene) return
         dispatchingScene = null
-        end.mark = if (dispatchingMark > NO_MARK) History.endMark() else NO_MARK
+        val uptimeMillis = SystemClock.uptimeMillis()
+        end.mark = if (dispatchingMark > NO_MARK) History.endMark(uptimeMillis) else NO_MARK
         end.scene = scene
-        end.uptimeMillis = SystemClock.uptimeMillis()
+        end.uptimeMillis = uptimeMillis
         end.metadata.value = metadata
         callback.dispatch(end)
         end.metadata.value = null

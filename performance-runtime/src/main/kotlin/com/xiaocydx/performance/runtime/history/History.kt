@@ -101,18 +101,18 @@ internal object History {
     }
 
     @MainThread
-    fun startMark(): Long {
+    fun startMark(uptimeMillis: Long): Long {
         // 频繁调用不做MainThread断言，流程确保MainSafe
         if (!isInitialized || !isRecordEnabled) return NO_MARK
-        recorder.enter(id = ID_SLICE, currentMs())
+        recorder.enter(id = ID_SLICE, uptimeMillis)
         return recorder.mark()
     }
 
     @MainThread
-    fun endMark(): Long {
+    fun endMark(uptimeMillis: Long): Long {
         // 频繁调用不做MainThread断言，流程确保MainSafe
         if (!isInitialized || !isRecordEnabled) return NO_MARK
-        recorder.exit(id = ID_SLICE, currentMs())
+        recorder.exit(id = ID_SLICE, uptimeMillis)
         return recorder.mark()
     }
 
