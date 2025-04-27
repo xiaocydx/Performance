@@ -6,12 +6,18 @@ plugins {
 android {
     namespace = "com.xiaocydx.performance.runtime"
     compileSdk = 34
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         minSdk = 21
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++11"
+            }
+        }
     }
 
     buildTypes {
@@ -26,6 +32,12 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.18.1"
+        }
     }
 }
 
