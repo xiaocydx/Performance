@@ -18,16 +18,16 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
+import android.app.ActivityManager.ProcessErrorStateInfo
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.history.record.Snapshot
-import com.xiaocydx.performance.runtime.history.sample.Sample
+import com.xiaocydx.performance.runtime.future.Pending
+import com.xiaocydx.performance.runtime.future.Future
 import com.xiaocydx.performance.runtime.history.segment.Merger
-import com.xiaocydx.performance.runtime.history.segment.Merger.Element
 import com.xiaocydx.performance.runtime.history.segment.Segment
 import com.xiaocydx.performance.runtime.history.segment.collectFrom
 import com.xiaocydx.performance.runtime.looper.DispatchContext
@@ -69,11 +69,11 @@ internal class ANRMetricsAnalyzer(
     private inner class Callback(private val merger: Merger) : LooperCallback {
         private val segment = Segment()
         private val handler = Handler(Looper.getMainLooper())
-        private var isANRMessage = false
+        private var anrInfo: ProcessErrorStateInfo? = null
 
         @WorkerThread
-        fun anrAction() {
-            handler.postAtFrontOfQueue { isANRMessage = true }
+        fun anrAction(info: ProcessErrorStateInfo) {
+            handler.postAtFrontOfQueue { anrInfo = info }
         }
 
         @MainThread
@@ -81,53 +81,28 @@ internal class ANRMetricsAnalyzer(
             // collectFrom() time << 1ms
             segment.collectFrom(current)
             if (current !is End) return
-            if (!isANRMessage) {
+            if (anrInfo == null) {
                 merger.consume(segment)
             } else {
-                isANRMessage = false
+                val info = anrInfo
+                anrInfo = null
                 segment.reset()
                 val endUptimeMillis = current.uptimeMillis
                 val startUptimeMillis = endUptimeMillis - (15 * 1000)
-                var elements = merger.peek(startUptimeMillis, endUptimeMillis)
+                val elements = merger.copy(startUptimeMillis, endUptimeMillis)
                 if (elements.isEmpty()) return
-
-                val last = elements.last()
-                elements = elements - last
-                val history = elements.map { it.toGroup() }
-                val current = last.toGroup()
+                val future = Future.getPendingList(Looper.myQueue(), endUptimeMillis)
             }
         }
     }
 
-    private fun Element.toGroup() = Group(
-        count = count,
-        scene = scene.name,
-        startUptimeMillis = startUptimeMillis,
-        endUptimeMillis = endUptimeMillis,
-        cpuDurationMillis = 0L,// TODO: 补充
-        metadata = "",// TODO: 补充
-        snapshot = host.snapshot(last.startMark, last.endMark),// TODO: 补充判断条件
-        sampleList = host.sampleList(last.startUptimeMillis, last.endUptimeMillis)// TODO: 补充判断条件
-    )
+    private class ANRTask(
+        private val elements: List<Any>,
+        private val future: List<Pending>
+    ): Runnable {
 
-    private data class Temp(
-        val pid: Int,
-        val tid: Int,
-        val latestActivity: String,
-        val createTimeMillis: Long,
-        val history: List<Group>,
-        val current: Group,
-        val future: List<Any>
-    )
-
-    private data class Group(
-        val count: Int,
-        val scene: String,
-        val startUptimeMillis: Long,
-        val endUptimeMillis: Long,
-        val cpuDurationMillis: Long,
-        val metadata: String,
-        val snapshot: Snapshot,
-        val sampleList: List<Sample>
-    )
+        override fun run() {
+            // TODO: 将Element转换为Group
+        }
+    }
 }

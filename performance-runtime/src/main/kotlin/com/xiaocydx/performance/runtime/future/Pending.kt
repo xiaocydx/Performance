@@ -20,7 +20,8 @@ package com.xiaocydx.performance.runtime.future
  * @author xcc
  * @date 2025/4/25
  */
-internal data class Pending(
+data class Pending(
+    val `when`: Long,
     val what: Int,
     val targetName: String,
     val callbackName: String,

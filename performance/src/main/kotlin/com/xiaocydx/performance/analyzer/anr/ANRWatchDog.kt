@@ -20,6 +20,7 @@ package com.xiaocydx.performance.analyzer.anr
 
 import android.app.ActivityManager
 import android.app.ActivityManager.ProcessErrorStateInfo
+import android.app.ActivityManager.ProcessErrorStateInfo.NOT_RESPONDING
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -46,10 +47,10 @@ internal class ANRWatchDog(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val watchDogThread = HandlerThread("PerformanceANRWatchDog", THREAD_PRIORITY_BACKGROUND)
     private lateinit var watchHandler: Handler
-    private var anrAction: (() -> Unit)? = null
+    private var anrAction: ((ProcessErrorStateInfo) -> Unit)? = null
     private var startUptimeMillis = 0L
 
-    fun start(anrAction: () -> Unit) {
+    fun start(anrAction: (ProcessErrorStateInfo) -> Unit) {
         this.anrAction = anrAction
         watchDogThread.start()
         watchHandler = Handler(watchDogThread.looper)
@@ -140,7 +141,8 @@ internal class ANRWatchDog(
                 while (retryCount > 0) {
                     retryCount--
                     val processesInErrorState = ams.processesInErrorState
-                    processErrorStateInfo = processesInErrorState?.find { it.pid == pid }
+                    processErrorStateInfo = processesInErrorState
+                        ?.find { it.pid == pid && it.condition == NOT_RESPONDING }
                     if (processErrorStateInfo != null) break
                     try {
                         Thread.sleep(500)
@@ -149,7 +151,9 @@ internal class ANRWatchDog(
                     }
                 }
                 val anrAction = anrAction
-                if (processErrorStateInfo != null) anrAction?.invoke()
+                if (processErrorStateInfo != null) {
+                    anrAction?.invoke(processErrorStateInfo)
+                }
             }
             isRunning = false
             detectionTask.post()

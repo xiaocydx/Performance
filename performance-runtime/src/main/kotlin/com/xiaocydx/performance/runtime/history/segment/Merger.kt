@@ -54,30 +54,30 @@ internal class Merger(
         return true
     }
 
-    fun peek(): List<Element> {
-        return deque.toList()
+    fun copy(): List<Element> {
+        return deque.map { it.deepCopy() }
     }
 
-    fun peek(startUptimeMillis: Long, endUptimeMillis: Long): List<Element> {
+    fun copy(startUptimeMillis: Long, endUptimeMillis: Long): List<Element> {
         val outcome = mutableListOf<Element>()
         for (i in deque.lastIndex downTo 0) {
             val element = deque[i]
             if (element.startUptimeMillis > endUptimeMillis) continue
             if (element.endUptimeMillis < startUptimeMillis) break
-            outcome.add(element)
+            outcome.add(element.deepCopy())
         }
         outcome.reverse()
         return outcome
     }
 
-    class Element {
-        val last = Segment()
-        var count = 1; private set
-        var startMark = 0L; private set
-        var startUptimeMillis = 0L; private set
-        var startThreadTimeMillis = 0L; private set
-        var idleDurationMillis = 0L; private set
-
+    data class Element(
+        var count: Int = 1,
+        var startMark: Long = 0L,
+        var startUptimeMillis: Long = 0L,
+        var startThreadTimeMillis: Long = 0L,
+        var idleDurationMillis: Long = 0L,
+        val last: Segment = Segment()
+    ) {
         val isSingle get() = last.isSingle
         val scene get() = last.scene
         val endUptimeMillis get() = last.endUptimeMillis
@@ -96,5 +96,7 @@ internal class Merger(
             idleDurationMillis += idleDuration
             last.copyFrom(segment)
         }
+
+        fun deepCopy() = copy(last = last.copy())
     }
 }

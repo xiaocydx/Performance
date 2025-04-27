@@ -18,6 +18,7 @@ package com.xiaocydx.performance.runtime.history.segment
 
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
+import com.xiaocydx.performance.runtime.looper.Scene
 import com.xiaocydx.performance.runtime.looper.Scene.IdleHandler
 import com.xiaocydx.performance.runtime.looper.Scene.Message
 import com.xiaocydx.performance.runtime.looper.Scene.NativeTouch
@@ -27,37 +28,39 @@ import com.xiaocydx.performance.runtime.looper.Start
  * @author xcc
  * @date 2025/4/25
  */
-internal class Segment {
-    var isSingle = false
-    var needRecord = false
-    var needSample = false
+internal data class Segment(
+    var isSingle: Boolean = false,
+    var needRecord: Boolean = false,
+    var needSample: Boolean = false,
 
     //region collectFrom DispatchContext
-    var scene = Message
-    var startMark = 0L
-    var startUptimeMillis = 0L
-    var startThreadTimeMillis = 0L
-    var endMark = 0L
-    var endUptimeMillis = 0L
+    var scene: Scene = Message,
+    var startMark: Long = 0L,
+    var startUptimeMillis: Long = 0L,
+    var startThreadTimeMillis: Long = 0L,
+    var endMark: Long = 0L,
+    var endUptimeMillis: Long = 0L,
 
     //region Metadata
     // scene = Scene.Message
-    var log = ""
-    var what = 0
-    var targetName = ""
-    var callbackName = ""
-    var arg1 = 0
-    var arg2 = 0
+    var log: String = "",
+    var `when`: Long = 0L,
+    var what: Int = 0,
+    var targetName: String? = null,
+    var callbackName: String? = null,
+    var arg1: Int = 0,
+    var arg2: Int = 0,
 
     //scene = IdleHandler
-    var idleHandlerName = ""
+    var idleHandlerName: String = "",
 
     //scene = NativeTouch
-    var action = 0
-    var x = 0f
-    var y = 0f
+    var action: Int = 0,
+    var x: Float = 0f,
+    var y: Float = 0f,
     //endregion
     //endregion
+) {
 
     fun reset() {
         copyFrom(emptySegment)
@@ -86,6 +89,38 @@ internal class Segment {
         y = segment.y
     }
 
+    fun metadata(uptimeMillis: Long): String {
+        val b = StringBuilder()
+        return when (scene) {
+            Message -> log.ifEmpty {
+                b.append("{ when=").append(`when` - uptimeMillis).append("ms")
+                if (targetName != null) {
+                    if (callbackName != null) {
+                        b.append(" callback=").append(callbackName)
+                    } else {
+                        b.append(" what=").append(what)
+                    }
+                    if (arg1 != 0) b.append(" arg1=").append(arg1)
+                    if (arg2 != 0) b.append(" arg1=").append(arg1)
+                } else {
+                    b.append(" barrier=").append(arg1)
+                }
+                b.append(" }")
+                b.toString()
+            }
+            IdleHandler -> {
+                b.append("MotionEvent { action=").append(action)
+                b.append(", x=").append(x).append(", y=").append(y)
+                b.append(" }")
+                b.toString()
+            }
+            NativeTouch -> {
+                b.append("IdleHandler { name=").append(idleHandlerName).append(" }")
+                b.toString()
+            }
+        }
+    }
+
     private companion object {
         val emptySegment = Segment()
     }
@@ -109,9 +144,10 @@ internal fun Segment.collectFrom(current: DispatchContext) {
                         return
                     }
                     val message = current.metadata.asMessage()!!
+                    `when` = message.`when`
                     what = message.what
-                    targetName = message.target?.javaClass?.name ?: "" // null is barrier
-                    callbackName = message.callback?.javaClass?.name ?: ""
+                    targetName = message.target?.javaClass?.name // null is barrier
+                    callbackName = message.callback?.javaClass?.name
                     arg1 = message.arg1
                     arg2 = message.arg2
                 }

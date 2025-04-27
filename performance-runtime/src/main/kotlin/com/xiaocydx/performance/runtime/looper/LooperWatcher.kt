@@ -34,9 +34,6 @@ internal sealed class LooperWatcher {
     @MainThread
     abstract fun trackGC(thunk: Runnable)
 
-    /**
-     * 移除观察者
-     */
     @MainThread
     @VisibleForTesting
     abstract fun remove()

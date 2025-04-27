@@ -85,15 +85,10 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
     }
 
     private class MetadataImpl(var value: Any? = null) : Metadata {
-
         override fun asMessageLog() = value as? String
-
         override fun asMessage() = value as? Message
-
         override fun asIdleHandler() = value as? IdleHandler
-
         override fun asMotionEvent() = value as? MotionEvent
-
         override fun toString(): String {
             asMessageLog()?.let { return it }
             asMessage()?.let { return it.toString() }
