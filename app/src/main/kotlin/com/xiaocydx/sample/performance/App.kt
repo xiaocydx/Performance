@@ -5,6 +5,7 @@ import com.xiaocydx.performance.Performance
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsConfig
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsWriter
 import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
+import com.xiaocydx.performance.analyzer.block.BlockMetricsPrinter
 import com.xiaocydx.performance.analyzer.block.BlockMetricsWriter
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsPrinter
@@ -20,8 +21,15 @@ class App : Application() {
         Performance.init(
             application = this,
             config = Performance.Config(
-                frameConfig = FrameMetricsConfig(receivers = listOf(FrameMetricsPrinter())),
-                blockConfig = BlockMetricsConfig(receiver = BlockMetricsWriter(this)),
+                frameConfig = FrameMetricsConfig(
+                    receivers = listOf(FrameMetricsPrinter())
+                ),
+                blockConfig = BlockMetricsConfig(
+                    receivers = listOf(
+                        BlockMetricsPrinter(),
+                        BlockMetricsWriter(application = this)
+                    )
+                ),
                 anrConfig = ANRMetricsConfig(receiver = ANRMetricsWriter())
             )
         )

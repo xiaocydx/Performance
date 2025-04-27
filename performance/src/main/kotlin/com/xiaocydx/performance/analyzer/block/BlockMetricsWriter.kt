@@ -17,19 +17,11 @@
 package com.xiaocydx.performance.analyzer.block
 
 import android.app.Application
-import android.util.Log
-import com.xiaocydx.performance.analyzer.block.BlockMetricsReceiver.Companion.DEFAULT_THRESHOLD_MILLIS
-import com.xiaocydx.performance.runtime.history.sample.CPUData
-import com.xiaocydx.performance.runtime.history.sample.Sample
+import com.google.gson.GsonBuilder
+import com.xiaocydx.performance.analyzer.`tag_createTime`
 import kotlinx.coroutines.Dispatchers
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.io.File.separator
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 import kotlin.coroutines.EmptyCoroutineContext
 
 /**
@@ -38,100 +30,22 @@ import kotlin.coroutines.EmptyCoroutineContext
  * @author xcc
  * @date 2025/4/15
  */
-class BlockMetricsWriter(
-    private val application: Application,
-    /**
-     * 接收[BlockMetrics]的卡顿阈值
-     */
-    override val thresholdMillis: Long = DEFAULT_THRESHOLD_MILLIS,
-) : BlockMetricsReceiver {
+class BlockMetricsWriter(private val application: Application) : BlockMetricsReceiver {
+    private val gson by lazy { GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create() }
 
     override fun receive(metrics: BlockMetrics) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
-            print(metrics, write(metrics))
-        }
-    }
-
-    private fun write(metrics: BlockMetrics): JSONObject = with(metrics) {
-        val dataJson = JSONObject().apply {
-            put("pid", pid)
-            put("tid", tid)
-            put("scene", scene)
-            put("latestActivity", latestActivity)
-            put("createTimeMillis", createTimeMillis)
-            put("thresholdMillis", thresholdMillis)
-            put("wallDurationMillis", wallDurationMillis)
-            put("cpuDurationMillis", cpuDurationMillis)
-            put("isRecordEnabled", isRecordEnabled)
-            put("metadata", metadata)
-            put("snapshot", JSONArray().apply {
-                for (i in 0 until snapshot.size) put(snapshot[i].value)
-            })
-            put("sampleList", JSONArray().apply {
-                metrics.sampleList.forEach { sample -> put(sample.toJSONObject()) }
-            })
-        }
-        val result = JSONObject()
-        result.put("tag", "BlockMetrics")
-        result.put("data", dataJson)
-        file(metrics).bufferedWriter().use { it.write(result.toString(2)) }
-        return dataJson
-    }
-
-    private fun print(metrics: BlockMetrics, json: JSONObject) {
-        json.remove("snapshot")
-        json.remove("sampleList")
-        Log.e(TAG, json.toString(2))
-        for (i in metrics.sampleList.lastIndex downTo 0) {
-            val sample = metrics.sampleList[i]
-            val cause = BlockMetricsSampleStack()
-            cause.stackTrace = sample.threadStack.toTypedArray()
-            val msg = sample.copy(threadStack = emptyList()).toString()
-                .replace("Sample", "Sample${i + 1}")
-                .replace(", threadStack=[]", "")
-            Log.e(TAG, msg, cause)
+            val json = gson.toJson(metrics)
+            file(metrics).bufferedWriter().use { it.write(json) }
         }
     }
 
     private fun file(metrics: BlockMetrics): File {
-        val time = try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-            sdf.timeZone = TimeZone.getDefault()
-            sdf.format(Date(metrics.createTimeMillis))
-        } catch (e: Throwable) {
-            metrics.createTimeMillis.toString()
-        }
-        val child = "performance${separator}block${separator}BlockMetrics_${time}"
+        val name = metrics.tag_createTime()
+        val child = "performance${separator}block${separator}${name}"
         val file = File(application.filesDir, child)
         file.parentFile?.takeIf { !it.exists() }?.mkdirs()
         file.takeIf { !it.exists() }?.delete()
         return file
     }
-
-    private fun Sample.toJSONObject() = JSONObject().apply {
-        put("uptimeMillis", uptimeMillis)
-        put("intervalMillis", intervalMillis)
-        put("priority", priority)
-        put("nice", nice)
-        cpuData?.let { put("cpuData", it.toJSONObject()) }
-        put("threadState", threadState)
-        put("threadStack", JSONArray().apply {
-            threadStack.forEach { put(it.toString()) }
-        })
-    }
-
-    private fun CPUData.toJSONObject() = JSONObject().apply {
-        put("cpu", cpu)
-        put("user", user)
-        put("system", system)
-        put("idle", idle)
-        put("iowait", iowait)
-        put("app", app)
-    }
-
-    private companion object {
-        const val TAG = "BlockMetricsWriter"
-    }
 }
-
-internal class BlockMetricsSampleStack() : RuntimeException()

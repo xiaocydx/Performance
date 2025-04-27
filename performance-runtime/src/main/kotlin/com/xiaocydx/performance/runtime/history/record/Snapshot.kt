@@ -24,7 +24,7 @@ import com.xiaocydx.performance.runtime.history.record.Node.Companion.ROOT_ID
  * @date 2025/4/25
  */
 @JvmInline
-value class Snapshot internal constructor(private val value: LongArray = longArrayOf()) {
+value class Snapshot internal constructor(private val value: LongArray) {
 
     val size: Int
         get() = value.size
@@ -83,6 +83,12 @@ value class Snapshot internal constructor(private val value: LongArray = longArr
             isComplete = children.last().isComplete,
             children = children
         )
+    }
+
+    companion object {
+        private val emptySnapshot = Snapshot(longArrayOf())
+
+        fun empty() = emptySnapshot
     }
 }
 

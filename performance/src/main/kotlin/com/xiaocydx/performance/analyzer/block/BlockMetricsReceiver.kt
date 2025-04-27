@@ -16,8 +16,6 @@
 
 package com.xiaocydx.performance.analyzer.block
 
-import androidx.annotation.IntRange
-
 /**
  * [BlockMetrics]的接收者
  *
@@ -27,20 +25,9 @@ import androidx.annotation.IntRange
 interface BlockMetricsReceiver {
 
     /**
-     * 接收[BlockMetrics]的卡顿阈值
-     */
-    @get:IntRange(from = 1)
-    val thresholdMillis: Long
-        get() = DEFAULT_THRESHOLD_MILLIS
-
-    /**
-     * 执行时间超过[thresholdMillis]，接收[BlockMetrics]
+     * 执行时间超过[BlockMetricsConfig.thresholdMillis]，接收[BlockMetrics]
      *
      * **注意**：该函数不能执行耗时较长的逻辑（比如IO操作），这会导致[metrics]不准确。
      */
     fun receive(metrics: BlockMetrics)
-
-    companion object {
-        const val DEFAULT_THRESHOLD_MILLIS = 700L
-    }
 }

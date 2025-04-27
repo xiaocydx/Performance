@@ -40,9 +40,4 @@ internal sealed class LooperWatcher {
     @MainThread
     @VisibleForTesting
     abstract fun remove()
-
-    companion object {
-
-
-    }
 }

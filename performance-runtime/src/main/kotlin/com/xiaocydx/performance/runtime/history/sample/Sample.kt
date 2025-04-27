@@ -23,18 +23,24 @@ package com.xiaocydx.performance.runtime.history.sample
 data class Sample(
     val uptimeMillis: Long,
     val intervalMillis: Long,
-    val priority: String,
-    val nice: String,
-    val cpuData: CPUData?,
-    val threadState: String,
-    val threadStack: List<StackTraceElement>
+    val cpuStat: CPUStat?,
+    val threadStat: ThreadStat
 )
 
-data class CPUData(
+data class CPUStat(
     val cpu: String,
     val user: String,
     val system: String,
     val idle: String,
     val iowait: String,
     val app: String
+)
+
+data class ThreadStat(
+    val priority: String,
+    val nice: String,
+    val state: String,
+    val stack: List<String>,
+    @Transient
+    val trace: List<StackTraceElement>
 )

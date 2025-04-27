@@ -19,6 +19,7 @@
 package com.xiaocydx.performance.analyzer.block
 
 import android.os.Process
+import com.xiaocydx.performance.analyzer.Metrics
 import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 
@@ -28,53 +29,86 @@ import com.xiaocydx.performance.runtime.history.sample.Sample
  * @author xcc
  * @date 2025/4/16
  */
-class BlockMetrics(
+data class BlockMetrics(
+    /**
+     * [Process.myPid]
+     */
+    override val pid: Int,
+
     /**
      * [Process.myTid]
      */
-    val pid: Int,
+    override val tid: Int,
+
     /**
-     * [Process.myTid]
+     * 可用于定义文件名
      */
-    val tid: Int,
+    override val createTimeMillis: Long,
+
     /**
      * 卡顿场景
      */
     val scene: String,
-    /**
-     * 最后启动的Activity
-     */
-    val latestActivity: String,
-    /**
-     * 创建时间
-     */
-    val createTimeMillis: Long,
-    /**
-     * 卡顿阈值
-     */
-    val thresholdMillis: Long,
-    /**
-     * 执行时间总和
-     */
-    val wallDurationMillis: Long,
-    /**
-     * CPU时间总和
-     */
-    val cpuDurationMillis: Long,
-    /**
-     * 是否已启用[History]的Record。若未启用，则[snapshot]为空。
-     */
-    val isRecordEnabled: Boolean,
+
     /**
      * [scene]的元数据
      */
     val metadata: String,
+
+    /**
+     * 最后启动的Activity
+     */
+    val latestActivity: String,
+
+    /**
+     * 卡顿阈值，来自[BlockMetricsConfig]
+     */
+    val thresholdMillis: Long,
+
+    /**
+     * 开始时间，可用于计算[wallDurationMillis]
+     */
+    val startUptimeMillis: Long,
+
+    /**
+     * 开始时间，可用于计算[cpuDurationMillis]
+     */
+    val startThreadTimeMillis: Long,
+
+    /**
+     * 结束时间，可用于计算[wallDurationMillis]
+     */
+    val endUptimeMillis: Long,
+
+    /**
+     * 结束时间，可用于计算[cpuDurationMillis]
+     */
+    val endThreadTimeMillis: Long,
+
+    /**
+     * 是否已启用[History]的Record。若未启用，则[snapshot]为空。
+     */
+    val isRecordEnabled: Boolean,
+
     /**
      * 调用栈快照
      */
     val snapshot: Snapshot,
+
     /**
      * 采样数据集合
      */
     val sampleList: List<Sample>
-)
+) : Metrics {
+
+    /**
+     * 可用于区分解析逻辑
+     */
+    override val tag = "BlockMetrics"
+
+    val wallDurationMillis: Long
+        get() = endUptimeMillis - startUptimeMillis
+
+    val cpuDurationMillis: Long
+        get() = endThreadTimeMillis - startThreadTimeMillis
+}

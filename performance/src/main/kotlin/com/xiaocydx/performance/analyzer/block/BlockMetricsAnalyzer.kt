@@ -23,7 +23,7 @@ import android.os.Process
 import android.os.SystemClock
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.history.sample.ProcSysStat
+import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -53,7 +53,6 @@ internal class BlockMetricsAnalyzer(
     }
 
     private inner class Callback(private val handler: Handler) : LooperCallback {
-        private val thresholdMillis = config.receiver.thresholdMillis
         private var startMark = 0L
         private var startUptimeMillis = 0L
         private var startThreadTimeMillis = 0L
@@ -66,65 +65,56 @@ internal class BlockMetricsAnalyzer(
                     startThreadTimeMillis = current.threadTimeMillis
                 }
                 is End -> {
-                    val endUptimeMillis = current.uptimeMillis
-                    val wallDurationMillis = endUptimeMillis - startUptimeMillis
-                    if (wallDurationMillis > thresholdMillis) {
-                        val latestActivity = host.getLatestActivity()?.javaClass?.name
-                        if (latestActivity.isNullOrEmpty()) return
-                        val endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
-                        val cpuDurationMillis = endThreadTimeMillis - startThreadTimeMillis
-                        handler.post(BlockTask(
-                            scene = current.scene.name,
-                            latestActivity = latestActivity,
-                            startMark = startMark,
-                            endMark = current.mark,
-                            thresholdMillis = thresholdMillis,
-                            startUptimeMillis = startUptimeMillis,
-                            endUptimeMillis = endUptimeMillis,
-                            cpuDurationMillis = cpuDurationMillis,
-                            isRecordEnabled = host.isRecordEnabled,
+                    if (current.uptimeMillis - startUptimeMillis <= config.thresholdMillis) return
+                    val latestActivity = host.getLatestActivity()?.javaClass?.name
+                    if (latestActivity.isNullOrEmpty()) return
+                    handler.post(BlockTask(
+                        startMark = startMark,
+                        endMark = current.mark,
+                        intermediate = BlockMetrics(
+                            //region lack
+                            pid = 0,
+                            tid = 0,
+                            createTimeMillis = 0L,
+                            snapshot = Snapshot.empty(),
+                            sampleList = emptyList(),
+                            //endregion
+                            scene = current.scene.toString(),
                             metadata = current.metadata.toString(),
-                            receiver = config.receiver
-                        ))
-                    }
+                            latestActivity = latestActivity,
+                            thresholdMillis = config.thresholdMillis,
+                            startUptimeMillis = startUptimeMillis,
+                            startThreadTimeMillis = startThreadTimeMillis,
+                            endUptimeMillis = current.uptimeMillis,
+                            endThreadTimeMillis = SystemClock.currentThreadTimeMillis(),
+                            isRecordEnabled = host.isRecordEnabled
+                        )
+                    ))
                 }
             }
         }
     }
 
     private inner class BlockTask(
-        private val scene: String,
-        private val latestActivity: String,
         private val startMark: Long,
         private val endMark: Long,
-        private val thresholdMillis: Long,
-        private val startUptimeMillis: Long,
-        private val endUptimeMillis: Long,
-        private val cpuDurationMillis: Long,
-        private val isRecordEnabled: Boolean,
-        private val metadata: String,
-        private val receiver: BlockMetricsReceiver
+        private val intermediate: BlockMetrics
     ) : Runnable {
 
         override fun run() {
             val createTimeMillis = System.currentTimeMillis()
+            val startUptimeMillis = intermediate.startUptimeMillis
+            val endUptimeMillis = intermediate.endUptimeMillis
             val snapshot = host.snapshot(startMark, endMark)
             val sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
-            ProcSysStat.read()
-            receiver.receive(BlockMetrics(
+            val metrics = intermediate.copy(
                 pid = Process.myPid(),
                 tid = Process.myPid(), // 主线程的tid跟pid一致
-                scene = scene,
-                latestActivity = latestActivity,
                 createTimeMillis = createTimeMillis,
-                thresholdMillis = thresholdMillis,
-                wallDurationMillis = endUptimeMillis - startUptimeMillis,
-                cpuDurationMillis = cpuDurationMillis,
-                isRecordEnabled = isRecordEnabled,
-                metadata = metadata,
                 snapshot = snapshot,
-                sampleList = sampleList,
-            ))
+                sampleList = sampleList
+            )
+            config.receivers.forEach { it.receive(metrics) }
         }
     }
 }

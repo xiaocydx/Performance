@@ -128,9 +128,9 @@ internal object History {
     @AnyThread
     fun snapshot(startMark: Long, endMark: Long): Snapshot {
         return when {
-            startMark < 0 || endMark < 0 -> Snapshot()
+            startMark < 0 || endMark < 0 -> Snapshot.empty()
             // volatile read: (Safe Publication)
-            !isRecorderCreated -> Snapshot()
+            !isRecorderCreated -> Snapshot.empty()
             // 短时间内[startMark, endMark]的数据不被覆盖，可视为不可变。
             // 当调用snapshot(startMark, latestMark())时，不稳定的结果：
             // 1. latestMark()未读到最新值，buffer未读到最新值，可接受的结果。

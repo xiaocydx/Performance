@@ -135,8 +135,8 @@ internal class Sampler(
 
         private fun sample() {
             val uptimeMillis = SystemClock.uptimeMillis()
-            val threadState = mainThread.state.toString()
-            val threadStack = mainThread.stackTrace.toList()
+            val threadState = mainThread.state
+            val stackTrace = mainThread.stackTrace.toList()
 
             if (pid == 0) pid = Process.myPid()
             val sysStat = ProcSysStat.read()
@@ -144,13 +144,13 @@ internal class Sampler(
             val lastSysStat = lastSysStat
             val lastPidStat = lastPidStat
 
-            var cpuData: CPUData? = null
+            var cpuStat: CPUStat? = null
             if (sysStat.isAvailable
                     && pidStat.isAvailable
                     && lastSysStat?.isAvailable == true
                     && lastPidStat?.isAvailable == true) {
                 val total = sysStat.total - lastSysStat.total
-                cpuData = CPUData(
+                cpuStat = CPUStat(
                     cpu = "${(total - (sysStat.idle - lastSysStat.idle)) * 100f / total}%",
                     user = "${(sysStat.user - lastSysStat.user) * 100f / total}%",
                     system = "${(sysStat.system - lastSysStat.system) * 100f / total}%",
@@ -160,16 +160,17 @@ internal class Sampler(
                 )
             }
 
-            var priority = ""
-            var nice = ""
-            if (pidStat.isAvailable) {
-                priority = pidStat.priority.toString()
-                nice = pidStat.nice.toString()
-            }
+            val threadStat = ThreadStat(
+                priority = pidStat.takeIf { it.isAvailable }?.priority?.toString() ?: "",
+                nice = pidStat.takeIf { it.isAvailable }?.nice?.toString() ?: "",
+                state = threadState.toString(),
+                stack = stackTrace.map { it.toString() },
+                trace = stackTrace
+            )
 
             this.lastSysStat = sysStat
             this.lastPidStat = pidStat
-            addSample(Sample(uptimeMillis, intervalMillis, priority, nice, cpuData, threadState, threadStack))
+            addSample(Sample(uptimeMillis, intervalMillis, cpuStat, threadStat))
         }
     }
 }
