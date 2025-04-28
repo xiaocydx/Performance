@@ -49,6 +49,9 @@ internal interface Host {
     val ams: ActivityManager
 
     @get:AnyThread
+    val anrEvent: SharedFlow<Unit>
+
+    @get:AnyThread
     val activityEvent: SharedFlow<ActivityEvent>
 
     @get:MainThread

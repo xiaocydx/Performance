@@ -49,6 +49,7 @@ internal class BlockMetricsAnalyzer(
             awaitCancellation()
         }.invokeOnCompletion {
             host.removeCallback(callback)
+            host.unregisterHistory(this@BlockMetricsAnalyzer)
         }
     }
 

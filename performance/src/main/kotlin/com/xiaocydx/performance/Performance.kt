@@ -57,6 +57,7 @@ import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi29
 import com.xiaocydx.performance.runtime.looper.LooperNativeTouchWatcher
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
 import com.xiaocydx.performance.runtime.looper.Start
+import com.xiaocydx.performance.runtime.signal.Signal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -145,6 +146,7 @@ object Performance {
         override val dumpLooper by lazy { dumpThread.looper!! }
         override val defaultLooper by lazy { defaultThread.looper!! }
         override val ams by lazy { application.getSystemService(ACTIVITY_SERVICE) as ActivityManager }
+        override val anrEvent by lazy { MutableSharedFlow<Unit>(extraBufferCapacity = Int.MAX_VALUE) }
         override val activityEvent = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
         override val isRecordEnabled get() = History.isRecordEnabled
 
@@ -205,14 +207,21 @@ object Performance {
                     }
                 }
             }
+            if (analyzer is ANRMetricsAnalyzer) {
+                Signal.setANRCallback { anrEvent.tryEmit(Unit) }
+            }
         }
 
         override fun unregisterHistory(analyzer: Analyzer) {
-            if (analyzers.remove(analyzer) && analyzers.isEmpty()) {
-                // TODO: 2025/4/26 cancel History.init()
+            if (!analyzers.remove(analyzer)) return
+            // TODO: 2025/4/26 cancel History.init()
+            if (analyzers.isEmpty()) {
                 val uptimeMillis = SystemClock.uptimeMillis()
                 callbacks.setFirst(callback = null)
                 sampler.stop(uptimeMillis)
+            }
+            if (analyzer is ANRMetricsAnalyzer) {
+                Signal.setANRCallback(null)
             }
         }
 
