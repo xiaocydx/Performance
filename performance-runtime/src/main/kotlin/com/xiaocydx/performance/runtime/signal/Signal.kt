@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 xiaocydx
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.xiaocydx.performance.runtime.signal
 
 import androidx.annotation.MainThread
@@ -7,36 +23,23 @@ import com.xiaocydx.performance.runtime.assertMainThread
  * @author xcc
  * @date 2025/4/27
  */
-object Signal {
-    private val callbacks = mutableListOf<ANRCallback>()
-    private val pendingCallbacks = mutableListOf<ANRCallback>()
+internal object Signal {
+    @Volatile private var anrCallback: ANRCallback? = null
 
     init {
         System.loadLibrary("performance_runtime")
     }
 
     @MainThread
-    fun addANRCallback(callback: ANRCallback) {
+    fun setANRCallback(current: ANRCallback?) {
         assertMainThread()
-        val beforeEmpty: Boolean
-        synchronized(callbacks) {
-            if (callbacks.contains(callback)) return
-            beforeEmpty = callbacks.isEmpty()
-            callbacks.add(callback)
+        val previous = anrCallback
+        if (previous == null && current != null) {
+            nativeRegister()
+        } else if (previous != null && current == null) {
+            nativeUnregister()
         }
-        if (beforeEmpty) nativeRegister()
-    }
-
-    @MainThread
-    fun removeANRCallback(callback: ANRCallback) {
-        assertMainThread()
-        val afterEmpty: Boolean
-        synchronized(callbacks) {
-            if (!callbacks.contains(callback)) return
-            callbacks.remove(callback)
-            afterEmpty = callbacks.isEmpty()
-        }
-        if (afterEmpty) nativeUnregister()
+        anrCallback = current
     }
 
     @JvmStatic
@@ -48,15 +51,7 @@ object Signal {
     // Called from native code
     @JvmStatic
     private fun anr() {
-        println("test -> 触发ANR回调")
-        // synchronized(callbacks) {
-        //     pendingCallbacks.addAll(callbacks)
-        // }
-        // pendingCallbacks.forEach { it.maybeANR() }
-        // pendingCallbacks.clear()
+        val callback = anrCallback
+        callback?.maybeANR()
     }
-}
-
-fun interface ANRCallback {
-    fun maybeANR()
 }
