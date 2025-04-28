@@ -21,4 +21,7 @@ package com.xiaocydx.performance.analyzer.anr
  * @date 2025/4/24
  */
 class ANRMetricsWriter : ANRMetricsReceiver {
+
+    override fun receive(metrics: ANRMetrics) {
+    }
 }

@@ -20,7 +20,7 @@ package com.xiaocydx.performance.analyzer.frame
  * @author xcc
  * @date 2025/4/3
  */
-data class FrameMetricsConfig(val receivers: List<FrameMetricsReceiver>) {
+data class FrameMetricsConfig(val receivers: List<FrameMetricsReceiver> = emptyList()) {
 
     internal fun checkProperty() {
         receivers.forEach { receiver ->

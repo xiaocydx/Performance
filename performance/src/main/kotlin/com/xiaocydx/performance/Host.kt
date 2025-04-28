@@ -85,5 +85,8 @@ internal interface Host {
     fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample>
 
     @AnyThread
+    fun sampleImmediately(): Sample?
+
+    @AnyThread
     fun snapshot(startMark: Long, endMark: Long): Snapshot
 }

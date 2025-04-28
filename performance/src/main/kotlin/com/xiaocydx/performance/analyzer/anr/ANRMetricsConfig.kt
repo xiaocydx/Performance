@@ -16,19 +16,22 @@
 
 package com.xiaocydx.performance.analyzer.anr
 
+import androidx.annotation.IntRange
+
 /**
  * @author xcc
  * @date 2025/4/24
  */
-data class ANRMetricsConfig(val receiver: ANRMetricsReceiver) {
+data class ANRMetricsConfig(
+    @get:IntRange(from = 0)
+    val idleThresholdMillis: Long = 16L,
+    @get:IntRange(from = 0)
+    val mergeThresholdMillis: Long = 300L,
+    val receivers: List<ANRMetricsReceiver> = emptyList()
+) {
 
     internal fun checkProperty() {
-        val name = receiver.javaClass.name
-        require(receiver.idleThresholdMillis >= 0) {
-            "${name}.idleThresholdMillis < 0"
-        }
-        require(receiver.mergeThresholdMillis >= 0) {
-            "${name}.mergeThresholdMillis < 0"
-        }
+        require(idleThresholdMillis >= 0) { "idleThresholdMillis < 0" }
+        require(mergeThresholdMillis >= 0) { "mergeThresholdMillis < 0" }
     }
 }

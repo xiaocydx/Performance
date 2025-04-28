@@ -86,9 +86,12 @@ object Performance {
         ReferenceQueueDaemon().start()
 
         IdleHandlerAnalyzer(host).start()
-        config.frameConfig?.let { FrameMetricsAnalyzer.create(host, it).start() }
-        config.blockConfig?.let { BlockMetricsAnalyzer(host, it).start() }
-        config.anrConfig?.let { ANRMetricsAnalyzer(host, it).start() }
+        config.frameConfig.takeIf { it.receivers.isNotEmpty() }
+            ?.let { FrameMetricsAnalyzer.create(host, it).start() }
+        config.blockConfig.takeIf { it.receivers.isNotEmpty() }
+            ?.let { BlockMetricsAnalyzer(host, it).start() }
+        config.anrConfig.takeIf { it.receivers.isNotEmpty() }
+            ?.let { ANRMetricsAnalyzer(host, it, config.blockConfig).start() }
         setupLooperWatcher()
     }
 
@@ -237,6 +240,14 @@ object Performance {
             return emptyList()
         }
 
+        override fun sampleImmediately(): Sample? {
+            if (sampleThread != null) {
+                // volatile read: acquire (Safe Publication)
+                return sampler.sampleImmediately()
+            }
+            return null
+        }
+
         override fun snapshot(startMark: Long, endMark: Long): Snapshot {
             return History.snapshot(startMark, endMark)
         }
@@ -248,16 +259,16 @@ object Performance {
 
     data class Config(
         val sampleConfig: SampleConfig = SampleConfig(),
-        val frameConfig: FrameMetricsConfig? = null,
-        val blockConfig: BlockMetricsConfig? = null,
-        val anrConfig: ANRMetricsConfig? = null
+        val frameConfig: FrameMetricsConfig = FrameMetricsConfig(),
+        val blockConfig: BlockMetricsConfig = BlockMetricsConfig(),
+        val anrConfig: ANRMetricsConfig = ANRMetricsConfig()
     ) {
 
         internal fun checkProperty() {
             sampleConfig.checkProperty()
-            frameConfig?.checkProperty()
-            blockConfig?.checkProperty()
-            anrConfig?.checkProperty()
+            frameConfig.checkProperty()
+            blockConfig.checkProperty()
+            anrConfig.checkProperty()
         }
     }
 }

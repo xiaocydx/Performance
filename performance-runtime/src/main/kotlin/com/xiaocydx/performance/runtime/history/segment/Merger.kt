@@ -76,11 +76,15 @@ internal class Merger(
         var startUptimeMillis: Long = 0L,
         var startThreadTimeMillis: Long = 0L,
         var idleDurationMillis: Long = 0L,
-        val last: Segment = Segment()
+        private val last: Segment = Segment()
     ) {
         val isSingle get() = last.isSingle
         val scene get() = last.scene
+        val endMark get() = last.endMark
         val endUptimeMillis get() = last.endUptimeMillis
+        val endThreadTimeMillis get() = last.endThreadTimeMillis
+        val needRecord get() = last.needRecord
+        val needSample get() = last.needSample
 
         fun init(segment: Segment) {
             count = 1
@@ -95,6 +99,10 @@ internal class Merger(
             count++
             idleDurationMillis += idleDuration
             last.copyFrom(segment)
+        }
+
+        fun metadata(): String {
+            return last.metadata()
         }
 
         fun deepCopy() = copy(last = last.copy())

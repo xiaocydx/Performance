@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
+import android.view.MotionEvent.actionToString
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.Scene
@@ -40,6 +41,7 @@ internal data class Segment(
     var startThreadTimeMillis: Long = 0L,
     var endMark: Long = 0L,
     var endUptimeMillis: Long = 0L,
+    var endThreadTimeMillis: Long = 0L,
 
     //region Metadata
     // scene = Scene.Message
@@ -61,6 +63,8 @@ internal data class Segment(
     //endregion
     //endregion
 ) {
+    val wallDurationMillis: Long
+        get() = endUptimeMillis - startUptimeMillis
 
     fun reset() {
         copyFrom(emptySegment)
@@ -77,7 +81,9 @@ internal data class Segment(
         startThreadTimeMillis = segment.startThreadTimeMillis
         endMark = segment.endMark
         endUptimeMillis = segment.endUptimeMillis
+        endThreadTimeMillis = segment.endThreadTimeMillis
 
+        `when` = segment.`when`
         what = segment.what
         targetName = segment.targetName
         callbackName = segment.callbackName
@@ -89,35 +95,30 @@ internal data class Segment(
         y = segment.y
     }
 
-    fun metadata(uptimeMillis: Long): String {
-        val b = StringBuilder()
-        return when (scene) {
-            Message -> log.ifEmpty {
-                b.append("{ when=").append(`when` - uptimeMillis).append("ms")
-                if (targetName != null) {
-                    if (callbackName != null) {
-                        b.append(" callback=").append(callbackName)
-                    } else {
-                        b.append(" what=").append(what)
-                    }
-                    if (arg1 != 0) b.append(" arg1=").append(arg1)
-                    if (arg2 != 0) b.append(" arg1=").append(arg1)
+    fun metadata() = when (scene) {
+        Message -> log.ifEmpty {
+            val b = StringBuilder()
+            b.append("{ when=").append(`when` - startUptimeMillis).append("ms")
+            if (targetName != null) {
+                if (callbackName != null) {
+                    b.append(" callback=").append(callbackName)
                 } else {
-                    b.append(" barrier=").append(arg1)
+                    b.append(" what=").append(what)
                 }
-                b.append(" }")
-                b.toString()
+                if (arg1 != 0) b.append(" arg1=").append(arg1)
+                if (arg2 != 0) b.append(" arg1=").append(arg1)
+                b.append(" target=").append(targetName)
+            } else {
+                b.append(" barrier=").append(arg1)
             }
-            IdleHandler -> {
-                b.append("MotionEvent { action=").append(action)
-                b.append(", x=").append(x).append(", y=").append(y)
-                b.append(" }")
-                b.toString()
-            }
-            NativeTouch -> {
-                b.append("IdleHandler { name=").append(idleHandlerName).append(" }")
-                b.toString()
-            }
+            b.append(" }")
+            b.toString()
+        }
+        IdleHandler -> {
+            "IdleHandler { name=$idleHandlerName }"
+        }
+        NativeTouch -> {
+            "MotionEvent { action=${actionToString(action)}, x=$x, y=$y }"
         }
     }
 

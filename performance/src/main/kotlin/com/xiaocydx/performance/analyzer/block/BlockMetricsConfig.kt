@@ -25,7 +25,7 @@ import androidx.annotation.IntRange
 data class BlockMetricsConfig(
     @IntRange(from = 1)
     val thresholdMillis: Long = 700,
-    val receivers: List<BlockMetricsReceiver>
+    val receivers: List<BlockMetricsReceiver> = emptyList()
 ) {
 
     internal fun checkProperty() {

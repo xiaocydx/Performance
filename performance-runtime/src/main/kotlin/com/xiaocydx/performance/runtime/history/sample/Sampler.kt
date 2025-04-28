@@ -74,6 +74,11 @@ internal class Sampler(
         return outcome
     }
 
+    @AnyThread
+    fun sampleImmediately(): Sample {
+        return sampleTask.sampleImmediately()
+    }
+
     private fun addSample(sample: Sample) {
         synchronized(sampleDeque) {
             if (sampleDeque.size == capacity) sampleDeque.removeFirst()
@@ -82,7 +87,7 @@ internal class Sampler(
     }
 
     private inner class SampleTask : Runnable {
-        private var pid = 0
+        private val pid by lazy { Process.myPid() }
         private var lastSysStat: ProcSysStat? = null
         private var lastPidStat: ProcPidStat? = null
         @Volatile private var isStarted = false
@@ -138,7 +143,6 @@ internal class Sampler(
             val threadState = mainThread.state
             val stackTrace = mainThread.stackTrace.toList()
 
-            if (pid == 0) pid = Process.myPid()
             val sysStat = ProcSysStat.read()
             val pidStat = ProcPidStat.read(pid)
             val lastSysStat = lastSysStat
@@ -160,17 +164,31 @@ internal class Sampler(
                 )
             }
 
-            val threadStat = ThreadStat(
-                priority = pidStat.takeIf { it.isAvailable }?.priority?.toString() ?: "",
-                nice = pidStat.takeIf { it.isAvailable }?.nice?.toString() ?: "",
-                state = threadState.toString(),
-                stack = stackTrace.map { it.toString() },
-                trace = stackTrace
-            )
-
+            val threadStat = threadStat(threadState, stackTrace, pidStat)
             this.lastSysStat = sysStat
             this.lastPidStat = pidStat
             addSample(Sample(uptimeMillis, intervalMillis, cpuStat, threadStat))
         }
+
+        fun sampleImmediately(): Sample {
+            val uptimeMillis = SystemClock.uptimeMillis()
+            val threadState = mainThread.state
+            val stackTrace = mainThread.stackTrace.toList()
+            val pidStat = ProcPidStat.read(pid)
+            val threadStat = threadStat(threadState, stackTrace, pidStat)
+            return Sample(uptimeMillis, intervalMillis, cpuStat = null, threadStat)
+        }
+
+        private fun threadStat(
+            threadState: Thread.State,
+            stackTrace: List<StackTraceElement>,
+            pidStat: ProcPidStat
+        ) = ThreadStat(
+            priority = pidStat.takeIf { it.isAvailable }?.priority?.toString() ?: "",
+            nice = pidStat.takeIf { it.isAvailable }?.nice?.toString() ?: "",
+            state = threadState.toString(),
+            stack = stackTrace.map { it.toString() },
+            trace = stackTrace
+        )
     }
 }

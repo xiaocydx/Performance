@@ -22,6 +22,7 @@ import android.os.Message
 import android.os.MessageQueue.IdleHandler
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.MotionEvent.actionToString
 import com.xiaocydx.performance.runtime.Reflection
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.History.NO_MARK
@@ -45,6 +46,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         start.uptimeMillis = uptimeMillis
         start.threadTimeMillis = SystemClock.currentThreadTimeMillis()
         start.metadata.value = metadata
+        start.metadata.uptimeMillis = uptimeMillis
         dispatchingMark = start.mark
         callback.dispatch(start)
         start.metadata.value = null
@@ -58,6 +60,7 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         end.scene = scene
         end.uptimeMillis = uptimeMillis
         end.metadata.value = metadata
+        end.metadata.uptimeMillis = start.metadata.uptimeMillis
         callback.dispatch(end)
         end.metadata.value = null
         dispatchActivityThreadMessage = false
@@ -84,16 +87,16 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
         }
     }
 
-    private class MetadataImpl(var value: Any? = null) : Metadata {
+    private class MetadataImpl(var value: Any? = null, var uptimeMillis: Long = 0L) : Metadata {
         override fun asMessageLog() = value as? String
         override fun asMessage() = value as? Message
         override fun asIdleHandler() = value as? IdleHandler
         override fun asMotionEvent() = value as? MotionEvent
         override fun toString(): String {
             asMessageLog()?.let { return it }
-            asMessage()?.let { return it.toString() }
-            asIdleHandler()?.let { return "IdleHandler { name=${it.javaClass.name ?: ""} }" }
-            asMotionEvent()?.let { return it.toString() }
+            asMessage()?.let { return it.toMetadataString(uptimeMillis) }
+            asIdleHandler()?.let { return it.toMetadataString() }
+            asMotionEvent()?.let { return it.toMetadataString() }
             return "Metadata { value=null }"
         }
     }
@@ -123,6 +126,35 @@ internal class LooperDispatcher(private val callback: LooperCallback) {
                 }
                 mCallbackField.set(handler, callback)
             }
+        }
+
+        private fun Message.toMetadataString(uptimeMillis: Long): String {
+            val b = StringBuilder()
+            b.append("{ when=").append(`when` - uptimeMillis).append("ms")
+            val targetName = target?.javaClass?.name
+            val callbackName = callback?.javaClass?.name
+            if (targetName != null) {
+                if (callbackName != null) {
+                    b.append(" callback=").append(callbackName)
+                } else {
+                    b.append(" what=").append(what)
+                }
+                if (arg1 != 0) b.append(" arg1=").append(arg1)
+                if (arg2 != 0) b.append(" arg1=").append(arg1)
+                b.append(" target=").append(targetName)
+            } else {
+                b.append(" barrier=").append(arg1)
+            }
+            b.append(" }")
+            return b.toString()
+        }
+
+        private fun IdleHandler.toMetadataString(): String {
+            return "IdleHandler { name=${javaClass.name ?: ""} }"
+        }
+
+        private fun MotionEvent.toMetadataString(): String {
+            return "MotionEvent { action=${actionToString(action)}, x=$x, y=$y }"
         }
     }
 }

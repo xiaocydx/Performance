@@ -28,14 +28,18 @@ import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.runtime.future.Future
-import com.xiaocydx.performance.runtime.future.Pending
+import com.xiaocydx.performance.runtime.history.record.Snapshot
+import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.segment.Merger
+import com.xiaocydx.performance.runtime.history.segment.Merger.Element
 import com.xiaocydx.performance.runtime.history.segment.Segment
 import com.xiaocydx.performance.runtime.history.segment.collectFrom
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
+import com.xiaocydx.performance.runtime.looper.Source
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.delay
@@ -49,15 +53,16 @@ import java.util.concurrent.atomic.AtomicLong
  */
 internal class ANRMetricsAnalyzer(
     host: Host,
-    private val config: ANRMetricsConfig
+    private val anrConfig: ANRMetricsConfig,
+    private val blockConfig: BlockMetricsConfig
 ) : Analyzer(host) {
 
     override fun init() {
         coroutineScope.launch {
             host.registerHistory(this@ANRMetricsAnalyzer)
             val callback = Callback(host.merger(
-                idleThresholdMillis = config.receiver.idleThresholdMillis,
-                mergeThresholdMillis = config.receiver.mergeThresholdMillis
+                idleThresholdMillis = anrConfig.idleThresholdMillis,
+                mergeThresholdMillis = anrConfig.mergeThresholdMillis
             ))
             host.addCallback(callback)
             try {
@@ -69,13 +74,7 @@ internal class ANRMetricsAnalyzer(
         }
     }
 
-    private companion object {
-        const val SYSTEM_DUMP_TIMEOUT_MILLIS = 20 * 1000L
-        const val AMS_ERROR_RETRY_COUNT = 20
-        const val AMS_ERROR_RETRY_MILLIS = SYSTEM_DUMP_TIMEOUT_MILLIS / AMS_ERROR_RETRY_COUNT
-    }
-
-    private suspend fun collectANREvent(anrAction: (Long) -> Unit) {
+    private suspend fun collectANREvent(anrAction: (anrSample: Sample) -> Unit) {
         val lastANRUptimeMillis = AtomicLong()
         val dumpDispatcher = Handler(host.dumpLooper).asCoroutineDispatcher()
         // Dispatchers.Unconfined:
@@ -86,7 +85,8 @@ internal class ANRMetricsAnalyzer(
                 val anrUptimeMillis = SystemClock.uptimeMillis()
                 if (anrUptimeMillis - lastANRUptimeMillis.get() < SYSTEM_DUMP_TIMEOUT_MILLIS) return@collect
                 lastANRUptimeMillis.set(anrUptimeMillis)
-                // TODO: 在此处调用Sampler.sample()抓取主线程堆栈
+
+                val anrSample = host.sampleImmediately() ?: return@collect
                 // TODO: fast path：判断主线程是否block中
                 // slow path：轮询ams，判断是否存在pid的ANR信息
                 launch(dumpDispatcher) {
@@ -101,7 +101,7 @@ internal class ANRMetricsAnalyzer(
                         if (processErrorStateInfo != null) break
                         delay(AMS_ERROR_RETRY_MILLIS)
                     }
-                    if (processErrorStateInfo != null) anrAction(anrUptimeMillis)
+                    if (processErrorStateInfo != null) anrAction(anrSample)
                 }
             }
         }
@@ -109,41 +109,113 @@ internal class ANRMetricsAnalyzer(
 
     private inner class Callback(private val merger: Merger) : LooperCallback {
         private val segment = Segment()
-        private val handler = Handler(Looper.getMainLooper())
-        private var anrUptimeMillis = 0L
+        private val dumpHandler = Handler(host.dumpLooper)
+        private val mainHandler = Handler(Looper.getMainLooper())
+        private var anrSample: Sample? = null
 
         @WorkerThread
-        fun anrAction(anrUptimeMillis: Long) {
-            handler.postAtFrontOfQueue { this.anrUptimeMillis = anrUptimeMillis }
+        fun anrAction(anrSample: Sample) {
+            mainHandler.postAtFrontOfQueue { this.anrSample = anrSample }
         }
 
         @MainThread
         override fun dispatch(current: DispatchContext) {
             // collectFrom() time << 1ms
             segment.collectFrom(current)
-            if (current !is End) return
-            if (anrUptimeMillis == 0L) {
-                merger.consume(segment)
-            } else {
-                val anrTime = anrUptimeMillis
-                anrUptimeMillis = 0L
-                segment.reset()
-                val endUptimeMillis = current.uptimeMillis
-                val startUptimeMillis = endUptimeMillis - (15 * 1000)
-                val elements = merger.copy(startUptimeMillis, endUptimeMillis)
-                if (elements.isEmpty()) return
-                val future = Future.getPendingList(Looper.myQueue(), endUptimeMillis)
+            when {
+                current !is End -> return
+                anrSample == null -> {
+                    if (segment.wallDurationMillis > blockConfig.thresholdMillis) {
+                        segment.isSingle = true
+                        segment.needRecord = true
+                        segment.needSample = true
+                        segment.endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
+                    } else if (current.isFrom(Source.ActivityThread)) {
+                        segment.isSingle = true
+                        segment.endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
+                    }
+                    merger.consume(segment)
+                }
+                else -> {
+                    segment.reset()
+                    val anrSample = anrSample
+                    this.anrSample = null
+                    val startUptimeMillis = current.uptimeMillis - (15 * 1000) // TODO: 配置化
+                    val elements = merger.copy(startUptimeMillis, current.uptimeMillis)
+                    val future = Future.getPendingList(Looper.myQueue(), current.uptimeMillis)
+                    dumpHandler.post(ANRTask(
+                        elements = elements,
+                        intermediate = ANRMetrics(
+                            //region lack
+                            pid = 0,
+                            tid = 0,
+                            createTimeMillis = 0L,
+                            history = emptyList(),
+                            //endregion
+                            latestActivity = host.getLatestActivity()?.javaClass?.name ?: "",
+                            thresholdMillis = blockConfig.thresholdMillis,
+                            isRecordEnabled = host.isRecordEnabled,
+                            anrSample = anrSample!!,
+                            future = future
+                        )
+                    ))
+                }
             }
         }
     }
 
-    private class ANRTask(
-        private val elements: List<Any>,
-        private val future: List<Pending>
+    private inner class ANRTask(
+        private val elements: List<Element>,
+        private val intermediate: ANRMetrics
     ) : Runnable {
 
         override fun run() {
-            // TODO: 将Element转换为Group
+            val createTimeMillis = System.currentTimeMillis()
+            val anrSample = intermediate.anrSample
+            val history = arrayOfNulls<Group>(elements.size)
+            for (i in elements.lastIndex downTo 0) {
+                val element = elements[i]
+                val startUptimeMillis = element.startUptimeMillis
+                val endUptimeMillis = element.endUptimeMillis
+                val containsANR = anrSample.uptimeMillis in startUptimeMillis..endUptimeMillis
+
+                var snapshot = Snapshot.empty()
+                var sampleList = emptyList<Sample>()
+                if (containsANR || element.needRecord) {
+                    snapshot = host.snapshot(element.startMark, element.endMark)
+                        .availableOrEmpty(startUptimeMillis, endUptimeMillis)
+                }
+                if (containsANR || element.needSample) {
+                    sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
+                }
+
+                history[i] = Group(
+                    count = element.count,
+                    scene = element.scene.toString(),
+                    metadata = element.metadata(),
+                    startUptimeMillis = startUptimeMillis,
+                    startThreadTimeMillis = element.startThreadTimeMillis,
+                    endUptimeMillis = endUptimeMillis,
+                    endThreadTimeMillis = element.endThreadTimeMillis,
+                    idleDurationMillis = element.idleDurationMillis,
+                    snapshot = snapshot,
+                    sampleList = sampleList,
+                )
+            }
+            @Suppress("UNCHECKED_CAST")
+            val metric = intermediate.copy(
+                pid = Process.myPid(),
+                tid = Process.myPid(), // 主线程的tid跟pid一致
+                createTimeMillis = createTimeMillis,
+                history = (history as Array<Group>).toList()
+            )
+            anrConfig.receivers.forEach { it.receive(metric) }
         }
+    }
+
+    private companion object {
+        const val SYSTEM_DUMP_TIMEOUT_MILLIS = 20 * 1000L
+        const val AMS_ERROR_RETRY_COUNT = 20
+        const val AMS_ERROR_RETRY_MILLIS = SYSTEM_DUMP_TIMEOUT_MILLIS / AMS_ERROR_RETRY_COUNT
     }
 }

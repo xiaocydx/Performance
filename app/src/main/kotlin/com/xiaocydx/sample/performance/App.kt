@@ -30,7 +30,9 @@ class App : Application() {
                         BlockMetricsWriter(application = this)
                     )
                 ),
-                anrConfig = ANRMetricsConfig(receiver = ANRMetricsWriter())
+                anrConfig = ANRMetricsConfig(
+                    receivers = listOf(ANRMetricsWriter())
+                )
             )
         )
     }
