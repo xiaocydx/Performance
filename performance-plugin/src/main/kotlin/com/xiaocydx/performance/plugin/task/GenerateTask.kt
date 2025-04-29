@@ -19,9 +19,10 @@ package com.xiaocydx.performance.plugin.task
 import com.google.gson.JsonParser
 import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.PerformanceExtension
-import com.xiaocydx.performance.plugin.generate.BlockMetricsParser
+import com.xiaocydx.performance.plugin.generate.block.BlockMetricsParser
 import com.xiaocydx.performance.plugin.generate.GenerateContext
 import com.xiaocydx.performance.plugin.generate.MetricsParser
+import com.xiaocydx.performance.plugin.generate.anr.ANRMetricsParser
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.TaskAction
 import java.io.File
@@ -40,7 +41,7 @@ internal abstract class GenerateTask : DefaultTask() {
             mappingFile = File(ext.mappingMethodFile),
             metricsDir = File(ext.metricsDir),
             logger = logger,
-            parserList = listOf(BlockMetricsParser())
+            parserList = listOf(BlockMetricsParser(), ANRMetricsParser())
         )
         parseMetricsFiles(context).forEach { pending ->
             val (file, metrics, parser) = pending

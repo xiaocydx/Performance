@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.plugin.generate
 
+import com.xiaocydx.performance.plugin.generate.Record.Companion.ID_SLICE
 import java.io.File
 
 /**
@@ -27,4 +28,18 @@ internal interface MetricsParser<T : Any> {
     fun match(tag: String): Class<T>?
 
     fun json(file: File, metrics: T, context: GenerateContext): String?
+
+    fun filter(snapshot: List<Long>): List<Long> {
+        if (snapshot.isEmpty()) return snapshot
+        val outcome = snapshot.toMutableList()
+        val first = Record(snapshot.first())
+        val last = Record(snapshot.last())
+        if (first.id == ID_SLICE) {
+            outcome.removeFirst()
+        }
+        if (outcome.isNotEmpty() && last.id == ID_SLICE) {
+            outcome.removeLast()
+        }
+        return outcome
+    }
 }

@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.plugin.generate
+package com.xiaocydx.performance.plugin.generate.block
 
-import com.xiaocydx.performance.plugin.generate.Record.Companion.ID_SLICE
-import com.xiaocydx.performance.plugin.metadata.MethodData
+import com.xiaocydx.performance.plugin.generate.GenerateContext
+import com.xiaocydx.performance.plugin.generate.MetricsParser
+import com.xiaocydx.performance.plugin.generate.Record
+import com.xiaocydx.performance.plugin.generate.Sample
+import com.xiaocydx.performance.plugin.generate.TraceEvent
 import java.io.File
 
 /**
@@ -42,7 +45,6 @@ internal data class BlockMetrics(
     val sampleList: List<Sample> = emptyList(),
 ) {
     val wallDurationMillis = endUptimeMillis - startUptimeMillis
-
     val cpuDurationMillis = endThreadTimeMillis - startThreadTimeMillis
 
     companion object {
@@ -61,26 +63,12 @@ internal class BlockMetricsParser : MetricsParser<BlockMetrics> {
         metrics: BlockMetrics,
         context: GenerateContext
     ): String? = with(metrics) {
-        if (snapshot.isEmpty()) {
-            context.logger.lifecycle { "${file.name} [failure]: snapshot is empty" }
-            return null
-        }
-        // gson构建的metrics，wallDurationMillis和cpuDurationMillis为0，通过copy()赋值
-        val args = this.copy()
-        val durationEvents = snapshot.map {
+        val snapshotEvents = filter(snapshot).map {
             val record = Record(it)
-            var methodData = context.mappingMethod[record.id]
+            val methodData = context.mappingMethod[record.id]
             if (methodData == null) {
-                if (record.id != ID_SLICE) {
-                    context.logger.lifecycle { "${file.name} [failure]: id = ${record.id} not exists" }
-                    return null
-                }
-                methodData = MethodData(
-                    id = ID_SLICE, access = 0,
-                    className = BlockMetrics.TAG,
-                    methodName = scene,
-                    desc = ""
-                )
+                context.logger.lifecycle { "${file.name} [failure]: id = ${record.id} not exists" }
+                return null
             }
             val className = methodData.className.replace("/", ".")
             TraceEvent.duration(
@@ -89,20 +77,36 @@ internal class BlockMetricsParser : MetricsParser<BlockMetrics> {
                 ts = TraceEvent.ts(record.timeMs),
                 pid = TraceEvent.pid(pid),
                 tid = TraceEvent.tid(tid),
-                cat = scene,
-                args = if (record.id == ID_SLICE && record.isEnter) args else null
+                cat = scene
             )
+        }.toMutableList()
+
+        // gson构建的metrics，wallDurationMillis和cpuDurationMillis为0，通过copy()赋值
+        val args = metrics.copy()
+        repeat(2) {
+            val isEnter = it == 0
+            val index = if (isEnter) 0 else snapshotEvents.size
+            val timeMs = if (isEnter) startUptimeMillis else endUptimeMillis
+            snapshotEvents.add(index, TraceEvent.duration(
+                name = "${BlockMetrics.TAG}.${scene}",
+                isBegin = isEnter,
+                ts = TraceEvent.ts(timeMs),
+                pid = TraceEvent.pid(pid),
+                tid = TraceEvent.tid(tid),
+                cat = scene,
+                args = if (isEnter) args else null
+            ))
         }
 
-        val instantEvents = sampleList.mapIndexed { i: Int, sample: Sample ->
+        val sampleEvents = sampleList.mapIndexed { i: Int, sample: Sample ->
             TraceEvent.instant(
                 name = "Sample${i + 1}",
                 ts = TraceEvent.ts(sample.uptimeMillis),
                 pid = TraceEvent.pid(pid),
-                tid = TraceEvent.tid(tid),
+                tid = "Sample",
                 args = sample
             )
         }
-        return context.gson.toJson(durationEvents + instantEvents)
+        return context.gson.toJson(snapshotEvents + sampleEvents)
     }
 }

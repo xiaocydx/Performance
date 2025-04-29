@@ -28,8 +28,9 @@ internal class TraceEvent private constructor(
     val ts: Long,
     val pid: String,
     val tid: String,
-    val cat: String?,
-    val args: Any?
+    val dur: Long? = null,
+    val cat: String? = null,
+    val args: Any? = null
 ) {
 
     companion object {
@@ -65,6 +66,28 @@ internal class TraceEvent private constructor(
             tid = tid,
             cat = cat,
             args = args
+        )
+
+        /**
+         * [Complete Events](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?tab=t.0#heading=h.lpfof2aylapb)
+         */
+        fun complete(
+            name: String,
+            startTs: Long,
+            endTs: Long,
+            pid: String,
+            tid: String,
+            cat: String? = null,
+            args: Any? = null
+        ) = TraceEvent(
+            name = name,
+            ph = "X",
+            ts = startTs,
+            pid = pid,
+            tid = tid,
+            dur = endTs - startTs,
+            cat = cat,
+            args = args,
         )
 
         /**
