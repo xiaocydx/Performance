@@ -87,9 +87,11 @@ internal class LooperIdleHandlerWatcher private constructor(
             runCatching {
                 val fields = MessageQueue::class.java.toSafe().declaredInstanceFields
                 val mIdleHandlers = fields.find("mIdleHandlers").apply { isAccessible = true }
-                val original = mIdleHandlers.get(mainQueue) as? List<IdleHandler>
-                watcher.set(original)
-                mIdleHandlers.set(mainQueue, watcher.get())
+                synchronized(mainQueue) {
+                    val original = mIdleHandlers.get(mainQueue) as? List<IdleHandler>
+                    watcher.set(original)
+                    mIdleHandlers.set(mainQueue, watcher.get())
+                }
             }
             return watcher
         }

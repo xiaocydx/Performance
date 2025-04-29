@@ -53,10 +53,10 @@ internal data class Segment(
     var arg1: Int = 0,
     var arg2: Int = 0,
 
-    //scene = IdleHandler
+    // scene = IdleHandler
     var idleHandlerName: String = "",
 
-    //scene = NativeTouch
+    // scene = NativeTouch
     var action: Int = 0,
     var x: Float = 0f,
     var y: Float = 0f,
