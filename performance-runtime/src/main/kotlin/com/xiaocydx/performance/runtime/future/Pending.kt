@@ -21,6 +21,7 @@ package com.xiaocydx.performance.runtime.future
  * @date 2025/4/25
  */
 data class Pending(
+    val uptimeMillis: Long,
     val `when`: Long,
     val what: Int,
     val targetName: String,

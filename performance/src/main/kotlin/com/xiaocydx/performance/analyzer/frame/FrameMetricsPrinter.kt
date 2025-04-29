@@ -26,8 +26,6 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.roundToInt
 
 /**
- * 打印[FrameMetricsAggregate]
- *
  * @author xcc
  * @date 2025/4/3
  */

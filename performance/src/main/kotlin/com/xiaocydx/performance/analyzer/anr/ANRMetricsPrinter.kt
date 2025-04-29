@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.analyzer.block
+package com.xiaocydx.performance.analyzer.anr
 
 import android.util.Log
 import com.google.gson.GsonBuilder
@@ -27,51 +27,47 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * @author xcc
- * @date 2025/4/27
+ * @date 2025/4/29
  */
-class BlockMetricsPrinter : BlockMetricsReceiver {
+class ANRMetricsPrinter : ANRMetricsReceiver {
     private val gson by lazy {
         GsonBuilder().setPrettyPrinting().disableHtmlEscaping()
-            .registerTypeAdapter(BlockMetrics::class.java, Adapter())
+            .registerTypeAdapter(ANRMetrics::class.java, Adapter())
             .create()
     }
 
-    override fun receive(metrics: BlockMetrics) {
+    override fun receive(metrics: ANRMetrics) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
             Log.e(TAG, gson.toJson(metrics))
-            for (i in metrics.sampleList.lastIndex downTo 0) {
-                val sample = metrics.sampleList[i]
-                val removed = sample.threadStat.copy(stack = emptyList(), trace = emptyList())
-                val message = sample.copy(threadStat = removed).toString()
-                    .replace("Sample", "Sample${i + 1}")
-                    .replace(", stack=[]", "")
-                    .replace(", trace=[]", "")
-                Log.e(TAG, message, sample.threadStat.toCause())
-            }
+            val anrSample = metrics.anrSample
+            val removed = anrSample.threadStat.copy(stack = emptyList(), trace = emptyList())
+            val message = anrSample.copy(threadStat = removed).toString()
+                .replace("Sample", "ANRSample")
+                .replace(", stack=[]", "")
+                .replace(", trace=[]", "")
+            Log.e(TAG, message, anrSample.threadStat.toCause())
         }
     }
 
-    private class Adapter : TypeAdapter<BlockMetrics>() {
-        override fun write(out: JsonWriter, metrics: BlockMetrics) {
+    private class Adapter : TypeAdapter<ANRMetrics>() {
+        override fun write(out: JsonWriter, metrics: ANRMetrics) {
             out.beginObject()
             out.apply {
-                name("scene").value(metrics.scene)
-                name("metadata").value(metrics.metadata)
                 name("latestActivity").value(metrics.latestActivity)
                 name("thresholdMillis").value(metrics.thresholdMillis)
-                name("wallDurationMillis").value(metrics.wallDurationMillis)
-                name("cpuDurationMillis").value(metrics.cpuDurationMillis)
                 name("isRecordEnabled").value(metrics.isRecordEnabled)
+                name("history.size").value(metrics.history.size)
+                name("future.size").value(metrics.future.size)
             }
             out.endObject()
         }
 
-        override fun read(`in`: JsonReader): BlockMetrics {
+        override fun read(`in`: JsonReader): ANRMetrics {
             throw UnsupportedOperationException()
         }
     }
 
     private companion object {
-        const val TAG = "BlockMetricsPrinter"
+        const val TAG = "ANRMetricsPrinter"
     }
 }

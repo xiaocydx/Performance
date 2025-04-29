@@ -39,8 +39,8 @@ internal object Future : Reflection {
         synchronized(queue) {
             var message = mMessagesField.get(queue) as? Message
             while (message != null) {
-                // TODO: 补充wait时长
                 outcome.add(Pending(
+                    uptimeMillis = uptimeMillis,
                     `when` = message.`when`,
                     what = message.what,
                     targetName = message.target?.javaClass?.name ?: "",
