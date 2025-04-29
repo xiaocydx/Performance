@@ -140,7 +140,7 @@ internal class ANRMetricsAnalyzer(
                     segment.reset()
                     val anrSample = anrSample
                     this.anrSample = null
-                    val startUptimeMillis = current.uptimeMillis - (15 * 1000) // TODO: 配置化
+                    val startUptimeMillis = current.uptimeMillis - anrConfig.recentDurationMillis
                     val elements = merger.copy(startUptimeMillis, current.uptimeMillis)
                     val future = Future.getPendingList(Looper.myQueue(), current.uptimeMillis)
                     dumpHandler.post(ANRTask(
@@ -169,10 +169,11 @@ internal class ANRMetricsAnalyzer(
         private val intermediate: ANRMetrics
     ) : Runnable {
 
+        @Suppress("UNCHECKED_CAST")
         override fun run() {
             val createTimeMillis = System.currentTimeMillis()
             val anrSample = intermediate.anrSample
-            val history = arrayOfNulls<Group>(elements.size)
+            val history = arrayOfNulls<CompletedBatch>(elements.size)
             for (i in elements.lastIndex downTo 0) {
                 val element = elements[i]
                 val startUptimeMillis = element.startUptimeMillis
@@ -189,10 +190,10 @@ internal class ANRMetricsAnalyzer(
                     sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
                 }
 
-                history[i] = Group(
+                history[i] = CompletedBatch(
                     count = element.count,
                     scene = element.scene.toString(),
-                    metadata = element.metadata(),
+                    lastMetadata = element.lastMetadata(),
                     startUptimeMillis = startUptimeMillis,
                     startThreadTimeMillis = element.startThreadTimeMillis,
                     endUptimeMillis = endUptimeMillis,
@@ -202,12 +203,13 @@ internal class ANRMetricsAnalyzer(
                     sampleList = sampleList,
                 )
             }
-            @Suppress("UNCHECKED_CAST")
+
+            val pid = Process.myPid()
             val metric = intermediate.copy(
-                pid = Process.myPid(),
-                tid = Process.myPid(), // 主线程的tid跟pid一致
+                pid = pid,
+                tid = pid, // 主线程的tid跟pid一致
                 createTimeMillis = createTimeMillis,
-                history = (history as Array<Group>).toList()
+                history = (history as Array<CompletedBatch>).toList()
             )
             anrConfig.receivers.forEach { it.receive(metric) }
         }

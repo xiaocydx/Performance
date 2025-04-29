@@ -14,56 +14,30 @@
  * limitations under the License.
  */
 
-@file:Suppress("KDocUnresolvedReference")
+package com.xiaocydx.performance.analyzer.anr
 
-package com.xiaocydx.performance.analyzer.block
-
-import android.os.Process
-import com.xiaocydx.performance.analyzer.Metrics
 import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 
 /**
- * 卡顿指标数据
- *
  * @author xcc
- * @date 2025/4/16
+ * @date 2025/4/29
  */
-data class BlockMetrics(
+data class CompletedBatch(
     /**
-     * [Process.myPid]
+     * 已完成的数量
      */
-    override val pid: Int,
+    val count: Int,
 
     /**
-     * [Process.myTid]
-     */
-    override val tid: Int,
-
-    /**
-     * 可用于定义文件名
-     */
-    override val createTimeMillis: Long,
-
-    /**
-     * 卡顿场景
+     * 已完成的场景
      */
     val scene: String,
 
     /**
-     * [scene]的元数据
+     * [scene]最后一次调度的元数据
      */
-    val metadata: String,
-
-    /**
-     * 最后启动的Activity
-     */
-    val latestActivity: String,
-
-    /**
-     * 卡顿阈值，来自[BlockMetricsConfig]
-     */
-    val thresholdMillis: Long,
+    val lastMetadata: String,
 
     /**
      * 开始时间，可用于计算[wallDurationMillis]
@@ -86,9 +60,9 @@ data class BlockMetrics(
     val endThreadTimeMillis: Long,
 
     /**
-     * 是否已启用[History]的Record。若未启用，则[snapshot]为空。
+     * [wallDurationMillis]包含的空闲时长
      */
-    val isRecordEnabled: Boolean,
+    val idleDurationMillis: Long,
 
     /**
      * 调用栈快照
@@ -99,16 +73,10 @@ data class BlockMetrics(
      * 采样数据集合
      */
     val sampleList: List<Sample>
-) : Metrics {
-
-    /**
-     * 可用于区分解析逻辑
-     */
-    override val tag = "BlockMetrics"
-
+) {
     val wallDurationMillis: Long
         get() = endUptimeMillis - startUptimeMillis
 
     val cpuDurationMillis: Long
-        get() = endThreadTimeMillis - startThreadTimeMillis
+        get() = if (endThreadTimeMillis == 0L) -1 else endThreadTimeMillis - startThreadTimeMillis
 }

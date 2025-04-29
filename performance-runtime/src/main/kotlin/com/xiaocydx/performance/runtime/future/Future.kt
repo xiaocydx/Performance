@@ -33,18 +33,18 @@ internal object Future : Reflection {
         Message::class.java.toSafe().declaredInstanceFields.find("next")
     }.getOrNull()?.apply { isAccessible = true }
 
-    fun getPendingList(queue: MessageQueue, uptimeMillis: Long): List<Pending> {
+    fun getPendingList(queue: MessageQueue, uptimeMillis: Long): List<PendingMessage> {
         if (mMessagesField == null || nextField == null) return emptyList()
-        val outcome = mutableListOf<Pending>()
+        val outcome = mutableListOf<PendingMessage>()
         synchronized(queue) {
             var message = mMessagesField.get(queue) as? Message
             while (message != null) {
-                outcome.add(Pending(
+                outcome.add(PendingMessage(
                     uptimeMillis = uptimeMillis,
                     `when` = message.`when`,
                     what = message.what,
-                    targetName = message.target?.javaClass?.name ?: "",
-                    callbackName = message.callback?.javaClass?.name ?: "",
+                    targetName = message.target?.javaClass?.name,
+                    callbackName = message.callback?.javaClass?.name,
                     arg1 = message.arg1,
                     arg2 = message.arg2
                 ))

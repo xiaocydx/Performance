@@ -23,15 +23,18 @@ import androidx.annotation.IntRange
  * @date 2025/4/24
  */
 data class ANRMetricsConfig(
-    @get:IntRange(from = 0)
+    @get:IntRange(from = 1)
     val idleThresholdMillis: Long = 16L,
-    @get:IntRange(from = 0)
+    @get:IntRange(from = 1)
     val mergeThresholdMillis: Long = 300L,
+    @get:IntRange(from = 1)
+    val recentDurationMillis: Long = 30 * 1000L,
     val receivers: List<ANRMetricsReceiver> = emptyList()
 ) {
 
     internal fun checkProperty() {
-        require(idleThresholdMillis >= 0) { "idleThresholdMillis < 0" }
-        require(mergeThresholdMillis >= 0) { "mergeThresholdMillis < 0" }
+        require(idleThresholdMillis >= 1) { "idleThresholdMillis < 1" }
+        require(mergeThresholdMillis >= 1) { "mergeThresholdMillis < 1" }
+        require(recentDurationMillis >= 1) { "mergeThresholdMillis < 1" }
     }
 }

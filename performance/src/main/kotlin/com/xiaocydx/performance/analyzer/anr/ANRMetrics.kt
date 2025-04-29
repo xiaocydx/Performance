@@ -21,11 +21,12 @@ package com.xiaocydx.performance.analyzer.anr
 import android.os.Process
 import com.xiaocydx.performance.analyzer.Metrics
 import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
-import com.xiaocydx.performance.runtime.future.Pending
-import com.xiaocydx.performance.runtime.history.record.Snapshot
+import com.xiaocydx.performance.runtime.future.PendingMessage
 import com.xiaocydx.performance.runtime.history.sample.Sample
 
 /**
+ * ANR指标数据
+ *
  * @author xcc
  * @date 2025/4/27
  */
@@ -56,71 +57,28 @@ data class ANRMetrics(
     val thresholdMillis: Long,
 
     /**
-     * 是否已启用[History]的Record。若未启用，则[snapshot]为空。
+     * 是否已启用[History]的Record。若未启用，则[CompletedBatch.snapshot]为空。
      */
     val isRecordEnabled: Boolean,
 
+    /**
+     * 发生ANR时的采样数据
+     */
     val anrSample: Sample,
 
-    val history: List<Group>,
+    /**
+     * 已完成的调度
+     */
+    val history: List<CompletedBatch>,
 
-    val future: List<Pending>
+    /**
+     * 待调度的消息
+     */
+    val future: List<PendingMessage>
 ) : Metrics {
 
     /**
      * 可用于区分解析逻辑
      */
     override val tag = "ANRMetrics"
-}
-
-data class Group(
-    val count: Int,
-
-    val scene: String,
-
-    /**
-     * [scene]的元数据
-     */
-    val metadata: String,
-
-    /**
-     * 开始时间，可用于计算[wallDurationMillis]
-     */
-    val startUptimeMillis: Long,
-
-    /**
-     * 开始时间，可用于计算[cpuDurationMillis]
-     */
-    val startThreadTimeMillis: Long,
-
-    /**
-     * 结束时间，可用于计算[wallDurationMillis]
-     */
-    val endUptimeMillis: Long,
-
-    /**
-     * 结束时间，可用于计算[cpuDurationMillis]
-     */
-    val endThreadTimeMillis: Long,
-
-    /**
-     * 包含的空闲时长
-     */
-    val idleDurationMillis: Long,
-
-    /**
-     * 调用栈快照
-     */
-    val snapshot: Snapshot,
-
-    /**
-     * 采样数据集合
-     */
-    val sampleList: List<Sample>
-) {
-    val wallDurationMillis: Long
-        get() = endUptimeMillis - startUptimeMillis
-
-    val cpuDurationMillis: Long
-        get() = if (endThreadTimeMillis == 0L) -1 else endThreadTimeMillis - startThreadTimeMillis
 }

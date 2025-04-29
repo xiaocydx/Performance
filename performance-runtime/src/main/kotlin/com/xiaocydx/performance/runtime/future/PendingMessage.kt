@@ -20,12 +20,32 @@ package com.xiaocydx.performance.runtime.future
  * @author xcc
  * @date 2025/4/25
  */
-data class Pending(
+data class PendingMessage(
     val uptimeMillis: Long,
     val `when`: Long,
     val what: Int,
-    val targetName: String,
-    val callbackName: String,
+    val targetName: String?,
+    val callbackName: String?,
     val arg1: Int,
     val arg2: Int
-)
+) {
+
+    override fun toString(): String {
+        val b = StringBuilder()
+        b.append("{ when=").append(`when` - uptimeMillis).append("ms")
+        if (targetName != null) {
+            if (callbackName != null) {
+                b.append(" callback=").append(callbackName)
+            } else {
+                b.append(" what=").append(what)
+            }
+            if (arg1 != 0) b.append(" arg1=").append(arg1)
+            if (arg2 != 0) b.append(" arg1=").append(arg1)
+            b.append(" target=").append(targetName)
+        } else {
+            b.append(" barrier=").append(arg1)
+        }
+        b.append(" }")
+        return b.toString()
+    }
+}

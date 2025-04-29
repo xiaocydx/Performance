@@ -109,9 +109,10 @@ internal class BlockMetricsAnalyzer(
             val snapshot = host.snapshot(startMark, endMark)
                 .availableOrEmpty(startUptimeMillis, endUptimeMillis)
             val sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
+            val pid = Process.myPid()
             val metrics = intermediate.copy(
-                pid = Process.myPid(),
-                tid = Process.myPid(), // 主线程的tid跟pid一致
+                pid = pid,
+                tid = pid, // 主线程的tid跟pid一致
                 createTimeMillis = createTimeMillis,
                 snapshot = snapshot,
                 sampleList = sampleList

@@ -59,6 +59,10 @@ internal class Merger(
     }
 
     fun copy(startUptimeMillis: Long, endUptimeMillis: Long): List<Element> {
+        if (startUptimeMillis < 0 || endUptimeMillis < 0
+                || endUptimeMillis < startUptimeMillis) {
+            return emptyList()
+        }
         val outcome = mutableListOf<Element>()
         for (i in deque.lastIndex downTo 0) {
             val element = deque[i]
@@ -101,7 +105,7 @@ internal class Merger(
             last.copyFrom(segment)
         }
 
-        fun metadata(): String {
+        fun lastMetadata(): String {
             return last.metadata()
         }
 
