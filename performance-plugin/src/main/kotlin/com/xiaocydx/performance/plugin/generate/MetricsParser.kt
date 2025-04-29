@@ -24,7 +24,7 @@ import java.io.File
  */
 internal interface MetricsParser<T : Any> {
 
-    fun matchDataClass(tag: String): Class<T>?
+    fun match(tag: String): Class<T>?
 
-    fun toTraceEventsJson(file: File, data: T, context: GenerateContext): String?
+    fun json(file: File, metrics: T, context: GenerateContext): String?
 }

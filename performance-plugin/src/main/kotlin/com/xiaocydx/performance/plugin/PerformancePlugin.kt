@@ -35,7 +35,7 @@ internal class PerformancePlugin : Plugin<Project> {
             throw GradleException("Performance Plugin, Android Application plugin required.")
         }
         PerformanceExtension.inject(project)
-        project.tasks.register("performanceGenerateJson", GenerateTask::class.java)
+        project.tasks.register("performanceGenerateTrace", GenerateTask::class.java)
 
         val androidExt = project.extensions.getByType(AndroidComponentsExtension::class.java)
         androidExt.onVariants { variant ->

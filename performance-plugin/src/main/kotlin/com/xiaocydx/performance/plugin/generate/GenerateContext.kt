@@ -16,7 +16,7 @@
 
 package com.xiaocydx.performance.plugin.generate
 
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.xiaocydx.performance.plugin.Logger
 import com.xiaocydx.performance.plugin.metadata.Metadata
 import com.xiaocydx.performance.plugin.metadata.MethodData
@@ -28,20 +28,20 @@ import java.io.File
  */
 internal class GenerateContext(
     mappingFile: File,
-    snapshotDir: File,
+    metricsDir: File,
     val logger: Logger,
     val parserList: List<MetricsParser<*>>
 ) {
-    val gson = Gson()
-    val jsonDir = File(snapshotDir, "json")
-    val snapshotFiles = snapshotDir.listFiles()?.filter { it.isFile } ?: emptyList()
+    val traceDir = File(metricsDir, "trace")
+    val gson = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()!!
+    val metricsFiles = metricsDir.listFiles()?.filter { it.isFile } ?: emptyList()
     val mappingMethod = mappingFile.bufferedReader(Metadata.charset).useLines { lines ->
         lines.map { MethodData.fromOutput(it) }.associateBy { it.id }
     }
 
     init {
         require(mappingFile.exists()) { "$mappingFile not exists" }
-        require(snapshotDir.exists()) { "$snapshotDir not exists" }
-        jsonDir.mkdirs()
+        require(metricsDir.exists()) { "$metricsDir not exists" }
+        traceDir.mkdirs()
     }
 }

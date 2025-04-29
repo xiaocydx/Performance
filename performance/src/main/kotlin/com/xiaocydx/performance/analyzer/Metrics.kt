@@ -32,6 +32,12 @@ import java.util.TimeZone
  * @date 2025/4/27
  */
 interface Metrics {
+
+    /**
+     * 可用于区分解析逻辑
+     */
+    val tag: String
+
     /**
      * [Process.myPid]
      */
@@ -41,11 +47,6 @@ interface Metrics {
      * [Process.myTid]
      */
     val tid: Int
-
-    /**
-     * 可用于区分解析逻辑
-     */
-    val tag: String
 
     /**
      * 可用于定义文件名

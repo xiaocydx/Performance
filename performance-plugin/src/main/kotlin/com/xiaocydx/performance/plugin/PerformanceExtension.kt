@@ -61,7 +61,7 @@ open class PerformanceHistoryExtension(
     @JvmField var excludeMethodFile: String = "",
     @JvmField var mappingMethodFile: String = "",
     @JvmField var mappingBaseFile: String = "",
-    @JvmField var snapshotDir: String = ""
+    @JvmField var metricsDir: String = ""
 ) {
 
     fun buildManifest(path: String, block: ExcludeManifest.() -> Unit): String {
@@ -82,7 +82,7 @@ open class PerformanceHistoryExtension(
         mappingMethodFile = mappingMethodFile.ifEmpty {
             "${buildDir}${separator}mapping${separator}MappingMethodList.text"
         }
-        if (snapshotDir.isNotEmpty()) File(snapshotDir).takeIf { !it.exists() }?.mkdirs()
+        if (metricsDir.isNotEmpty()) File(metricsDir).takeIf { !it.exists() }?.mkdirs()
     }
 
     class ExcludeManifest(private val writer: PrintWriter) {

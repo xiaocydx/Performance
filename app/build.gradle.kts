@@ -52,7 +52,7 @@ performance {
         val dir = "${rootDir}${separator}build-files"
         isTraceEnabled = true
         isRecordEnabled = true
-        snapshotDir = "${dir}${separator}snapshot"
+        metricsDir = "${dir}${separator}metrics"
         excludeManifest = buildManifest("${dir}${separator}ExcludeManifest.text") {
             addPackage("kotlin/", "kotlinx/coroutines/")
         }

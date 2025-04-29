@@ -20,8 +20,25 @@ package com.xiaocydx.performance.plugin.generate
  * @author xcc
  * @date 2025/4/24
  */
-internal class SampleData(
+data class Sample(
     val uptimeMillis: Long = 0L,
-    val threadState: String = "",
-    val threadStack: List<String> = emptyList()
+    val intervalMillis: Long = 0L,
+    val cpuStat: CPUStat? = null,
+    val threadStat: ThreadStat = ThreadStat()
+)
+
+data class CPUStat(
+    val cpu: String = "",
+    val user: String = "",
+    val system: String = "",
+    val idle: String = "",
+    val iowait: String = "",
+    val app: String = ""
+)
+
+data class ThreadStat(
+    val priority: String = "",
+    val nice: String = "",
+    val state: String = "",
+    val stack: List<String> = emptyList()
 )

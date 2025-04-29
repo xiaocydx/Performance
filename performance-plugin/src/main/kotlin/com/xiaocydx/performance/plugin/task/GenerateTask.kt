@@ -38,47 +38,43 @@ internal abstract class GenerateTask : DefaultTask() {
         val ext = PerformanceExtension.getHistory(project).setDefaultProperty(project)
         val context = GenerateContext(
             mappingFile = File(ext.mappingMethodFile),
-            snapshotDir = File(ext.snapshotDir),
+            metricsDir = File(ext.metricsDir),
             logger = logger,
             parserList = listOf(BlockMetricsParser())
         )
-        parseSnapshotFiles(context).forEach { pending ->
-            val (file, data, parser) = pending
-            val json = parser.toTraceEventsJson(file, data, context) ?: return@forEach
-            val jsonFile = File(context.jsonDir, "${file.name}.json")
+        parseMetricsFiles(context).forEach { pending ->
+            val (file, metrics, parser) = pending
+            val json = parser.json(file, metrics, context) ?: return@forEach
+            val jsonFile = File(context.traceDir, "${file.name}.json")
             jsonFile.bufferedWriter().use { writer -> writer.write(json) }
             logger.lifecycle { "${file.name} [success]: ${jsonFile.absolutePath}" }
         }
     }
 
-    private fun parseSnapshotFiles(context: GenerateContext): List<Pending> {
+    private fun parseMetricsFiles(context: GenerateContext): List<Pending> {
         val outcome = mutableListOf<Pending>()
-        context.snapshotFiles.forEach { file ->
-            val element = JsonParser.parseString(file.readText())
+        context.metricsFiles.forEach { file ->
+            val text = file.readText()
+            val element = JsonParser.parseString(text)
             val obj = runCatching { element.asJsonObject }.getOrNull()
             val tag = runCatching { obj?.get("tag")?.asString }.getOrNull()
-            val dataJson = obj?.get("data")?.toString()
             if (tag.isNullOrEmpty()) {
                 logger.lifecycle { "${file.name} [failure]: tag is empty" }
                 return@forEach
             }
-            if (dataJson.isNullOrEmpty()) {
-                logger.lifecycle { "${file.name} [failure]: data is empty" }
-                return@forEach
-            }
             context.parserList.forEach action@{
-                val dataClass = it.matchDataClass(tag)
-                if (dataClass == null) {
+                val clazz = it.match(tag)
+                if (clazz == null) {
                     logger.lifecycle { "${file.name} [failure]: tag no match" }
                     return@action
                 }
-                val data = context.gson.fromJson(dataJson, dataClass)
+                val metrics = context.gson.fromJson(text, clazz)
                 @Suppress("UNCHECKED_CAST")
-                outcome.add(Pending(file, data, it as MetricsParser<Any>))
+                outcome.add(Pending(file, metrics, it as MetricsParser<Any>))
             }
         }
         return outcome
     }
 
-    private data class Pending(val file: File, val data: Any, val parser: MetricsParser<Any>)
+    private data class Pending(val file: File, val metrics: Any, val parser: MetricsParser<Any>)
 }
