@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * @author xcc
@@ -75,18 +76,22 @@ internal class ANRMetricsAnalyzer(
     }
 
     private suspend fun collectANREvent(anrAction: (anrSample: Sample) -> Unit) {
-        val lastANRUptimeMillis = AtomicLong()
+        val lastANRTime = AtomicLong()
+        val lastANRSample = AtomicReference<Sample>()
         val dumpDispatcher = Handler(host.dumpLooper).asCoroutineDispatcher()
         // Dispatchers.Unconfined:
         // 在emit anrEvent的线程记录anrUptimeMillis和主线程堆栈，让ANRMetrics更为准确
         withContext(Dispatchers.Unconfined) {
             // 产生一次ANR，会按顺序发送多次anrEvent，sysDumpTimeoutMillis期间只处理首次
             host.anrEvent.collect {
-                val anrUptimeMillis = SystemClock.uptimeMillis()
-                if (anrUptimeMillis - lastANRUptimeMillis.get() < SYSTEM_DUMP_TIMEOUT_MILLIS) return@collect
-                lastANRUptimeMillis.set(anrUptimeMillis)
+                val anrTime = SystemClock.uptimeMillis()
+                if (anrTime - lastANRTime.get() < SYSTEM_DUMP_TIMEOUT_MILLIS) {
+                    lastANRSample.set(host.sampleImmediately())
+                    return@collect
+                }
+                lastANRTime.set(anrTime)
+                lastANRSample.set(host.sampleImmediately())
 
-                val anrSample = host.sampleImmediately() ?: return@collect
                 // TODO: fast path：判断主线程是否block中
                 // slow path：轮询ams，判断是否存在pid的ANR信息
                 launch(dumpDispatcher) {
@@ -101,6 +106,7 @@ internal class ANRMetricsAnalyzer(
                         if (processErrorStateInfo != null) break
                         delay(AMS_ERROR_RETRY_MILLIS)
                     }
+                    val anrSample = lastANRSample.get() ?: return@launch
                     if (processErrorStateInfo != null) anrAction(anrSample)
                 }
             }
@@ -176,27 +182,28 @@ internal class ANRMetricsAnalyzer(
             val history = arrayOfNulls<CompletedBatch>(elements.size)
             for (i in elements.lastIndex downTo 0) {
                 val element = elements[i]
-                val startUptimeMillis = element.startUptimeMillis
-                val endUptimeMillis = element.endUptimeMillis
-                val containsANR = anrSample.uptimeMillis in startUptimeMillis..endUptimeMillis
+                val last = element.last
+                val lastStartTime = last.startUptimeMillis
+                val lastEndTime = last.endUptimeMillis
+                val containsANR = anrSample.uptimeMillis in lastStartTime..lastEndTime
 
                 var snapshot = Snapshot.empty()
                 var sampleList = emptyList<Sample>()
                 if (containsANR || element.needRecord) {
-                    snapshot = host.snapshot(element.startMark, element.endMark)
-                        .availableOrEmpty(startUptimeMillis, endUptimeMillis)
+                    snapshot = host.snapshot(last.startMark, last.endMark)
+                        .availableOrEmpty(lastStartTime, lastEndTime)
                 }
                 if (containsANR || element.needSample) {
-                    sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
+                    sampleList = host.sampleList(lastStartTime, lastEndTime)
                 }
 
                 history[i] = CompletedBatch(
                     count = element.count,
                     scene = element.scene.toString(),
                     lastMetadata = element.lastMetadata(),
-                    startUptimeMillis = startUptimeMillis,
+                    startUptimeMillis = element.startUptimeMillis,
                     startThreadTimeMillis = element.startThreadTimeMillis,
-                    endUptimeMillis = endUptimeMillis,
+                    endUptimeMillis = element.endUptimeMillis,
                     endThreadTimeMillis = element.endThreadTimeMillis,
                     idleDurationMillis = element.idleDurationMillis,
                     snapshot = snapshot,

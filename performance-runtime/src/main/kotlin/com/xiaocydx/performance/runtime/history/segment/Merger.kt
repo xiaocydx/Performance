@@ -76,15 +76,13 @@ internal class Merger(
 
     data class Element(
         var count: Int = 1,
-        var startMark: Long = 0L,
         var startUptimeMillis: Long = 0L,
         var startThreadTimeMillis: Long = 0L,
         var idleDurationMillis: Long = 0L,
-        private val last: Segment = Segment()
+        val last: Segment = Segment()
     ) {
         val isSingle get() = last.isSingle
         val scene get() = last.scene
-        val endMark get() = last.endMark
         val endUptimeMillis get() = last.endUptimeMillis
         val endThreadTimeMillis get() = last.endThreadTimeMillis
         val needRecord get() = last.needRecord
@@ -92,7 +90,6 @@ internal class Merger(
 
         fun init(segment: Segment) {
             count = 1
-            startMark = segment.startMark
             startUptimeMillis = segment.startUptimeMillis
             startThreadTimeMillis = segment.startThreadTimeMillis
             idleDurationMillis = 0L

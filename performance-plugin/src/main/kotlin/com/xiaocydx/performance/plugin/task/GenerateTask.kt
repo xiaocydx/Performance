@@ -63,15 +63,17 @@ internal abstract class GenerateTask : DefaultTask() {
                 logger.lifecycle { "${file.name} [failure]: tag is empty" }
                 return@forEach
             }
-            context.parserList.forEach action@{
-                val clazz = it.match(tag)
-                if (clazz == null) {
-                    logger.lifecycle { "${file.name} [failure]: tag no match" }
-                    return@action
-                }
+            var pending: Pending? = null
+            for (i in 0 until context.parserList.size) {
+                val parser = context.parserList[i]
+                val clazz = parser.match(tag) ?: continue
                 val metrics = context.gson.fromJson(text, clazz)
                 @Suppress("UNCHECKED_CAST")
-                outcome.add(Pending(file, metrics, it as MetricsParser<Any>))
+                pending = Pending(file, metrics, parser as MetricsParser<Any>)
+                outcome.add(pending)
+            }
+            if (pending == null) {
+                logger.lifecycle { "${file.name} [failure]: tag no match" }
             }
         }
         return outcome
