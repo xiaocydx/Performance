@@ -60,8 +60,8 @@ internal data class Segment(
     var isTouch: Boolean = false,
     var action: Int = 0,
     var keyCode: Int = 0,
-    var x: Float = 0f,
-    var y: Float = 0f,
+    var rawX: Float = 0f,
+    var rawY: Float = 0f,
     //endregion
     //endregion
 ) {
@@ -93,8 +93,8 @@ internal data class Segment(
         arg2 = segment.arg2
         idleHandlerName = segment.idleHandlerName
         action = segment.action
-        x = segment.x
-        y = segment.y
+        rawX = segment.rawX
+        rawY = segment.rawY
     }
 
     fun metadata() = when (scene) {
@@ -113,7 +113,7 @@ internal data class Segment(
             Metadata.idleHandlerToString(idleHandlerName)
         }
         NativeInput -> if (isTouch) {
-            Metadata.motionEventToString(action, x, y)
+            Metadata.motionEventToString(action, rawX, rawY)
         } else {
             Metadata.keyEventToString(action, keyCode)
         }
@@ -158,9 +158,9 @@ internal fun Segment.collectFrom(current: DispatchContext) {
                 NativeInput -> {
                     current.metadata.asMotionEvent()?.let {
                         isTouch = true
-                        action = it.action
-                        x = it.x
-                        y = it.y
+                        action = it.actionMasked
+                        rawX = it.rawX
+                        rawY = it.rawY
                         return
                     }
                     current.metadata.asKeyEvent()!!.let {

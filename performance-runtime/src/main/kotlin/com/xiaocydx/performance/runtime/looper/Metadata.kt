@@ -100,11 +100,11 @@ internal interface Metadata {
         }
 
         fun motionEventToString(event: MotionEvent): String {
-            return motionEventToString(event.action, event.x, event.y)
+            return motionEventToString(event.actionMasked, event.rawX, event.rawY)
         }
 
-        fun motionEventToString(action: Int, x: Float, y: Float): String {
-            return "MotionEvent { action=${actionToString(action)}, x=$x, y=$y }"
+        fun motionEventToString(action: Int, rawX: Float, rawY: Float): String {
+            return "MotionEvent { action=${actionToString(action)}, rawX=$rawX, rawX=$rawY }"
         }
 
         fun keyEventToString(event: KeyEvent): String {
