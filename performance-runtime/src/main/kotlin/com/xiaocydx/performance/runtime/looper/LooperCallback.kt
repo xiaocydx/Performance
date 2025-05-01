@@ -22,6 +22,7 @@ import android.os.Looper
 import android.os.Message
 import android.os.MessageQueue.IdleHandler
 import android.view.MotionEvent
+import android.view.KeyEvent
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.history.History
@@ -57,7 +58,7 @@ internal interface Start : DispatchContext {
      * [scene]的元数据：
      * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - `null`。
      * * [Scene.IdleHandler]：[IdleHandler]。
-     * * [Scene.NativeTouch]：[MotionEvent]。
+     * * [Scene.NativeInput]：[MotionEvent]或[KeyEvent]。
      */
     val metadata: Metadata
 
@@ -75,28 +76,17 @@ internal interface End : DispatchContext {
      * [scene]的元数据：
      * * [Scene.Message]: Android 10以下 - Printer字符串，Android 10及以上 - [Message]。
      * * [Scene.IdleHandler]：[IdleHandler]。
-     * * [Scene.NativeTouch]：[MotionEvent]。
+     * * [Scene.NativeInput]：[MotionEvent]或[KeyEvent]。
      */
     val metadata: Metadata
 }
 
 internal enum class Scene {
-    Message, IdleHandler, NativeTouch
+    Message, IdleHandler, NativeInput
 }
 
 internal enum class Source {
     ActivityThread, // Choreographer, ViewRootImpl
-}
-
-internal interface Metadata {
-
-    fun asMessageLog(): String?
-
-    fun asMessage(): Message?
-
-    fun asIdleHandler(): IdleHandler?
-
-    fun asMotionEvent(): MotionEvent?
 }
 
 @MainThread

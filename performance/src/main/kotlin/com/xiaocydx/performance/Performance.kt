@@ -54,7 +54,7 @@ import com.xiaocydx.performance.runtime.looper.LooperDispatcher
 import com.xiaocydx.performance.runtime.looper.LooperIdleHandlerWatcher
 import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi
 import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi29
-import com.xiaocydx.performance.runtime.looper.LooperNativeTouchWatcher
+import com.xiaocydx.performance.runtime.looper.LooperNativeInputWatcher
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
 import com.xiaocydx.performance.runtime.looper.Start
 import com.xiaocydx.performance.runtime.signal.Signal
@@ -122,7 +122,7 @@ object Performance {
         scope.launch {
             host.activityEvent.filterIsInstance<ActivityEvent.Created>().collect {
                 val activity = host.getActivity(it.activityKey) ?: return@collect
-                LooperNativeTouchWatcher.setup(activity.window, dispatcher)
+                LooperNativeInputWatcher.setup(activity.window, dispatcher)
             }
         }
     }

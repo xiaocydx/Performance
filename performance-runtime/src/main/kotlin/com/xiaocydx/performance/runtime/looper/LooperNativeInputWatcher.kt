@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.runtime.looper
 
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Window
 import androidx.annotation.MainThread
@@ -24,7 +25,7 @@ import androidx.annotation.MainThread
  * @author xcc
  * @date 2025/3/27
  */
-internal class LooperNativeTouchWatcher private constructor(
+internal class LooperNativeInputWatcher private constructor(
     private val window: Window,
     private val dispatcher: LooperDispatcher
 ) : LooperWatcher() {
@@ -44,9 +45,17 @@ internal class LooperNativeTouchWatcher private constructor(
 
         @MainThread
         override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-            dispatcher.start(scene = Scene.NativeTouch, metadata = event)
+            dispatcher.start(scene = Scene.NativeInput, metadata = event)
             val consumed = delegate.dispatchTouchEvent(event)
-            dispatcher.end(scene = Scene.NativeTouch, metadata = event)
+            dispatcher.end(scene = Scene.NativeInput, metadata = event)
+            return consumed
+        }
+
+        @MainThread
+        override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+            dispatcher.start(scene = Scene.NativeInput, metadata = event)
+            val consumed = delegate.dispatchKeyEvent(event)
+            dispatcher.end(scene = Scene.NativeInput, metadata = event)
             return consumed
         }
     }
@@ -58,7 +67,7 @@ internal class LooperNativeTouchWatcher private constructor(
             window: Window,
             dispatcher: LooperDispatcher
         ): LooperWatcher {
-            val watcher = LooperNativeTouchWatcher(window, dispatcher)
+            val watcher = LooperNativeInputWatcher(window, dispatcher)
             window.callback = watcher.windowCallback
             return watcher
         }

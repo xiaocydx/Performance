@@ -40,13 +40,13 @@ internal object Future : Reflection {
             var message = mMessagesField.get(queue) as? Message
             while (message != null) {
                 outcome.add(PendingMessage(
-                    uptimeMillis = uptimeMillis,
                     `when` = message.`when`,
                     what = message.what,
                     targetName = message.target?.javaClass?.name,
                     callbackName = message.callback?.javaClass?.name,
                     arg1 = message.arg1,
-                    arg2 = message.arg2
+                    arg2 = message.arg2,
+                    uptimeMillis = uptimeMillis,
                 ))
                 message = nextField.get(message) as? Message
             }

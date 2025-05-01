@@ -16,36 +16,31 @@
 
 package com.xiaocydx.performance.runtime.future
 
+import com.xiaocydx.performance.runtime.looper.Metadata
+
 /**
  * @author xcc
  * @date 2025/4/25
  */
 data class PendingMessage(
-    val uptimeMillis: Long,
     val `when`: Long,
     val what: Int,
     val targetName: String?,
     val callbackName: String?,
     val arg1: Int,
-    val arg2: Int
+    val arg2: Int,
+    val uptimeMillis: Long
 ) {
 
     override fun toString(): String {
-        val b = StringBuilder()
-        b.append("{ when=").append(`when` - uptimeMillis).append("ms")
-        if (targetName != null) {
-            if (callbackName != null) {
-                b.append(" callback=").append(callbackName)
-            } else {
-                b.append(" what=").append(what)
-            }
-            if (arg1 != 0) b.append(" arg1=").append(arg1)
-            if (arg2 != 0) b.append(" arg1=").append(arg1)
-            b.append(" target=").append(targetName)
-        } else {
-            b.append(" barrier=").append(arg1)
-        }
-        b.append(" }")
-        return b.toString()
+        return Metadata.messageToString(
+            `when` = `when`,
+            what = what,
+            targetName = targetName,
+            callbackName = callbackName,
+            arg1 = arg1,
+            arg2 = arg2,
+            uptimeMillis = uptimeMillis
+        )
     }
 }

@@ -16,13 +16,13 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
-import android.view.MotionEvent.actionToString
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
+import com.xiaocydx.performance.runtime.looper.Metadata
 import com.xiaocydx.performance.runtime.looper.Scene
 import com.xiaocydx.performance.runtime.looper.Scene.IdleHandler
 import com.xiaocydx.performance.runtime.looper.Scene.Message
-import com.xiaocydx.performance.runtime.looper.Scene.NativeTouch
+import com.xiaocydx.performance.runtime.looper.Scene.NativeInput
 import com.xiaocydx.performance.runtime.looper.Start
 
 /**
@@ -44,7 +44,7 @@ internal data class Segment(
     var endThreadTimeMillis: Long = 0L,
 
     //region Metadata
-    // scene = Scene.Message
+    // scene = Message
     var log: String = "",
     var `when`: Long = 0L,
     var what: Int = 0,
@@ -56,8 +56,10 @@ internal data class Segment(
     // scene = IdleHandler
     var idleHandlerName: String = "",
 
-    // scene = NativeTouch
+    // scene = NativeInput
+    var isTouch: Boolean = false,
     var action: Int = 0,
+    var keyCode: Int = 0,
     var x: Float = 0f,
     var y: Float = 0f,
     //endregion
@@ -97,28 +99,23 @@ internal data class Segment(
 
     fun metadata() = when (scene) {
         Message -> log.ifEmpty {
-            val b = StringBuilder()
-            b.append("{ when=").append(`when` - startUptimeMillis).append("ms")
-            if (targetName != null) {
-                if (callbackName != null) {
-                    b.append(" callback=").append(callbackName)
-                } else {
-                    b.append(" what=").append(what)
-                }
-                if (arg1 != 0) b.append(" arg1=").append(arg1)
-                if (arg2 != 0) b.append(" arg1=").append(arg1)
-                b.append(" target=").append(targetName)
-            } else {
-                b.append(" barrier=").append(arg1)
-            }
-            b.append(" }")
-            b.toString()
+            Metadata.messageToString(
+                `when` = `when`,
+                what = what,
+                targetName = targetName,
+                callbackName = callbackName,
+                arg1 = arg1,
+                arg2 = arg2,
+                uptimeMillis = startUptimeMillis
+            )
         }
         IdleHandler -> {
-            "IdleHandler { name=$idleHandlerName }"
+            Metadata.idleHandlerToString(idleHandlerName)
         }
-        NativeTouch -> {
-            "MotionEvent { action=${actionToString(action)}, x=$x, y=$y }"
+        NativeInput -> if (isTouch) {
+            Metadata.motionEventToString(action, x, y)
+        } else {
+            Metadata.keyEventToString(action, keyCode)
         }
     }
 
@@ -144,23 +141,33 @@ internal fun Segment.collectFrom(current: DispatchContext) {
                         log = it
                         return
                     }
-                    val message = current.metadata.asMessage()!!
-                    `when` = message.`when`
-                    what = message.what
-                    targetName = message.target?.javaClass?.name // null is barrier
-                    callbackName = message.callback?.javaClass?.name
-                    arg1 = message.arg1
-                    arg2 = message.arg2
+                    current.metadata.asMessage()!!.let {
+                        `when` = it.`when`
+                        what = it.what
+                        targetName = it.target?.javaClass?.name
+                        callbackName = it.callback?.javaClass?.name
+                        arg1 = it.arg1
+                        arg2 = it.arg2
+                    }
                 }
                 IdleHandler -> {
-                    val idleHandler = current.metadata.asIdleHandler()!!
-                    idleHandlerName = idleHandler.javaClass.name ?: ""
+                    current.metadata.asIdleHandler()!!.let {
+                        idleHandlerName = it.javaClass.name ?: ""
+                    }
                 }
-                NativeTouch -> {
-                    val motionEvent = current.metadata.asMotionEvent()!!
-                    action = motionEvent.action
-                    x = motionEvent.x
-                    y = motionEvent.y
+                NativeInput -> {
+                    current.metadata.asMotionEvent()?.let {
+                        isTouch = true
+                        action = it.action
+                        x = it.x
+                        y = it.y
+                        return
+                    }
+                    current.metadata.asKeyEvent()!!.let {
+                        isTouch = false
+                        action = it.action
+                        keyCode = it.keyCode
+                    }
                 }
             }
         }
