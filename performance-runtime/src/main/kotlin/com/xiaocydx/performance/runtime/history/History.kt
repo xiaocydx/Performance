@@ -131,11 +131,6 @@ internal object History {
             startMark < 0 || endMark < 0 -> Snapshot.empty()
             // volatile read: (Safe Publication)
             !isRecorderCreated -> Snapshot.empty()
-            // 短时间内[startMark, endMark]的数据不被覆盖，可视为不可变。
-            // 当调用snapshot(startMark, latestMark())时，不稳定的结果：
-            // 1. latestMark()未读到最新值，buffer未读到最新值，可接受的结果。
-            // 2. latestMark()已读到最新值，buffer未读到最新值，需进一步过滤。
-            // recorder.latestMark不用volatile，recorder.record()会频繁调用。
             else -> recorder.snapshot(startMark, endMark)
         }
     }
