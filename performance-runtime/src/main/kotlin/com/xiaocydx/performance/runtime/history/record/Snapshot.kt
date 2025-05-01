@@ -42,12 +42,11 @@ value class Snapshot internal constructor(private val value: LongArray) {
             return true
         }
 
-    fun availableOrEmpty(startTimeMs: Long, endTimeMs: Long): Snapshot {
+    fun available(endTimeMs: Long): Snapshot {
         if (!isAvailable) return empty()
-        val first = Record(value.first())
-        val last = Record(value.last())
-        if (first.timeMs > startTimeMs) return empty()
-        if (last.timeMs > endTimeMs) return empty()
+        for (i in 0 until size) {
+            if (get(i).timeMs > endTimeMs) return empty()
+        }
         return this
     }
 

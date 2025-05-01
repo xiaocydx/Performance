@@ -106,8 +106,7 @@ internal class BlockMetricsAnalyzer(
             val createTimeMillis = System.currentTimeMillis()
             val startUptimeMillis = intermediate.startUptimeMillis
             val endUptimeMillis = intermediate.endUptimeMillis
-            val snapshot = host.snapshot(startMark, endMark)
-                .availableOrEmpty(startUptimeMillis, endUptimeMillis)
+            val snapshot = host.snapshot(startMark, endMark).available(endUptimeMillis)
             val sampleList = host.sampleList(startUptimeMillis, endUptimeMillis)
             val pid = Process.myPid()
             val metrics = intermediate.copy(

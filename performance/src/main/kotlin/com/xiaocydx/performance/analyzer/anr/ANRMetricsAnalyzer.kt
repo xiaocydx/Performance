@@ -190,8 +190,7 @@ internal class ANRMetricsAnalyzer(
                 var snapshot = Snapshot.empty()
                 var sampleList = emptyList<Sample>()
                 if (containsANR || element.needRecord) {
-                    snapshot = host.snapshot(last.startMark, last.endMark)
-                        .availableOrEmpty(lastStartTime, lastEndTime)
+                    snapshot = host.snapshot(last.startMark, last.endMark).available(lastEndTime)
                 }
                 if (containsANR || element.needSample) {
                     sampleList = host.sampleList(lastStartTime, lastEndTime)
