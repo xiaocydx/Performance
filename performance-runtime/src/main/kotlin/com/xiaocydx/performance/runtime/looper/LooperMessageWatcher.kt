@@ -78,9 +78,10 @@ internal class LooperMessageWatcherApi private constructor(
 @RequiresApi(29)
 internal class LooperMessageWatcherApi29 private constructor(
     original: Any?,
-    private val mainLooper: Looper,
+    mainLooper: Looper,
     private val dispatcher: LooperDispatcher
 ) : LooperWatcher() {
+    private val mainThreadId = mainLooper.thread.id
     private val fakeObserver = FakeLooperObserverImpl()
     private val realObserver = fakeObserver.toReal(original)
 
@@ -96,7 +97,7 @@ internal class LooperMessageWatcherApi29 private constructor(
     }
 
     private inline fun ifMainThread(action: () -> Unit) {
-        if (mainLooper.isCurrentThread) action()
+        if (Thread.currentThread().id == mainThreadId) action()
     }
 
     private inner class FakeLooperObserverImpl : FakeLooperObserver {

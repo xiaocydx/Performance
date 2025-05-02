@@ -85,14 +85,19 @@ internal data class Segment(
         endUptimeMillis = segment.endUptimeMillis
         endThreadTimeMillis = segment.endThreadTimeMillis
 
+        log = segment.log
         `when` = segment.`when`
         what = segment.what
         targetName = segment.targetName
         callbackName = segment.callbackName
         arg1 = segment.arg1
         arg2 = segment.arg2
+
         idleHandlerName = segment.idleHandlerName
+
+        isTouch = segment.isTouch
         action = segment.action
+        keyCode = segment.keyCode
         rawX = segment.rawX
         rawY = segment.rawY
     }

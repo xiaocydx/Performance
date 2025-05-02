@@ -215,7 +215,7 @@ internal class ANRMetricsAnalyzer(
                 pid = pid,
                 tid = pid, // 主线程的tid跟pid一致
                 createTimeMillis = createTimeMillis,
-                history = (history as Array<CompletedBatch>).toList()
+                history = history.asList() as List<CompletedBatch>
             )
             anrConfig.receivers.forEach { it.receive(metric) }
         }

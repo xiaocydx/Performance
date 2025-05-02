@@ -40,12 +40,12 @@ internal class Sampler(
     private val mainThread = Looper.getMainLooper().thread
     private val sampleDeque = ArrayDeque<Sample>(capacity)
 
-    @Volatile private var sampleUptimeMillis = 0L
+    @Volatile private var startUptimeMillis = 0L
     @Volatile private var stopUptimeMillis = 0L
 
     @MainThread
     fun start(uptimeMillis: Long) {
-        resetSampleTime(uptimeMillis, fromTask = false)
+        startUptimeMillis = uptimeMillis + intervalMillis
         stopUptimeMillis = Long.MAX_VALUE
         sampleTask.startIfNecessary()
     }
@@ -53,13 +53,6 @@ internal class Sampler(
     @MainThread
     fun stop(uptimeMillis: Long) {
         stopUptimeMillis = uptimeMillis
-    }
-
-    @AnyThread
-    private fun resetSampleTime(uptimeMillis: Long, fromTask: Boolean) {
-        val nextSampleTime = uptimeMillis + intervalMillis
-        sampleUptimeMillis = nextSampleTime.coerceAtLeast(sampleUptimeMillis)
-        logger.debug { "reset fromTask = $fromTask" }
     }
 
     @AnyThread
@@ -114,14 +107,13 @@ internal class Sampler(
             if (delay(currentTime)) return
             if (stop(currentTime)) return
 
-            resetSampleTime(currentTime, fromTask = true)
             handler.postDelayed(this, intervalMillis)
         }
 
         private fun delay(currentTime: Long): Boolean {
-            val sampleTime = sampleUptimeMillis
-            if (currentTime < sampleUptimeMillis) {
-                val delayMillis = sampleTime - currentTime
+            val startTime = startUptimeMillis
+            if (currentTime < startTime) {
+                val delayMillis = startTime - currentTime
                 handler.postDelayed(this, delayMillis)
                 logger.debug { "delay ${delayMillis}ms" }
                 return true
@@ -141,7 +133,7 @@ internal class Sampler(
         private fun sample() {
             val uptimeMillis = SystemClock.uptimeMillis()
             val threadState = mainThread.state
-            val stackTrace = mainThread.stackTrace.toList()
+            val stackTrace = mainThread.stackTrace.asList()
 
             val sysStat = ProcSysStat.read()
             val pidStat = ProcPidStat.read(pid)
@@ -173,7 +165,7 @@ internal class Sampler(
         fun sampleImmediately(): Sample {
             val uptimeMillis = SystemClock.uptimeMillis()
             val threadState = mainThread.state
-            val stackTrace = mainThread.stackTrace.toList()
+            val stackTrace = mainThread.stackTrace.asList()
             val pidStat = ProcPidStat.read(pid)
             val threadStat = threadStat(threadState, stackTrace, pidStat)
             return Sample(uptimeMillis, intervalMillis, cpuStat = null, threadStat)

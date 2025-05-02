@@ -65,7 +65,7 @@ internal value class SafeClass(private val clazz: Class<*>) {
         get() {
             val methods = runCatching {
                 if (Build.VERSION.SDK_INT < 28) {
-                    clazz.declaredMethods.toList()
+                    clazz.declaredMethods.asList()
                 } else {
                     HiddenApiBypass.getDeclaredMethods(clazz).filterIsInstance<Method>()
                 }

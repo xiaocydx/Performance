@@ -129,7 +129,7 @@ internal object History {
     fun snapshot(startMark: Long, endMark: Long): Snapshot {
         return when {
             startMark < 0 || endMark < 0 -> Snapshot.empty()
-            // volatile read: (Safe Publication)
+            // volatile read: acquire (Safe Publication)
             !isRecorderCreated -> Snapshot.empty()
             else -> recorder.snapshot(startMark, endMark)
         }
