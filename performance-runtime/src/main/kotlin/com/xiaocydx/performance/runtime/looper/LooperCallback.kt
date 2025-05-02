@@ -21,8 +21,8 @@ package com.xiaocydx.performance.runtime.looper
 import android.os.Looper
 import android.os.Message
 import android.os.MessageQueue.IdleHandler
-import android.view.MotionEvent
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.history.History

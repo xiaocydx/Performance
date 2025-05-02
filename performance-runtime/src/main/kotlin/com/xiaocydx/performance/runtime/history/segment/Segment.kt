@@ -16,6 +16,7 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
+import androidx.annotation.VisibleForTesting
 import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.Metadata
@@ -124,8 +125,35 @@ internal data class Segment(
         }
     }
 
-    private companion object {
-        val emptySegment = Segment()
+    companion object {
+        private val emptySegment = Segment()
+
+        @VisibleForTesting
+        fun copySource() = Segment(
+            isSingle = true,
+            needRecord = true,
+            needSample = true,
+            scene = Message,
+            startMark = 1L,
+            startUptimeMillis = 1L,
+            startThreadTimeMillis = 1L,
+            endMark = 1L,
+            endUptimeMillis = 1L,
+            endThreadTimeMillis = 1L,
+            log = "log",
+            `when` = 1L,
+            what = 1,
+            targetName = "targetName",
+            callbackName = "callbackName",
+            arg1 = 1,
+            arg2 = 1,
+            idleHandlerName = "idleHandlerName",
+            isTouch = true,
+            action = 1,
+            keyCode = 1,
+            rawX = 1f,
+            rawY = 1f
+        )
     }
 }
 

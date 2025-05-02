@@ -16,6 +16,8 @@
 
 package com.xiaocydx.performance.runtime.history.segment
 
+import androidx.annotation.VisibleForTesting
+
 /**
  * @author xcc
  * @date 2025/4/23
@@ -32,15 +34,17 @@ internal class Merger(
         segment.reset()
     }
 
-    private fun append(segment: Segment) {
+    @VisibleForTesting
+    fun append(segment: Segment) {
         val element = if (deque.size == capacity) deque.removeFirst() else Element()
         element.init(segment)
         deque.add(element)
     }
 
-    private fun merge(segment: Segment): Boolean {
+    @VisibleForTesting
+    fun merge(segment: Segment): Boolean {
         if (segment.isSingle) return false
-        val element = deque.lastOrNull()
+        val element = lastOrNull()
         if (element == null || element.isSingle || element.scene != segment.scene) return false
 
         val idleDuration = segment.startUptimeMillis - element.endUptimeMillis
@@ -54,6 +58,11 @@ internal class Merger(
         return true
     }
 
+    @VisibleForTesting
+    fun lastOrNull(): Element? {
+        return deque.lastOrNull()
+    }
+
     fun copy(): List<Element> {
         return deque.map { it.deepCopy() }
     }
@@ -64,13 +73,12 @@ internal class Merger(
             return emptyList()
         }
         val outcome = mutableListOf<Element>()
-        for (i in deque.lastIndex downTo 0) {
+        for (i in 0 until deque.size) {
             val element = deque[i]
-            if (element.startUptimeMillis > endUptimeMillis) continue
-            if (element.endUptimeMillis < startUptimeMillis) break
+            if (element.endUptimeMillis < startUptimeMillis) continue
+            if (element.startUptimeMillis > endUptimeMillis) break
             outcome.add(element.deepCopy())
         }
-        outcome.reverse()
         return outcome
     }
 
