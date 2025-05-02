@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.runtime.activity
+package com.xiaocydx.performance.runtime.component
 
 import android.app.Activity
 

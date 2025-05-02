@@ -24,8 +24,8 @@ import android.os.Looper
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.activity.ActivityEvent
-import com.xiaocydx.performance.runtime.activity.ActivityKey
+import com.xiaocydx.performance.runtime.component.ActivityEvent
+import com.xiaocydx.performance.runtime.component.ActivityKey
 import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.segment.Merger

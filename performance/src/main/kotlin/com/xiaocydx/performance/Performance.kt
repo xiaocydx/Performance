@@ -37,9 +37,9 @@ import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
-import com.xiaocydx.performance.runtime.activity.ActivityEvent
-import com.xiaocydx.performance.runtime.activity.ActivityKey
-import com.xiaocydx.performance.runtime.activity.ActivityWatcher
+import com.xiaocydx.performance.runtime.component.ActivityEvent
+import com.xiaocydx.performance.runtime.component.ActivityKey
+import com.xiaocydx.performance.runtime.component.ComponentWatcher
 import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
@@ -136,8 +136,8 @@ object Performance {
         private val dumpThread by lazy { HandlerThread("PerformanceDumpThread").apply { start() } }
         private val defaultThread by lazy { HandlerThread("PerformanceDefaultThread").apply { start() } }
 
+        private val component = ComponentWatcher()
         private val callbacks = CompositeLooperCallback()
-        private val activityWatcher = ActivityWatcher()
         private val analyzers = mutableListOf<Analyzer>()
         private lateinit var application: Application
         private lateinit var config: Config
@@ -156,7 +156,7 @@ object Performance {
         fun init(application: Application, config: Config) {
             this.application = application
             this.config = config
-            activityWatcher.init(application, send = activityEvent::tryEmit)
+            component.init(application, send = activityEvent::tryEmit)
         }
 
         fun getCallback(): LooperCallback {
@@ -169,11 +169,11 @@ object Performance {
         }
 
         override fun getActivity(key: ActivityKey): Activity? {
-            return activityWatcher.getActivity(key)
+            return component.getActivity(key)
         }
 
         override fun getLatestActivity(): Activity? {
-            return activityWatcher.getLatestActivity()
+            return component.getLatestActivity()
         }
 
         override fun addCallback(callback: LooperCallback) {

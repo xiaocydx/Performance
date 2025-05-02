@@ -23,8 +23,8 @@ import android.os.MessageQueue
 import androidx.appcompat.app.AlertDialog
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
-import com.xiaocydx.performance.runtime.activity.ActivityEvent
-import com.xiaocydx.performance.runtime.activity.ActivityKey
+import com.xiaocydx.performance.runtime.component.ActivityEvent
+import com.xiaocydx.performance.runtime.component.ActivityKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine

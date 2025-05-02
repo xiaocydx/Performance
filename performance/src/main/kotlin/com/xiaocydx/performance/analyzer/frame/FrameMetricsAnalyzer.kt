@@ -27,8 +27,8 @@ import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.doOnAttach
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
-import com.xiaocydx.performance.runtime.activity.ActivityEvent
-import com.xiaocydx.performance.runtime.activity.ActivityKey
+import com.xiaocydx.performance.runtime.component.ActivityEvent
+import com.xiaocydx.performance.runtime.component.ActivityKey
 import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 

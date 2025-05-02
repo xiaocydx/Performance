@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.xiaocydx.performance.runtime.activity
+package com.xiaocydx.performance.runtime.component
 
 import android.app.Activity
 import android.app.Application
@@ -26,9 +26,9 @@ import com.xiaocydx.performance.runtime.assertMainThread
  * @author xcc
  * @date 2025/3/20
  */
-internal class ActivityWatcher {
-    private val map = HashMap<ActivityKey, Activity>()
-    private var latestKey: ActivityKey? = null
+internal class ComponentWatcher {
+    private val activityMap = HashMap<ActivityKey, Activity>()
+    private var latestActivityKey: ActivityKey? = null
 
     @MainThread
     fun init(application: Application, send: (ActivityEvent) -> Unit) {
@@ -37,7 +37,7 @@ internal class ActivityWatcher {
             object : Application.ActivityLifecycleCallbacks {
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
                     val event = ActivityEvent.Created(activity)
-                    map[event.activityKey] = activity
+                    activityMap[event.activityKey] = activity
                     send(event)
                 }
 
@@ -47,7 +47,7 @@ internal class ActivityWatcher {
 
                 override fun onActivityResumed(activity: Activity) {
                     val event = ActivityEvent.Resumed(activity)
-                    latestKey = event.activityKey
+                    latestActivityKey = event.activityKey
                     send(event)
                 }
 
@@ -61,8 +61,8 @@ internal class ActivityWatcher {
 
                 override fun onActivityDestroyed(activity: Activity) {
                     val event = ActivityEvent.Destroyed(activity)
-                    if (event.activityKey == latestKey) latestKey = null
-                    map.remove(event.activityKey)
+                    if (event.activityKey == latestActivityKey) latestActivityKey = null
+                    activityMap.remove(event.activityKey)
                     send(event)
                 }
 
@@ -74,12 +74,12 @@ internal class ActivityWatcher {
     @MainThread
     fun getActivity(key: ActivityKey): Activity? {
         assertMainThread()
-        return map[key]
+        return activityMap[key]
     }
 
     @MainThread
     fun getLatestActivity(): Activity? {
         assertMainThread()
-        return latestKey?.let(::getActivity)
+        return latestActivityKey?.let(::getActivity)
     }
 }
