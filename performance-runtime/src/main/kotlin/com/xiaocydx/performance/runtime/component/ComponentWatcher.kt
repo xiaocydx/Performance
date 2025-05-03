@@ -19,6 +19,7 @@ package com.xiaocydx.performance.runtime.component
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.runtime.assertMainThread
 
@@ -29,6 +30,7 @@ import com.xiaocydx.performance.runtime.assertMainThread
 internal class ComponentWatcher {
     private val activityMap = HashMap<ActivityKey, Activity>()
     private var latestActivityKey: ActivityKey? = null
+    @Volatile private var activeActivityCount = 0
 
     @MainThread
     fun init(application: Application, send: (ActivityEvent) -> Unit) {
@@ -42,6 +44,7 @@ internal class ComponentWatcher {
                 }
 
                 override fun onActivityStarted(activity: Activity) {
+                    activeActivityCount++
                     send(ActivityEvent.Started(activity))
                 }
 
@@ -56,6 +59,7 @@ internal class ComponentWatcher {
                 }
 
                 override fun onActivityStopped(activity: Activity) {
+                    activeActivityCount--
                     send(ActivityEvent.Stopped(activity))
                 }
 
@@ -81,5 +85,10 @@ internal class ComponentWatcher {
     fun getLatestActivity(): Activity? {
         assertMainThread()
         return latestActivityKey?.let(::getActivity)
+    }
+
+    @AnyThread
+    fun getActiveActivityCount(): Int{
+        return activeActivityCount
     }
 }

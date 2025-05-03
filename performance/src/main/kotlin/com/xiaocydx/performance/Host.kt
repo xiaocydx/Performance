@@ -40,6 +40,9 @@ import kotlinx.coroutines.flow.SharedFlow
 internal interface Host {
 
     @get:AnyThread
+    val pid: Int
+
+    @get:AnyThread
     val dumpLooper: Looper
 
     @get:AnyThread
@@ -65,6 +68,9 @@ internal interface Host {
 
     @MainThread
     fun getLatestActivity(): Activity?
+
+    @AnyThread
+    fun getActiveActivityCount(): Int
 
     @MainThread
     fun addCallback(callback: LooperCallback)

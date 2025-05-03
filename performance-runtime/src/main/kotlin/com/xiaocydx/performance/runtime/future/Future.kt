@@ -18,6 +18,7 @@ package com.xiaocydx.performance.runtime.future
 
 import android.os.Message
 import android.os.MessageQueue
+import android.os.SystemClock
 import com.xiaocydx.performance.runtime.Reflection
 
 /**
@@ -33,24 +34,43 @@ internal object Future : Reflection {
         Message::class.java.toSafe().declaredInstanceFields.find("next")
     }.getOrNull()?.apply { isAccessible = true }
 
-    fun getPendingList(queue: MessageQueue, uptimeMillis: Long): List<PendingMessage> {
-        if (mMessagesField == null || nextField == null) return emptyList()
+    private val isAvailable: Boolean
+        get() = mMessagesField != null || nextField != null
+
+    fun getFirstPending(
+        queue: MessageQueue,
+        uptimeMillis: Long = SystemClock.uptimeMillis()
+    ): PendingMessage? {
+        if (!isAvailable) return null
+        val message = synchronized(queue) { mMessagesField!!.get(queue) as? Message }
+        return message?.toPending(uptimeMillis)
+    }
+
+    fun getPendingList(
+        queue: MessageQueue,
+        uptimeMillis: Long = SystemClock.uptimeMillis()
+    ): List<PendingMessage> {
+        if (!isAvailable) return emptyList()
         val outcome = mutableListOf<PendingMessage>()
         synchronized(queue) {
-            var message = mMessagesField.get(queue) as? Message
+            var message = mMessagesField!!.get(queue) as? Message
             while (message != null) {
-                outcome.add(PendingMessage(
-                    `when` = message.`when`,
-                    what = message.what,
-                    targetName = message.target?.javaClass?.name,
-                    callbackName = message.callback?.javaClass?.name,
-                    arg1 = message.arg1,
-                    arg2 = message.arg2,
-                    uptimeMillis = uptimeMillis,
-                ))
-                message = nextField.get(message) as? Message
+                outcome.add(message.toPending(uptimeMillis))
+                message = nextField!!.get(message) as? Message
             }
         }
         return outcome
+    }
+
+    private fun Message.toPending(uptimeMillis: Long): PendingMessage {
+        return PendingMessage(
+            `when` = `when`,
+            what = what,
+            targetName = target?.javaClass?.name,
+            callbackName = callback?.javaClass?.name,
+            arg1 = arg1,
+            arg2 = arg2,
+            uptimeMillis = uptimeMillis,
+        )
     }
 }

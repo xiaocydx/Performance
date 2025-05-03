@@ -20,9 +20,10 @@ package com.xiaocydx.performance.analyzer.anr
 
 import android.app.ActivityManager.ProcessErrorStateInfo
 import android.app.ActivityManager.ProcessErrorStateInfo.NOT_RESPONDING
+import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
 import android.os.Handler
 import android.os.Looper
-import android.os.Process
+import android.os.MessageQueue
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
@@ -67,7 +68,7 @@ internal class ANRMetricsAnalyzer(
             ))
             host.addCallback(callback)
             try {
-                collectANREvent(anrAction = callback::anrAction)
+                collectANREvent(Looper.myQueue(), callback::anrAction)
             } finally {
                 host.removeCallback(callback)
                 host.registerHistory(this@ANRMetricsAnalyzer)
@@ -75,42 +76,69 @@ internal class ANRMetricsAnalyzer(
         }
     }
 
-    private suspend fun collectANREvent(anrAction: (anrSample: Sample) -> Unit) {
+    private suspend fun collectANREvent(
+        mainQueue: MessageQueue,
+        anrAction: (anrSample: Sample) -> Unit
+    ) {
         val lastANRTime = AtomicLong()
         val lastANRSample = AtomicReference<Sample>()
         val dumpDispatcher = Handler(host.dumpLooper).asCoroutineDispatcher()
         // Dispatchers.Unconfined:
-        // 在emit anrEvent的线程记录anrUptimeMillis和主线程堆栈，让ANRMetrics更为准确
+        // 在发送anrEvent的线程记录anrTime和anrSample，让ANRMetrics更为准确
         withContext(Dispatchers.Unconfined) {
-            // 产生一次ANR，会按顺序发送多次anrEvent，sysDumpTimeoutMillis期间只处理首次
+            // 发生ANR会发送多次anrEvent，DUMP_TIMEOUT_MILLIS期间只处理首次
             host.anrEvent.collect {
                 val anrTime = SystemClock.uptimeMillis()
-                if (anrTime - lastANRTime.get() < SYSTEM_DUMP_TIMEOUT_MILLIS) {
-                    lastANRSample.set(host.sampleImmediately())
+                val anrSample = requireNotNull(host.sampleImmediately())
+                lastANRSample.set(anrSample)
+
+                if (anrTime - lastANRTime.get() < DUMP_TIMEOUT_MILLIS) return@collect
+                lastANRTime.set(anrTime)
+
+                if (isBackground()) {
+                    // 可能是后台ANR
+                    anrAction(anrSample)
                     return@collect
                 }
-                lastANRTime.set(anrTime)
-                lastANRSample.set(host.sampleImmediately())
 
-                // TODO: fast path：判断主线程是否block中
-                // slow path：轮询ams，判断是否存在pid的ANR信息
+                // fast path：判断首个消息，处理前台ANR闪退
+                if (isPostpone(mainQueue)) {
+                    anrAction(anrSample)
+                    return@collect
+                }
+
+                // slow path：轮询ams，判断是否为前台ANR
                 launch(dumpDispatcher) {
-                    val pid = Process.myPid()
                     var processErrorStateInfo: ProcessErrorStateInfo? = null
                     var retry = AMS_ERROR_RETRY_COUNT
                     while (retry > 0) {
                         retry--
                         val processesInErrorState = host.ams.processesInErrorState
                         processErrorStateInfo = processesInErrorState
-                            ?.find { it.pid == pid && it.condition == NOT_RESPONDING }
+                            ?.find { it.pid == host.pid && it.condition == NOT_RESPONDING }
                         if (processErrorStateInfo != null) break
                         delay(AMS_ERROR_RETRY_MILLIS)
                     }
-                    val anrSample = lastANRSample.get() ?: return@launch
-                    if (processErrorStateInfo != null) anrAction(anrSample)
+                    if (processErrorStateInfo != null) anrAction(lastANRSample.get())
                 }
             }
         }
+    }
+
+    private fun isBackground(): Boolean {
+        if (host.getActiveActivityCount() == 0) return true
+        // activeActivityCount > 0进程不一定处于前台，
+        // 可能是主线程阻塞中，还没有处理生命周期消息，
+        // 获取runningAppProcesses做进一步判断。
+        val runningAppProcesses = host.ams.runningAppProcesses ?: emptyList()
+        val info = runningAppProcesses.firstOrNull { it.pid == host.pid }
+        return info == null || info.importance != IMPORTANCE_FOREGROUND
+    }
+
+    private fun isPostpone(mainQueue: MessageQueue): Boolean {
+        val first = Future.getFirstPending(mainQueue) ?: return false
+        // first.`when` = 0L是Handler.sendMessageAtFrontOfQueue()发送的消息
+        return first.`when` != 0L && first.uptimeMillis - first.`when` > POSTPONE_THRESHOLD
     }
 
     private inner class Callback(private val merger: Merger) : LooperCallback {
@@ -175,7 +203,6 @@ internal class ANRMetricsAnalyzer(
         private val intermediate: ANRMetrics
     ) : Runnable {
 
-        @Suppress("UNCHECKED_CAST")
         override fun run() {
             val createTimeMillis = System.currentTimeMillis()
             val anrSample = intermediate.anrSample
@@ -210,10 +237,10 @@ internal class ANRMetricsAnalyzer(
                 )
             }
 
-            val pid = Process.myPid()
+            @Suppress("UNCHECKED_CAST")
             val metric = intermediate.copy(
-                pid = pid,
-                tid = pid, // 主线程的tid跟pid一致
+                pid = host.pid,
+                tid = host.pid, // 主线程的tid跟pid一致
                 createTimeMillis = createTimeMillis,
                 history = history.asList() as List<CompletedBatch>
             )
@@ -222,8 +249,9 @@ internal class ANRMetricsAnalyzer(
     }
 
     private companion object {
-        const val SYSTEM_DUMP_TIMEOUT_MILLIS = 20 * 1000L
+        const val DUMP_TIMEOUT_MILLIS = 20 * 1000L
         const val AMS_ERROR_RETRY_COUNT = 20
-        const val AMS_ERROR_RETRY_MILLIS = SYSTEM_DUMP_TIMEOUT_MILLIS / AMS_ERROR_RETRY_COUNT
+        const val AMS_ERROR_RETRY_MILLIS = DUMP_TIMEOUT_MILLIS / AMS_ERROR_RETRY_COUNT
+        const val POSTPONE_THRESHOLD = 2000L
     }
 }

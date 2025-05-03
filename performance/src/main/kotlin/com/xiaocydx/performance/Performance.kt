@@ -24,6 +24,7 @@ import android.app.Application
 import android.os.Build
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.Process
 import android.os.Process.THREAD_PRIORITY_BACKGROUND
 import android.os.SystemClock
 import androidx.annotation.MainThread
@@ -146,6 +147,7 @@ object Performance {
         private var sampleThread: HandlerThread? = null
         private lateinit var sampler: Sampler
 
+        override val pid by lazy { Process.myPid() }
         override val dumpLooper by lazy { dumpThread.looper!! }
         override val defaultLooper by lazy { defaultThread.looper!! }
         override val ams by lazy { application.getSystemService(ACTIVITY_SERVICE) as ActivityManager }
@@ -174,6 +176,10 @@ object Performance {
 
         override fun getLatestActivity(): Activity? {
             return component.getLatestActivity()
+        }
+
+        override fun getActiveActivityCount(): Int {
+            return component.getActiveActivityCount()
         }
 
         override fun addCallback(callback: LooperCallback) {
