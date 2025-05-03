@@ -62,8 +62,9 @@ internal class ModifyProcessor(
     private fun modify(isTraceEnabled: Boolean, isRecordEnabled: Boolean, classNode: ClassNode) {
         fun methodEnterInstructions(methodData: MethodData) = InsnList().apply {
             if (isTraceEnabled) {
-                val className = methodData.className.replace("/", ".")
-                add(LdcInsnNode("${className}.${methodData.methodName}"))
+                val hash = methodData.className.hashCode() and CLASS_NAME_HASH_CODE_MASK
+                val className = methodData.className.substringAfterLast("/")
+                add(LdcInsnNode("(${hash}) ${className}.${methodData.methodName}"))
                 add(MethodInsnNode(INVOKESTATIC, HISTORY, "beginTrace", "(Ljava/lang/String;)V", false))
             }
             if (isRecordEnabled) {
@@ -98,5 +99,6 @@ internal class ModifyProcessor(
 
     private companion object {
         const val HISTORY = "com/xiaocydx/performance/runtime/history/History"
+        const val CLASS_NAME_HASH_CODE_MASK = 0xFFFF
     }
 }
