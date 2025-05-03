@@ -81,8 +81,8 @@ internal class BlockMetricsParser : MetricsParser<BlockMetrics> {
             )
         }.toMutableList()
 
-        // gson构建的metrics，wallDurationMillis和cpuDurationMillis为0，通过copy()赋值
-        val args = metrics.copy()
+        // 去除snapshot和sampleList，避免查看TraceEvent出现卡顿
+        val args = metrics.copy(snapshot = emptyList(), sampleList = emptyList())
         repeat(2) {
             val isEnter = it == 0
             val index = if (isEnter) 0 else snapshotEvents.size

@@ -66,7 +66,8 @@ internal class ANRMetricsParser : MetricsParser<ANRMetrics> {
                 pid = TraceEvent.pid(pid),
                 tid = TraceEvent.tid(tid),
                 cat = batch.scene,
-                args = batch
+                // 去除snapshot和sampleList，避免查看TraceEvent出现卡顿
+                args = batch.copy(snapshot = emptyList(), sampleList = emptyList())
             )
         }
 
