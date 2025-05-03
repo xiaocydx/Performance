@@ -19,7 +19,6 @@
 package com.xiaocydx.performance.analyzer.block
 
 import android.os.Handler
-import android.os.Process
 import android.os.SystemClock
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
@@ -42,7 +41,7 @@ internal class BlockMetricsAnalyzer(
 
     override fun init() {
         val handler = Handler(host.dumpLooper)
-        val callback = Callback(handler)
+        val callback = LooperCallbackImpl(handler)
         coroutineScope.launch {
             host.registerHistory(this@BlockMetricsAnalyzer)
             host.addCallback(callback)
@@ -53,7 +52,7 @@ internal class BlockMetricsAnalyzer(
         }
     }
 
-    private inner class Callback(private val handler: Handler) : LooperCallback {
+    private inner class LooperCallbackImpl(private val handler: Handler) : LooperCallback {
         private var startMark = 0L
         private var startUptimeMillis = 0L
         private var startThreadTimeMillis = 0L
@@ -69,7 +68,7 @@ internal class BlockMetricsAnalyzer(
                     if (current.uptimeMillis - startUptimeMillis <= config.thresholdMillis) return
                     val latestActivity = host.getLatestActivity()?.javaClass?.name
                     if (latestActivity.isNullOrEmpty()) return
-                    handler.post(BlockTask(
+                    handler.post(BlockMetricsTask(
                         startMark = startMark,
                         endMark = current.mark,
                         intermediate = BlockMetrics(
@@ -96,7 +95,7 @@ internal class BlockMetricsAnalyzer(
         }
     }
 
-    private inner class BlockTask(
+    private inner class BlockMetricsTask(
         private val startMark: Long,
         private val endMark: Long,
         private val intermediate: BlockMetrics

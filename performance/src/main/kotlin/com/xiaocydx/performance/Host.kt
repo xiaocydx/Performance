@@ -21,11 +21,13 @@ package com.xiaocydx.performance
 import android.app.Activity
 import android.app.ActivityManager
 import android.os.Looper
+import android.os.SystemClock
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.runtime.component.ActivityEvent
 import com.xiaocydx.performance.runtime.component.ActivityKey
+import com.xiaocydx.performance.runtime.future.PendingMessage
 import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.segment.Merger
@@ -83,6 +85,12 @@ internal interface Host {
 
     @MainThread
     fun unregisterHistory(analyzer: Analyzer)
+
+    @AnyThread
+    fun getFirstPending(uptimeMillis: Long = SystemClock.uptimeMillis()): PendingMessage?
+
+    @AnyThread
+    fun getPendingList(uptimeMillis: Long = SystemClock.uptimeMillis()): List<PendingMessage>
 
     @MainThread
     fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger

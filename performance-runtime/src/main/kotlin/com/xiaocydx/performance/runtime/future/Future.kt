@@ -18,38 +18,24 @@ package com.xiaocydx.performance.runtime.future
 
 import android.os.Message
 import android.os.MessageQueue
-import android.os.SystemClock
 import com.xiaocydx.performance.runtime.Reflection
 
 /**
  * @author xcc
  * @date 2025/4/25
  */
-internal object Future : Reflection {
-    private val mMessagesField = runCatching {
-        MessageQueue::class.java.toSafe().declaredInstanceFields.find("mMessages")
-    }.getOrNull()?.apply { isAccessible = true }
+internal class Future(private val queue: MessageQueue) {
 
-    private val nextField = runCatching {
-        Message::class.java.toSafe().declaredInstanceFields.find("next")
-    }.getOrNull()?.apply { isAccessible = true }
-
-    private val isAvailable: Boolean
+    val isAvailable: Boolean
         get() = mMessagesField != null || nextField != null
 
-    fun getFirstPending(
-        queue: MessageQueue,
-        uptimeMillis: Long = SystemClock.uptimeMillis()
-    ): PendingMessage? {
+    fun getFirstPending(uptimeMillis: Long): PendingMessage? {
         if (!isAvailable) return null
         val message = synchronized(queue) { mMessagesField!!.get(queue) as? Message }
         return message?.toPending(uptimeMillis)
     }
 
-    fun getPendingList(
-        queue: MessageQueue,
-        uptimeMillis: Long = SystemClock.uptimeMillis()
-    ): List<PendingMessage> {
+    fun getPendingList(uptimeMillis: Long): List<PendingMessage> {
         if (!isAvailable) return emptyList()
         val outcome = mutableListOf<PendingMessage>()
         synchronized(queue) {
@@ -72,5 +58,15 @@ internal object Future : Reflection {
             arg2 = arg2,
             uptimeMillis = uptimeMillis,
         )
+    }
+
+    private companion object : Reflection {
+        val mMessagesField = runCatching {
+            MessageQueue::class.java.toSafe().declaredInstanceFields.find("mMessages")
+        }.getOrNull()?.apply { isAccessible = true }
+
+        val nextField = runCatching {
+            Message::class.java.toSafe().declaredInstanceFields.find("next")
+        }.getOrNull()?.apply { isAccessible = true }
     }
 }

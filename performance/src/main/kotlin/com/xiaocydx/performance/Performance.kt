@@ -38,10 +38,12 @@ import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsConfig
 import com.xiaocydx.performance.analyzer.stable.IdleHandlerAnalyzer
+import com.xiaocydx.performance.runtime.assertMainThread
 import com.xiaocydx.performance.runtime.component.ActivityEvent
 import com.xiaocydx.performance.runtime.component.ActivityKey
 import com.xiaocydx.performance.runtime.component.ComponentWatcher
-import com.xiaocydx.performance.runtime.assertMainThread
+import com.xiaocydx.performance.runtime.future.Future
+import com.xiaocydx.performance.runtime.future.PendingMessage
 import com.xiaocydx.performance.runtime.gc.ReferenceQueueDaemon
 import com.xiaocydx.performance.runtime.history.History
 import com.xiaocydx.performance.runtime.history.record.Snapshot
@@ -142,6 +144,7 @@ object Performance {
         private val analyzers = mutableListOf<Analyzer>()
         private lateinit var application: Application
         private lateinit var config: Config
+        private lateinit var future: Future
 
         @Volatile
         private var sampleThread: HandlerThread? = null
@@ -155,9 +158,11 @@ object Performance {
         override val activityEvent = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
         override val isRecordEnabled get() = History.isRecordEnabled
 
+        @MainThread
         fun init(application: Application, config: Config) {
             this.application = application
             this.config = config
+            future = Future(Looper.myQueue())
             component.init(application, send = activityEvent::tryEmit)
         }
 
@@ -232,6 +237,14 @@ object Performance {
             if (analyzer is ANRMetricsAnalyzer) {
                 Signal.setANRCallback(null)
             }
+        }
+
+        override fun getFirstPending(uptimeMillis: Long): PendingMessage? {
+            return future.getFirstPending(uptimeMillis)
+        }
+
+        override fun getPendingList(uptimeMillis: Long): List<PendingMessage> {
+            return future.getPendingList(uptimeMillis)
         }
 
         override fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger {

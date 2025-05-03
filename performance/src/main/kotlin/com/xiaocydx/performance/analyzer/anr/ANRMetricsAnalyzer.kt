@@ -23,14 +23,12 @@ import android.app.ActivityManager.ProcessErrorStateInfo.NOT_RESPONDING
 import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
 import android.os.Handler
 import android.os.Looper
-import android.os.MessageQueue
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
 import com.xiaocydx.performance.analyzer.block.BlockMetricsConfig
-import com.xiaocydx.performance.runtime.future.Future
 import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.segment.Merger
@@ -62,13 +60,13 @@ internal class ANRMetricsAnalyzer(
     override fun init() {
         coroutineScope.launch {
             host.registerHistory(this@ANRMetricsAnalyzer)
-            val callback = Callback(host.merger(
+            val callback = LooperCallbackImpl(host.merger(
                 idleThresholdMillis = anrConfig.idleThresholdMillis,
                 mergeThresholdMillis = anrConfig.mergeThresholdMillis
             ))
             host.addCallback(callback)
             try {
-                collectANREvent(Looper.myQueue(), callback::anrAction)
+                collectANREvent(anrAction = callback::anrAction)
             } finally {
                 host.removeCallback(callback)
                 host.registerHistory(this@ANRMetricsAnalyzer)
@@ -76,10 +74,7 @@ internal class ANRMetricsAnalyzer(
         }
     }
 
-    private suspend fun collectANREvent(
-        mainQueue: MessageQueue,
-        anrAction: (anrSample: Sample) -> Unit
-    ) {
+    private suspend fun collectANREvent(anrAction: (anrSample: Sample) -> Unit) {
         val lastANRTime = AtomicLong()
         val lastANRSample = AtomicReference<Sample>()
         val dumpDispatcher = Handler(host.dumpLooper).asCoroutineDispatcher()
@@ -102,7 +97,7 @@ internal class ANRMetricsAnalyzer(
                 }
 
                 // fast path：判断首个消息，处理前台ANR闪退
-                if (isPostpone(mainQueue)) {
+                if (isPostpone()) {
                     anrAction(anrSample)
                     return@collect
                 }
@@ -135,13 +130,13 @@ internal class ANRMetricsAnalyzer(
         return info == null || info.importance != IMPORTANCE_FOREGROUND
     }
 
-    private fun isPostpone(mainQueue: MessageQueue): Boolean {
-        val first = Future.getFirstPending(mainQueue) ?: return false
+    private fun isPostpone(): Boolean {
+        val first = host.getFirstPending() ?: return false
         // first.`when` = 0L是Handler.sendMessageAtFrontOfQueue()发送的消息
         return first.`when` != 0L && first.uptimeMillis - first.`when` > POSTPONE_THRESHOLD
     }
 
-    private inner class Callback(private val merger: Merger) : LooperCallback {
+    private inner class LooperCallbackImpl(private val merger: Merger) : LooperCallback {
         private val segment = Segment()
         private val dumpHandler = Handler(host.dumpLooper)
         private val mainHandler = Handler(Looper.getMainLooper())
@@ -176,8 +171,8 @@ internal class ANRMetricsAnalyzer(
                     this.anrSample = null
                     val startUptimeMillis = current.uptimeMillis - anrConfig.recentDurationMillis
                     val elements = merger.copy(startUptimeMillis, current.uptimeMillis)
-                    val future = Future.getPendingList(Looper.myQueue(), current.uptimeMillis)
-                    dumpHandler.post(ANRTask(
+                    val future = host.getPendingList(current.uptimeMillis)
+                    dumpHandler.post(ANRMetricsTask(
                         elements = elements,
                         intermediate = ANRMetrics(
                             //region lack
@@ -198,7 +193,7 @@ internal class ANRMetricsAnalyzer(
         }
     }
 
-    private inner class ANRTask(
+    private inner class ANRMetricsTask(
         private val elements: List<Element>,
         private val intermediate: ANRMetrics
     ) : Runnable {
