@@ -23,7 +23,8 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".CheckIdleActivity" />
+        <activity android:name=".CheckIdleHandlerActivity" />
+        <activity android:name=".BlockMetricsActivity" />
     </application>
 
 </manifest>

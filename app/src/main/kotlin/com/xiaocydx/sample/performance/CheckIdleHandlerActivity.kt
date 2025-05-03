@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
  * @author xcc
  * @date 2025/3/20
  */
-class CheckIdleActivity: AppCompatActivity() {
+class CheckIdleHandlerActivity: AppCompatActivity() {
     private lateinit var view: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
