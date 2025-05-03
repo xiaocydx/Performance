@@ -60,11 +60,15 @@ internal class ModifyProcessor(
     }
 
     private fun modify(isTraceEnabled: Boolean, isRecordEnabled: Boolean, classNode: ClassNode) {
+        var traceClassName = ""
+        if (isTraceEnabled) {
+            val hash = classNode.name.hashCode() and CLASS_NAME_HASH_CODE_MASK
+            traceClassName = "(${hash}) ${classNode.name.substringAfterLast("/")}"
+        }
+
         fun methodEnterInstructions(methodData: MethodData) = InsnList().apply {
             if (isTraceEnabled) {
-                val hash = methodData.className.hashCode() and CLASS_NAME_HASH_CODE_MASK
-                val className = methodData.className.substringAfterLast("/")
-                add(LdcInsnNode("(${hash}) ${className}.${methodData.methodName}"))
+                add(LdcInsnNode("${traceClassName}.${methodData.methodName}"))
                 add(MethodInsnNode(INVOKESTATIC, HISTORY, "beginTrace", "(Ljava/lang/String;)V", false))
             }
             if (isRecordEnabled) {
