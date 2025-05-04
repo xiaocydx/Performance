@@ -3,6 +3,7 @@ package com.xiaocydx.sample.performance
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 
@@ -13,7 +14,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         click(R.id.btnFrameMetrics) { }
         click(R.id.btnBlockMetrics) { start<BlockMetricsActivity>() }
-        click(R.id.btnANRMetrics) { }
+        click(R.id.btnANRMetrics) { start<ANRMetricsActivity>() }
         click(R.id.btnIdleHandler) { start<CheckIdleHandlerActivity>() }
     }
 

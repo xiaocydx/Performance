@@ -58,9 +58,13 @@ internal class ANRMetricsParser : MetricsParser<ANRMetrics> {
         // gson构建的batch，wallDurationMillis和cpuDurationMillis为0，通过copy()赋值
         val history = history.map { it.copy() }
         val historyEvents = history.mapIndexed { i: Int, batch ->
+            var cpu = ""
+            if (batch.cpuDurationMillis >= 0) {
+                cpu = ", cpu=${batch.cpuDurationMillis}ms"
+            }
             TraceEvent.complete(
                 name = " Batch#${i + 1} { count=${batch.count}, scene=${batch.scene}, " +
-                        "wall=${batch.wallDurationMillis}ms, cpu=${batch.cpuDurationMillis}ms }",
+                        "wall=${batch.wallDurationMillis}ms${cpu} }",
                 startTs = TraceEvent.ts(batch.startUptimeMillis),
                 endTs = TraceEvent.ts(batch.endUptimeMillis),
                 pid = TraceEvent.pid(pid),
@@ -71,10 +75,10 @@ internal class ANRMetricsParser : MetricsParser<ANRMetrics> {
             )
         }
 
-        val intervalMs = 10
+        val futureIntervalMs = 10
         val futureEvents = future.mapIndexed { i, pending ->
-            val startMs = pending.uptimeMillis + i * intervalMs
-            val endMs = startMs + intervalMs
+            val startMs = pending.uptimeMillis + i * futureIntervalMs
+            val endMs = startMs + futureIntervalMs
             TraceEvent.complete(
                 name = " Pending#${i + 1}",
                 startTs = TraceEvent.ts(startMs),
@@ -84,6 +88,15 @@ internal class ANRMetricsParser : MetricsParser<ANRMetrics> {
                 args = pending
             )
         }
+
+        val paddingStartMs = anrSample.uptimeMillis + future.size * futureIntervalMs
+        val paddingEvent = TraceEvent.complete(
+            name = " ",
+            startTs = TraceEvent.ts(paddingStartMs),
+            endTs = TraceEvent.ts(paddingStartMs + 3000L),
+            pid = TraceEvent.pid(pid),
+            tid = TraceEvent.tid(tid)
+        )
 
         val snapshotEvents = history.flatMap { batch ->
             filter(batch.snapshot).map {
@@ -115,15 +128,20 @@ internal class ANRMetricsParser : MetricsParser<ANRMetrics> {
                     args = sample
                 )
             }
-        }.toMutableList()
+        }
 
-        sampleEvents.add(TraceEvent.instant(
+        val anrSampleEvent = TraceEvent.instant(
             name = "ANRSample",
             ts = TraceEvent.ts(anrSample.uptimeMillis),
             pid = TraceEvent.pid(pid),
             tid = "ANRSample",
             args = anrSample
-        ))
-        return context.gson.toJson(historyEvents + futureEvents + snapshotEvents + sampleEvents)
+        )
+
+        return context.gson.toJson(
+            historyEvents + futureEvents + paddingEvent +
+                    snapshotEvents +
+                    sampleEvents + anrSampleEvent
+        )
     }
 }
