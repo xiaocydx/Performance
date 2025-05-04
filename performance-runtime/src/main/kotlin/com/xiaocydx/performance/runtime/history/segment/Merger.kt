@@ -27,7 +27,7 @@ internal class Merger(
     private val idleThresholdMillis: Long,
     private val mergeThresholdMillis: Long,
 ) {
-    private val deque = ArrayDeque<Element>(capacity)
+    private val deque = ArrayDeque<Range>(capacity)
 
     fun consume(segment: Segment) {
         if (!merge(segment)) append(segment)
@@ -36,53 +36,53 @@ internal class Merger(
 
     @VisibleForTesting
     fun append(segment: Segment) {
-        val element = if (deque.size == capacity) deque.removeFirst() else Element()
-        element.init(segment)
-        deque.add(element)
+        val range = if (deque.size == capacity) deque.removeFirst() else Range()
+        range.init(segment)
+        deque.add(range)
     }
 
     @VisibleForTesting
     fun merge(segment: Segment): Boolean {
         if (segment.isSingle) return false
-        val element = lastOrNull()
-        if (element == null || element.isSingle || element.scene != segment.scene) return false
+        val range = lastOrNull()
+        if (range == null || range.isSingle || range.scene != segment.scene) return false
 
-        val idleDuration = segment.startUptimeMillis - element.endUptimeMillis
+        val idleDuration = segment.startUptimeMillis - range.endUptimeMillis
         if (idleDuration > idleThresholdMillis) return false
 
-        val lastDuration = element.endUptimeMillis - element.startUptimeMillis
+        val lastDuration = range.endUptimeMillis - range.startUptimeMillis
         val currDuration = segment.endUptimeMillis - segment.startUptimeMillis
         if (lastDuration + currDuration > mergeThresholdMillis) return false
 
-        element.merge(segment, idleDuration)
+        range.merge(segment, idleDuration)
         return true
     }
 
     @VisibleForTesting
-    fun lastOrNull(): Element? {
+    fun lastOrNull(): Range? {
         return deque.lastOrNull()
     }
 
-    fun copy(): List<Element> {
+    fun copy(): List<Range> {
         return deque.map { it.deepCopy() }
     }
 
-    fun copy(startUptimeMillis: Long, endUptimeMillis: Long): List<Element> {
+    fun copy(startUptimeMillis: Long, endUptimeMillis: Long): List<Range> {
         if (startUptimeMillis < 0 || endUptimeMillis < 0
                 || endUptimeMillis < startUptimeMillis) {
             return emptyList()
         }
-        val outcome = mutableListOf<Element>()
+        val outcome = mutableListOf<Range>()
         for (i in 0 until deque.size) {
-            val element = deque[i]
-            if (element.endUptimeMillis < startUptimeMillis) continue
-            if (element.startUptimeMillis > endUptimeMillis) break
-            outcome.add(element.deepCopy())
+            val range = deque[i]
+            if (range.endUptimeMillis < startUptimeMillis) continue
+            if (range.startUptimeMillis > endUptimeMillis) break
+            outcome.add(range.deepCopy())
         }
         return outcome
     }
 
-    data class Element(
+    data class Range(
         var count: Int = 1,
         var startUptimeMillis: Long = 0L,
         var startThreadTimeMillis: Long = 0L,

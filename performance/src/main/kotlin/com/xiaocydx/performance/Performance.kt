@@ -29,7 +29,7 @@ import android.os.Process.THREAD_PRIORITY_BACKGROUND
 import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
-import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.HistoryTokenStore.Count
 import com.xiaocydx.performance.analyzer.SampleConfig
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsConfig
@@ -50,6 +50,8 @@ import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.sample.Sampler
 import com.xiaocydx.performance.runtime.history.segment.Merger
+import com.xiaocydx.performance.runtime.history.segment.Segment
+import com.xiaocydx.performance.runtime.history.segment.collectFrom
 import com.xiaocydx.performance.runtime.looper.CompositeLooperCallback
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.LooperCallback
@@ -59,6 +61,7 @@ import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi
 import com.xiaocydx.performance.runtime.looper.LooperMessageWatcherApi29
 import com.xiaocydx.performance.runtime.looper.LooperNativeInputWatcher
 import com.xiaocydx.performance.runtime.looper.LooperWatcher
+import com.xiaocydx.performance.runtime.looper.Source
 import com.xiaocydx.performance.runtime.looper.Start
 import com.xiaocydx.performance.runtime.signal.Signal
 import kotlinx.coroutines.CoroutineScope
@@ -141,14 +144,17 @@ object Performance {
 
         private val component = ComponentWatcher()
         private val callbacks = CompositeLooperCallback()
-        private val analyzers = mutableListOf<Analyzer>()
+        private val tokenStore = HistoryTokenStore()
         private lateinit var application: Application
         private lateinit var config: Config
         private lateinit var future: Future
 
         @Volatile
         private var sampleThread: HandlerThread? = null
-        private lateinit var sampler: Sampler
+        private var sampler: Sampler? = null
+
+        private val segment = Segment()
+        private var merger: Merger? = null
 
         override val pid by lazy { Process.myPid() }
         override val dumpLooper by lazy { dumpThread.looper!! }
@@ -158,7 +164,6 @@ object Performance {
         override val activityEvent = MutableSharedFlow<ActivityEvent>(extraBufferCapacity = Int.MAX_VALUE)
         override val isRecordEnabled get() = History.isRecordEnabled
 
-        @MainThread
         fun init(application: Application, config: Config) {
             this.application = application
             this.config = config
@@ -195,15 +200,45 @@ object Performance {
             callbacks.remove(callback)
         }
 
-        override fun registerHistory(analyzer: Analyzer) {
-            if (analyzers.contains(analyzer)) return
-            val beforeEmpty = analyzers.isEmpty()
-            analyzers.add(analyzer)
+        override fun registerHistory(token: HistoryToken) {
+            if (!tokenStore.add(token)) return
 
-            History.init()
-            var sampleThread = sampleThread
-            if (sampleThread == null) {
-                sampleThread = HandlerThread("PerformanceSampleThread", THREAD_PRIORITY_BACKGROUND)
+            if (tokenStore.isEmptyToNotEmpty(Count::total)) {
+                History.init()
+                callbacks.setFirst { current ->
+                    when (current) {
+                        is Start -> {
+                            sampler?.start(current.uptimeMillis)
+                            // collectFrom() time << 1ms
+                            merger?.let { segment.collectFrom(current) }
+                        }
+                        is End -> {
+                            println("test -> end = ${current.metadata.toString()}")
+                            sampler?.stop(current.uptimeMillis)
+                            merger?.let {
+                                segment.collectFrom(current)
+                                if (segment.wallDurationMillis > config.blockConfig.thresholdMillis) {
+                                    segment.isSingle = true
+                                    segment.needRecord = true
+                                    segment.needSample = true
+                                    segment.endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
+                                } else if (current.isFrom(Source.ActivityThread)) {
+                                    segment.isSingle = true
+                                    segment.endThreadTimeMillis = SystemClock.currentThreadTimeMillis()
+                                }
+                                it.consume(segment)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (tokenStore.isEmptyToNotEmpty(Count::needSignal)) {
+                Signal.setANRCallback { anrEvent.tryEmit(Unit) }
+            }
+
+            if (tokenStore.isEmptyToNotEmpty(Count::needSample)) {
+                val sampleThread = HandlerThread("PerformanceSampleThread", THREAD_PRIORITY_BACKGROUND)
                 sampleThread.start()
                 sampler = requireHistory(History.sampler(
                     looper = sampleThread.looper,
@@ -213,30 +248,62 @@ object Performance {
                 this.sampleThread = sampleThread
             }
 
-            if (beforeEmpty) {
-                callbacks.setFirst { current ->
-                    when (current) {
-                        is Start -> sampler.start(current.uptimeMillis)
-                        is End -> sampler.stop(current.uptimeMillis)
-                    }
-                }
-            }
-            if (analyzer is ANRMetricsAnalyzer) {
-                Signal.setANRCallback { anrEvent.tryEmit(Unit) }
+            if (tokenStore.isEmptyToNotEmpty(Count::needSegment)) {
+                merger = requireHistory(History.merger(
+                    idleThresholdMillis = config.anrConfig.idleThresholdMillis,
+                    mergeThresholdMillis = config.anrConfig.mergeThresholdMillis
+                ))
             }
         }
 
-        override fun unregisterHistory(analyzer: Analyzer) {
-            if (!analyzers.remove(analyzer)) return
-            // TODO: 2025/4/26 cancel History.init()
-            if (analyzers.isEmpty()) {
-                val uptimeMillis = SystemClock.uptimeMillis()
+        override fun unregisterHistory(token: HistoryToken) {
+            if (!tokenStore.remove(token)) return
+
+            if (tokenStore.isNotEmptyToEmpty(Count::total)) {
+                // TODO: 2025/4/26 cancel History.init()
                 callbacks.setFirst(callback = null)
-                sampler.stop(uptimeMillis)
             }
-            if (analyzer is ANRMetricsAnalyzer) {
+
+            if (tokenStore.isNotEmptyToEmpty(Count::needSignal)) {
                 Signal.setANRCallback(null)
             }
+
+            if (tokenStore.isNotEmptyToEmpty(Count::needSample)) {
+                sampleThread!!.quit()
+                sampler!!.stop(SystemClock.uptimeMillis())
+                sampler = null
+                // volatile write: release (Safe Publication)
+                sampleThread = null
+            }
+
+            if (tokenStore.isEmptyToNotEmpty(Count::needSegment)) {
+                merger = null
+            }
+        }
+
+        override fun snapshot(startMark: Long, endMark: Long): Snapshot {
+            return History.snapshot(startMark, endMark)
+        }
+
+        override fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
+            if (sampleThread != null) {
+                // volatile read: acquire (Safe Publication)
+                return sampler!!.sampleList(startUptimeMillis, endUptimeMillis)
+            }
+            return emptyList()
+        }
+
+        override fun sampleImmediately(): Sample? {
+            if (sampleThread != null) {
+                // volatile read: acquire (Safe Publication)
+                return sampler!!.sampleImmediately()
+            }
+            return null
+        }
+
+        override fun segmentRange(startUptimeMillis: Long, endUptimeMillis: Long): List<Merger.Range> {
+            assertMainThread()
+            return merger?.copy(startUptimeMillis, endUptimeMillis) ?: emptyList()
         }
 
         override fun getFirstPending(uptimeMillis: Long): PendingMessage? {
@@ -245,30 +312,6 @@ object Performance {
 
         override fun getPendingList(uptimeMillis: Long): List<PendingMessage> {
             return future.getPendingList(uptimeMillis)
-        }
-
-        override fun merger(idleThresholdMillis: Long, mergeThresholdMillis: Long): Merger {
-            return requireHistory(History.merger(idleThresholdMillis, mergeThresholdMillis))
-        }
-
-        override fun sampleList(startUptimeMillis: Long, endUptimeMillis: Long): List<Sample> {
-            if (sampleThread != null) {
-                // volatile read: acquire (Safe Publication)
-                return sampler.sampleList(startUptimeMillis, endUptimeMillis)
-            }
-            return emptyList()
-        }
-
-        override fun sampleImmediately(): Sample? {
-            if (sampleThread != null) {
-                // volatile read: acquire (Safe Publication)
-                return sampler.sampleImmediately()
-            }
-            return null
-        }
-
-        override fun snapshot(startMark: Long, endMark: Long): Snapshot {
-            return History.snapshot(startMark, endMark)
         }
 
         private fun <T : Any> requireHistory(value: T?): T {

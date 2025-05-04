@@ -17,7 +17,6 @@
 package com.xiaocydx.performance.runtime.history.segment
 
 import androidx.annotation.VisibleForTesting
-import com.xiaocydx.performance.runtime.looper.DispatchContext
 import com.xiaocydx.performance.runtime.looper.End
 import com.xiaocydx.performance.runtime.looper.Metadata
 import com.xiaocydx.performance.runtime.looper.Scene
@@ -157,51 +156,48 @@ internal data class Segment(
     }
 }
 
-internal fun Segment.collectFrom(current: DispatchContext) {
-    when (current) {
-        is Start -> {
-            scene = current.scene
-            startMark = current.mark
-            startUptimeMillis = current.uptimeMillis
-            startThreadTimeMillis = current.threadTimeMillis
+internal fun Segment.collectFrom(start: Start) {
+    scene = start.scene
+    startMark = start.mark
+    startUptimeMillis = start.uptimeMillis
+    startThreadTimeMillis = start.threadTimeMillis
+}
+
+internal fun Segment.collectFrom(end: End) {
+    endMark = end.mark
+    endUptimeMillis = end.uptimeMillis
+    when (end.scene) {
+        Message -> {
+            end.metadata.asMessageLog()?.let {
+                log = it
+                return
+            }
+            end.metadata.asMessage()!!.let {
+                `when` = it.`when`
+                what = it.what
+                targetName = it.target?.javaClass?.name
+                callbackName = it.callback?.javaClass?.name
+                arg1 = it.arg1
+                arg2 = it.arg2
+            }
         }
-        is End -> {
-            endMark = current.mark
-            endUptimeMillis = current.uptimeMillis
-            when (current.scene) {
-                Message -> {
-                    current.metadata.asMessageLog()?.let {
-                        log = it
-                        return
-                    }
-                    current.metadata.asMessage()!!.let {
-                        `when` = it.`when`
-                        what = it.what
-                        targetName = it.target?.javaClass?.name
-                        callbackName = it.callback?.javaClass?.name
-                        arg1 = it.arg1
-                        arg2 = it.arg2
-                    }
-                }
-                IdleHandler -> {
-                    current.metadata.asIdleHandler()!!.let {
-                        idleHandlerName = it.javaClass.name ?: ""
-                    }
-                }
-                NativeInput -> {
-                    current.metadata.asMotionEvent()?.let {
-                        isTouch = true
-                        action = it.actionMasked
-                        rawX = it.rawX
-                        rawY = it.rawY
-                        return
-                    }
-                    current.metadata.asKeyEvent()!!.let {
-                        isTouch = false
-                        action = it.action
-                        keyCode = it.keyCode
-                    }
-                }
+        IdleHandler -> {
+            end.metadata.asIdleHandler()!!.let {
+                idleHandlerName = it.javaClass.name ?: ""
+            }
+        }
+        NativeInput -> {
+            end.metadata.asMotionEvent()?.let {
+                isTouch = true
+                action = it.actionMasked
+                rawX = it.rawX
+                rawY = it.rawY
+                return
+            }
+            end.metadata.asKeyEvent()!!.let {
+                isTouch = false
+                action = it.action
+                keyCode = it.keyCode
             }
         }
     }
