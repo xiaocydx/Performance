@@ -40,11 +40,10 @@ class ANRMetricsPrinter : ANRMetricsReceiver {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
             Log.e(TAG, gson.toJson(metrics))
             val anrSample = metrics.anrSample
-            val removed = anrSample.threadStat.copy(stack = emptyList(), trace = emptyList())
+            val removed = anrSample.threadStat.copy(stack = emptyList())
             val message = anrSample.copy(threadStat = removed).toString()
                 .replace("Sample", "ANRSample")
                 .replace(", stack=[]", "")
-                .replace(", trace=[]", "")
             Log.e(TAG, message, anrSample.threadStat.toCause())
         }
     }

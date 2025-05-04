@@ -39,13 +39,13 @@ class BlockMetricsPrinter : BlockMetricsReceiver {
     override fun receive(metrics: BlockMetrics) {
         Dispatchers.IO.dispatch(EmptyCoroutineContext) {
             Log.e(TAG, gson.toJson(metrics))
-            for (i in metrics.sampleList.lastIndex downTo 0) {
+            val sampleList = metrics.sampleList.takeLast(3)
+            for (i in sampleList.lastIndex downTo 0) {
                 val sample = metrics.sampleList[i]
-                val removed = sample.threadStat.copy(stack = emptyList(), trace = emptyList())
+                val removed = sample.threadStat.copy(stack = emptyList())
                 val message = sample.copy(threadStat = removed).toString()
                     .replace("Sample", "Sample${i + 1}")
                     .replace(", stack=[]", "")
-                    .replace(", trace=[]", "")
                 Log.e(TAG, message, sample.threadStat.toCause())
             }
         }

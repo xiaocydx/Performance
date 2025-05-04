@@ -16,16 +16,8 @@
 
 package com.xiaocydx.performance.analyzer
 
-import android.app.Application
 import android.os.Process
-import com.google.gson.GsonBuilder
 import com.xiaocydx.performance.runtime.history.sample.ThreadStat
-import java.io.File
-import java.io.File.separator
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 /**
  * @author xcc
@@ -56,39 +48,6 @@ interface Metrics {
 
 internal fun ThreadStat.toCause(): RuntimeException {
     val cause = RuntimeException()
-    cause.stackTrace = trace.toTypedArray()
+    cause.stackTrace = stack.toTypedArray()
     return cause
-}
-
-internal class MetricsOutput(private val application: Application) {
-
-    fun write(dirName: String, metrics: Metrics) {
-        val json = gson.toJson(metrics)
-        file(dirName, metrics).bufferedWriter().use { it.write(json) }
-    }
-
-    private fun file(dirName: String, metrics: Metrics): File {
-        val name = metrics.tag_createTime()
-        val child = "performance$separator${dirName}$separator${name}"
-        val file = File(application.filesDir, child)
-        file.parentFile?.takeIf { !it.exists() }?.mkdirs()
-        file.takeIf { !it.exists() }?.delete()
-        return file
-    }
-
-    @Suppress("FunctionName")
-    private fun Metrics.tag_createTime(): String {
-        val createTime = try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-            sdf.timeZone = TimeZone.getDefault()
-            sdf.format(Date(createTimeMillis))
-        } catch (e: Throwable) {
-            createTimeMillis.toString()
-        }
-        return "${tag}_${createTime}"
-    }
-
-    private companion object {
-        val gson = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()!!
-    }
 }

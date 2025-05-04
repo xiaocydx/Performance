@@ -179,8 +179,7 @@ internal class Sampler(
             priority = pidStat.takeIf { it.isAvailable }?.priority?.toString() ?: "",
             nice = pidStat.takeIf { it.isAvailable }?.nice?.toString() ?: "",
             state = threadState.toString(),
-            stack = stackTrace.map { it.toString() },
-            trace = stackTrace
+            stack = stackTrace,
         )
     }
 }

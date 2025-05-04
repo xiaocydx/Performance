@@ -40,7 +40,5 @@ data class ThreadStat(
     val priority: String,
     val nice: String,
     val state: String,
-    val stack: List<String>,
-    @Transient
-    val trace: List<StackTraceElement>
+    val stack: List<StackTraceElement>
 )
