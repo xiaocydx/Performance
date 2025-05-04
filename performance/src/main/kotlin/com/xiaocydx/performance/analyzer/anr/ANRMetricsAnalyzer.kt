@@ -32,12 +32,11 @@ import com.xiaocydx.performance.runtime.future.PendingMessage
 import com.xiaocydx.performance.runtime.history.record.Snapshot
 import com.xiaocydx.performance.runtime.history.sample.Sample
 import com.xiaocydx.performance.runtime.history.segment.Merger.Range
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * @author xcc
@@ -71,38 +70,36 @@ internal class ANRMetricsAnalyzer(
         private val dumpDispatcher = dumpHandler.asCoroutineDispatcher()
 
         suspend fun collectANREvent(): Unit = withContext(dumpDispatcher) {
-            val lastANRTime = AtomicLong()
-            val lastANRSample = AtomicReference<Sample>()
-            val lastFuture = AtomicReference<List<PendingMessage>>()
+            var lastANRTime = 0L
+            var lastANRSample: Sample
+            var lastFuture: List<PendingMessage>
             host.anrEvent.collect {
                 val anrTime = SystemClock.uptimeMillis()
-                val anrSample = requireNotNull(host.sampleImmediately())
-                val future = host.getPendingList(anrTime)
-                lastANRSample.set(anrSample)
-                lastFuture.set(future)
+                lastANRSample = requireNotNull(host.sampleImmediately())
+                lastFuture = host.getPendingList(anrTime)
 
-                if (anrTime - lastANRTime.get() < DUMP_TIMEOUT_MILLIS) {
+                if (anrTime - lastANRTime < DUMP_TIMEOUT_MILLIS) {
                     // ANR会发送多次event，DUMP_TIMEOUT_MILLIS期间只处理首次
                     return@collect
                 }
-                lastANRTime.set(anrTime)
+                lastANRTime = anrTime
 
                 if (isBackground()) {
                     // 可能是后台ANR
-                    proceed(anrTime, anrSample, future)
+                    proceed(lastANRTime, lastANRSample, lastFuture)
                     return@collect
                 }
 
                 // fast path：判断首个消息，处理前台ANR闪退
-                if (isPostpone(future)) {
-                    proceed(anrTime, anrSample, future)
+                if (isPostpone(lastFuture)) {
+                    proceed(lastANRTime, lastANRSample, lastFuture)
                     return@collect
                 }
 
                 // slow path：轮询ams，判断是否为前台ANR
-                launch {
-                    var processErrorStateInfo: ProcessErrorStateInfo? = null
+                launch(start = CoroutineStart.UNDISPATCHED) {
                     var retry = AMS_ERROR_RETRY_COUNT
+                    var processErrorStateInfo: ProcessErrorStateInfo? = null
                     while (retry > 0) {
                         retry--
                         processErrorStateInfo = host.ams.processesInErrorState
@@ -111,7 +108,7 @@ internal class ANRMetricsAnalyzer(
                         delay(AMS_ERROR_RETRY_MILLIS)
                     }
                     if (processErrorStateInfo != null) {
-                        proceed(lastANRTime.get(), lastANRSample.get(), lastFuture.get())
+                        proceed(lastANRTime, lastANRSample, lastFuture)
                     }
                 }
             }
