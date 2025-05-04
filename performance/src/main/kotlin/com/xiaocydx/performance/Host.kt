@@ -99,9 +99,6 @@ internal interface Host {
     fun segmentRange(startUptimeMillis: Long, endUptimeMillis: Long): List<Range>
 
     @AnyThread
-    fun getFirstPending(uptimeMillis: Long = SystemClock.uptimeMillis()): PendingMessage?
-
-    @AnyThread
     fun getPendingList(uptimeMillis: Long = SystemClock.uptimeMillis()): List<PendingMessage>
 }
 

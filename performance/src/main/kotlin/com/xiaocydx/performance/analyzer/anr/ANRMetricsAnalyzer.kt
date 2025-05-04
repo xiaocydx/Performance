@@ -51,7 +51,7 @@ internal class ANRMetricsAnalyzer(
 
     override fun init() {
         val token = HistoryToken(
-            analyzer = this@ANRMetricsAnalyzer,
+            analyzer = this,
             needSignal = true,
             needSample = true,
             needSegment = true
@@ -94,7 +94,7 @@ internal class ANRMetricsAnalyzer(
                 }
 
                 // fast path：判断首个消息，处理前台ANR闪退
-                if (isPostpone()) {
+                if (isPostpone(future)) {
                     proceed(anrTime, anrSample, future)
                     return@collect
                 }
@@ -127,8 +127,8 @@ internal class ANRMetricsAnalyzer(
             return info == null || info.importance != IMPORTANCE_FOREGROUND
         }
 
-        private fun isPostpone(): Boolean {
-            val first = host.getFirstPending() ?: return false
+        private fun isPostpone(future: List<PendingMessage>): Boolean {
+            val first = future.firstOrNull() ?: return false
             // first.`when` = 0L是Handler.sendMessageAtFrontOfQueue()发送的消息
             return first.`when` != 0L && first.uptimeMillis - first.`when` > POSTPONE_THRESHOLD
         }

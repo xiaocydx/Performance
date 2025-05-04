@@ -213,7 +213,6 @@ object Performance {
                             merger?.let { segment.collectFrom(current) }
                         }
                         is End -> {
-                            println("test -> end = ${current.metadata.toString()}")
                             sampler?.stop(current.uptimeMillis)
                             merger?.let {
                                 segment.collectFrom(current)
@@ -304,10 +303,6 @@ object Performance {
         override fun segmentRange(startUptimeMillis: Long, endUptimeMillis: Long): List<Merger.Range> {
             assertMainThread()
             return merger?.copy(startUptimeMillis, endUptimeMillis) ?: emptyList()
-        }
-
-        override fun getFirstPending(uptimeMillis: Long): PendingMessage? {
-            return future.getFirstPending(uptimeMillis)
         }
 
         override fun getPendingList(uptimeMillis: Long): List<PendingMessage> {
