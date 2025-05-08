@@ -24,6 +24,7 @@ import android.view.Window
 import androidx.annotation.CallSuper
 import com.xiaocydx.performance.Host
 import com.xiaocydx.performance.analyzer.Analyzer
+import com.xiaocydx.performance.analyzer.ConflatedEvent
 import com.xiaocydx.performance.analyzer.doOnAttach
 import com.xiaocydx.performance.analyzer.frame.api16.FrameMetricsAnalyzerApi16
 import com.xiaocydx.performance.analyzer.frame.api24.FrameMetricsAnalyzerApi24
@@ -36,13 +37,19 @@ import java.lang.ref.WeakReference
  * @author xcc
  * @date 2025/4/5
  */
-internal abstract class FrameMetricsAnalyzer(host: Host) : Analyzer(host) {
+internal abstract class FrameMetricsAnalyzer(host: Host) : Analyzer(host), FrameMetricsScope {
+    private val forceMakeEndEvent = ConflatedEvent<Unit>()
     protected val frameMetricsListeners = HashMap<ActivityKey, FrameMetricsListener>()
     @Volatile protected var defaultRefreshRate = 60.0f; private set
 
     @CallSuper
     override fun init() {
         // TODO: 补充isStopped拦截
+        coroutineScope.launch {
+            forceMakeEndEvent.flow.collect {
+                frameMetricsListeners.values.forEach { it.forceMakeEnd() }
+            }
+        }
         coroutineScope.launch {
             host.activityEvent.collect {
                 val activity = host.getActivity(it.activityKey)
@@ -71,6 +78,10 @@ internal abstract class FrameMetricsAnalyzer(host: Host) : Analyzer(host) {
             frameMetricsListeners.forEach { it.value.detach() }
             frameMetricsListeners.clear()
         }
+    }
+
+    override fun forceMakeEnd() {
+        forceMakeEndEvent.send(Unit)
     }
 
     protected abstract fun createListener(activity: Activity): FrameMetricsListener

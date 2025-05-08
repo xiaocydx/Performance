@@ -78,6 +78,7 @@ import kotlin.coroutines.resume
  */
 object Performance {
     private val host = HostImpl()
+    private val impl = mutableListOf<Any>()
     private var isInitialized = false
 
     @MainThread
@@ -90,14 +91,27 @@ object Performance {
         host.init(application, config)
         ReferenceQueueDaemon().start()
 
-        IdleHandlerAnalyzer(host).start()
-        config.frame.takeIf { it.receivers.isNotEmpty() }
-            ?.let { FrameMetricsAnalyzer.create(host, it).start() }
-        config.block.takeIf { it.receivers.isNotEmpty() }
-            ?.let { BlockMetricsAnalyzer(host, it).start() }
-        config.anr.takeIf { it.receivers.isNotEmpty() }
-            ?.let { ANRMetricsAnalyzer(host, it, config.block).start() }
+        val analyzers = listOf(
+            IdleHandlerAnalyzer(host),
+            config.frame.takeIf { it.receivers.isNotEmpty() }
+                ?.let { FrameMetricsAnalyzer.create(host, it) },
+            config.block.takeIf { it.receivers.isNotEmpty() }
+                ?.let { BlockMetricsAnalyzer(host, it) },
+            config.anr.takeIf { it.receivers.isNotEmpty() }
+                ?.let { ANRMetricsAnalyzer(host, it, config.block) }
+        )
+
+        analyzers.forEach { it?.start() }
+        synchronized(impl) { analyzers.forEach { it?.let(impl::add) } }
         setupLooperWatcher()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    internal fun <T : Any> impl(clazz: Class<T>): T? {
+        require(clazz.isInterface)
+        return synchronized(impl) {
+            impl.firstOrNull { clazz.isAssignableFrom(it.javaClass) } as? T
+        }
     }
 
     private fun setupLooperWatcher() {
