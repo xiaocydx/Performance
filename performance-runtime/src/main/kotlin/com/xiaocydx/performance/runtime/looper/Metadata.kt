@@ -74,18 +74,18 @@ internal interface Metadata {
             uptimeMillis: Long
         ): String {
             val b = StringBuilder()
-            b.append("{ when=").append(`when` - uptimeMillis).append("ms")
+            b.append("Message { when=").append(`when` - uptimeMillis).append("ms")
             if (targetName != null) {
                 if (callbackName != null) {
-                    b.append(" callback=").append(callbackName)
+                    b.append(", callback=").append(callbackName)
                 } else {
-                    b.append(" what=").append(what)
+                    b.append(", what=").append(what)
                 }
-                if (arg1 != 0) b.append(" arg1=").append(arg1)
-                if (arg2 != 0) b.append(" arg1=").append(arg1)
-                b.append(" target=").append(targetName)
+                if (arg1 != 0) b.append(", arg1=").append(arg1)
+                if (arg2 != 0) b.append(", arg1=").append(arg1)
+                b.append(", target=").append(targetName)
             } else {
-                b.append(" barrier=").append(arg1)
+                b.append(", barrier=").append(arg1)
             }
             b.append(" }")
             return b.toString()

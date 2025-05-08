@@ -90,23 +90,23 @@ class FrameMetricsPrinter(
 
         private fun droppedFramesString(str: StringBuilder, visitor: FrameMetricsVisitor): String {
             str.clear()
-            str.append("{")
+            str.append("{ ")
             var total = 0
             val last = DroppedFrames.entries.lastIndex
             DroppedFrames.entries.forEachIndexed { i, drop ->
                 val frames = visitor.droppedFramesOf(drop)
                 if (drop == DroppedFrames.Total) {
                     total = frames
-                    str.append("total").append(" = ").append(total)
+                    str.append("total").append("=").append(total)
                 } else {
                     var rate = if (total > 0) frames.toFloat() / total else 0f
                     rate *= 100
                     rate = (rate * 10).toInt() / 10f
-                    str.append(dropNames[i]).append(" = ").append(rate).append('%')
+                    str.append(dropNames[i]).append("=").append(rate).append('%')
                 }
                 if (i != last) str.append(", ")
             }
-            str.append("}")
+            str.append(" }")
             return str.toString()
         }
 
@@ -116,17 +116,17 @@ class FrameMetricsPrinter(
             visitor: FrameMetricsVisitor
         ): String {
             str.clear()
-            str.append("{")
+            str.append("{ ")
             val sdk = Build.VERSION.SDK_INT
             val last = FrameDuration.entries.lastIndex
             FrameDuration.entries.forEachIndexed { i, id ->
                 if (sdk < id.api) return@forEachIndexed
                 val ns = visitor.avgDroppedDurationOf(drop, id)
                 val ms = ns / FrameMetricsAggregate.NANOS_PER_MILLIS
-                str.append(id.name.lowercase()).append(" = ").append(ms).append("ms")
+                str.append(id.name.lowercase()).append("=").append(ms).append("ms")
                 if (i != last) str.append(", ")
             }
-            str.append("}")
+            str.append(" }")
             return str.toString()
         }
     }
