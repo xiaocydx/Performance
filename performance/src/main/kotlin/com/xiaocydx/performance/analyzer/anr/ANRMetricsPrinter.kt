@@ -53,7 +53,8 @@ class ANRMetricsPrinter : ANRMetricsReceiver {
             out.beginObject()
             out.apply {
                 name("latestActivity").value(metrics.latestActivity)
-                name("thresholdMillis").value(metrics.thresholdMillis)
+                name("blockThresholdMillis").value(metrics.blockThresholdMillis)
+                name("sampleIntervalMillis").value(metrics.sampleIntervalMillis)
                 name("isRecordEnabled").value(metrics.isRecordEnabled)
                 name("history.size").value(metrics.history.size)
                 name("future.size").value(metrics.future.size)

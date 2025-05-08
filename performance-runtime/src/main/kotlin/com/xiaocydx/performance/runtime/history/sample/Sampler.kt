@@ -159,7 +159,7 @@ internal class Sampler(
             val threadStat = threadStat(threadState, stackTrace, pidStat)
             this.lastSysStat = sysStat
             this.lastPidStat = pidStat
-            addSample(Sample(uptimeMillis, intervalMillis, cpuStat, threadStat))
+            addSample(Sample(uptimeMillis, cpuStat, threadStat))
         }
 
         fun sampleImmediately(): Sample {
@@ -168,7 +168,7 @@ internal class Sampler(
             val stackTrace = mainThread.stackTrace.asList()
             val pidStat = ProcPidStat.read(pid)
             val threadStat = threadStat(threadState, stackTrace, pidStat)
-            return Sample(uptimeMillis, intervalMillis, cpuStat = null, threadStat)
+            return Sample(uptimeMillis, cpuStat = null, threadStat)
         }
 
         private fun threadStat(

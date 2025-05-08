@@ -22,7 +22,6 @@ package com.xiaocydx.performance.runtime.history.sample
  */
 data class Sample(
     val uptimeMillis: Long,
-    val intervalMillis: Long,
     val cpuStat: CPUStat?,
     val threadStat: ThreadStat
 )

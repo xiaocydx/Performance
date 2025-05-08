@@ -67,7 +67,7 @@ internal class BlockMetricsAnalyzer(
                     startThreadTimeMillis = current.threadTimeMillis
                 }
                 is End -> {
-                    if (current.uptimeMillis - startUptimeMillis <= config.thresholdMillis) return
+                    if (current.uptimeMillis - startUptimeMillis <= config.blockThresholdMillis) return
                     val latestActivity = host.getLatestActivity()?.javaClass?.name
                     if (latestActivity.isNullOrEmpty()) return
                     dumpHandler.post(BlockMetricsTask(
@@ -84,7 +84,8 @@ internal class BlockMetricsAnalyzer(
                             scene = current.scene.toString(),
                             metadata = current.metadata.toString(),
                             latestActivity = latestActivity,
-                            thresholdMillis = config.thresholdMillis,
+                            blockThresholdMillis = config.blockThresholdMillis,
+                            sampleIntervalMillis = config.sampleIntervalMillis,
                             startUptimeMillis = startUptimeMillis,
                             startThreadTimeMillis = startThreadTimeMillis,
                             endUptimeMillis = current.uptimeMillis,

@@ -25,7 +25,7 @@ package com.xiaocydx.performance.analyzer.block
 interface BlockMetricsReceiver {
 
     /**
-     * 执行时间超过[BlockMetricsConfig.thresholdMillis]，接收[BlockMetrics]
+     * 执行时间超过[BlockMetricsConfig.blockThresholdMillis]，接收[BlockMetrics]
      *
      * **注意**：该函数不能执行耗时较长的逻辑（比如IO操作），这会导致[metrics]不准确。
      */

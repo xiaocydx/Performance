@@ -22,7 +22,6 @@ package com.xiaocydx.performance.plugin.generate
  */
 internal data class Sample(
     val uptimeMillis: Long = 0L,
-    val intervalMillis: Long = 0L,
     val cpuStat: CPUStat? = null,
     val threadStat: ThreadStat = ThreadStat()
 )

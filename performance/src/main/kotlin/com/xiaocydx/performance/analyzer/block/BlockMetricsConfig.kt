@@ -24,11 +24,14 @@ import androidx.annotation.IntRange
  */
 data class BlockMetricsConfig(
     @IntRange(from = 1)
-    val thresholdMillis: Long = 700,
+    val blockThresholdMillis: Long = 700,
+    @IntRange(from = 1)
+    val sampleIntervalMillis: Long = 500,
     val receivers: List<BlockMetricsReceiver> = emptyList()
 ) {
 
     internal fun checkProperty() {
-        require(thresholdMillis >= 1) { "thresholdMillis < 1" }
+        require(blockThresholdMillis >= 1) { "blockThresholdMillis < 1" }
+        require(sampleIntervalMillis >= 1) { "sampleIntervalMillis < 1" }
     }
 }

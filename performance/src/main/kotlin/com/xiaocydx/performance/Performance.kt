@@ -30,7 +30,6 @@ import android.os.SystemClock
 import androidx.annotation.MainThread
 import androidx.appcompat.app.AppCompatActivity.ACTIVITY_SERVICE
 import com.xiaocydx.performance.HistoryTokenStore.Count
-import com.xiaocydx.performance.analyzer.SampleConfig
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsAnalyzer
 import com.xiaocydx.performance.analyzer.anr.ANRMetricsConfig
 import com.xiaocydx.performance.analyzer.block.BlockMetricsAnalyzer
@@ -92,12 +91,12 @@ object Performance {
         ReferenceQueueDaemon().start()
 
         IdleHandlerAnalyzer(host).start()
-        config.frameConfig.takeIf { it.receivers.isNotEmpty() }
+        config.frame.takeIf { it.receivers.isNotEmpty() }
             ?.let { FrameMetricsAnalyzer.create(host, it).start() }
-        config.blockConfig.takeIf { it.receivers.isNotEmpty() }
+        config.block.takeIf { it.receivers.isNotEmpty() }
             ?.let { BlockMetricsAnalyzer(host, it).start() }
-        config.anrConfig.takeIf { it.receivers.isNotEmpty() }
-            ?.let { ANRMetricsAnalyzer(host, it, config.blockConfig).start() }
+        config.anr.takeIf { it.receivers.isNotEmpty() }
+            ?.let { ANRMetricsAnalyzer(host, it, config.block).start() }
         setupLooperWatcher()
     }
 
@@ -216,7 +215,7 @@ object Performance {
                             sampler?.stop(current.uptimeMillis)
                             merger?.let {
                                 segment.collectFrom(current)
-                                if (segment.wallDurationMillis > config.blockConfig.thresholdMillis) {
+                                if (segment.wallDurationMillis > config.block.blockThresholdMillis) {
                                     segment.isSingle = true
                                     segment.needRecord = true
                                     segment.needSample = true
@@ -241,7 +240,7 @@ object Performance {
                 sampleThread.start()
                 sampler = requireHistory(History.sampler(
                     looper = sampleThread.looper,
-                    intervalMillis = config.sampleConfig.intervalMillis
+                    intervalMillis = config.block.sampleIntervalMillis
                 ))
                 // volatile write: release (Safe Publication)
                 this.sampleThread = sampleThread
@@ -249,8 +248,8 @@ object Performance {
 
             if (tokenStore.isEmptyToNotEmpty(Count::needSegment)) {
                 merger = requireHistory(History.merger(
-                    idleThresholdMillis = config.anrConfig.idleThresholdMillis,
-                    mergeThresholdMillis = config.anrConfig.mergeThresholdMillis
+                    idleThresholdMillis = config.anr.idleThresholdMillis,
+                    mergeThresholdMillis = config.anr.mergeThresholdMillis
                 ))
             }
         }
@@ -315,17 +314,15 @@ object Performance {
     }
 
     data class Config(
-        val sampleConfig: SampleConfig = SampleConfig(),
-        val frameConfig: FrameMetricsConfig = FrameMetricsConfig(),
-        val blockConfig: BlockMetricsConfig = BlockMetricsConfig(),
-        val anrConfig: ANRMetricsConfig = ANRMetricsConfig()
+        val frame: FrameMetricsConfig = FrameMetricsConfig(),
+        val block: BlockMetricsConfig = BlockMetricsConfig(),
+        val anr: ANRMetricsConfig = ANRMetricsConfig()
     ) {
 
         internal fun checkProperty() {
-            sampleConfig.checkProperty()
-            frameConfig.checkProperty()
-            blockConfig.checkProperty()
-            anrConfig.checkProperty()
+            frame.checkProperty()
+            block.checkProperty()
+            anr.checkProperty()
         }
     }
 }

@@ -144,7 +144,8 @@ internal class ANRMetricsAnalyzer(
                         history = emptyList(),
                         //endregion
                         latestActivity = host.getLatestActivity()?.javaClass?.name ?: "",
-                        thresholdMillis = blockConfig.thresholdMillis,
+                        blockThresholdMillis = blockConfig.blockThresholdMillis,
+                        sampleIntervalMillis = blockConfig.sampleIntervalMillis,
                         isRecordEnabled = host.isRecordEnabled,
                         anrSample = anrSample,
                         future = future

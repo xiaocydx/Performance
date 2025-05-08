@@ -22,9 +22,9 @@ class App : Application() {
         Performance.init(
             application = this,
             config = Performance.Config(
-                frameConfig = FrameMetricsConfig(receivers = listOf(FrameMetricsPrinter())),
-                blockConfig = BlockMetricsConfig(receivers = listOf(writer, BlockMetricsPrinter())),
-                anrConfig = ANRMetricsConfig(receivers = listOf(writer, ANRMetricsPrinter()))
+                frame = FrameMetricsConfig(receivers = listOf(FrameMetricsPrinter())),
+                block = BlockMetricsConfig(receivers = listOf(writer, BlockMetricsPrinter())),
+                anr = ANRMetricsConfig(receivers = listOf(writer, ANRMetricsPrinter()))
             )
         )
     }

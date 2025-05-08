@@ -61,9 +61,14 @@ data class BlockMetrics(
     val latestActivity: String,
 
     /**
-     * 卡顿阈值，来自[BlockMetricsConfig]
+     * 卡顿阈值，取自[BlockMetricsConfig]
      */
-    val thresholdMillis: Long,
+    val blockThresholdMillis: Long,
+
+    /**
+     * 采样间隔，取自[BlockMetricsConfig]
+     */
+    val sampleIntervalMillis: Long,
 
     /**
      * 开始时间，可用于计算[wallDurationMillis]
