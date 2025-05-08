@@ -19,6 +19,7 @@ package com.xiaocydx.performance.analyzer.frame
 import android.os.SystemClock
 import android.view.FrameMetrics
 import androidx.annotation.RequiresApi
+import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate.Companion.NANOS_PER_MILLIS
 import com.xiaocydx.performance.analyzer.frame.FrameMetricsAggregate.Companion.NANOS_PER_SECOND
 import com.xiaocydx.performance.analyzer.frame.api16.FrameInfo
 import com.xiaocydx.performance.analyzer.frame.api24.totalNanos
@@ -37,6 +38,7 @@ internal class FrameMetricsAggregator(
     private var totalNanos = 0f
     private var refreshRates = 0f
 
+    override var totalMillis = 0L; private set
     override val intervalMillis = receiver.intervalMillis
     override var targetKey: Any = Unit; private set
     override var targetName = ""; private set
@@ -79,6 +81,7 @@ internal class FrameMetricsAggregator(
             avgFps = NANOS_PER_SECOND / (totalNanos / renderedFrames)
             avgRefreshRate = refreshRates / renderedFrames
             dropped.calculateAvg()
+            totalMillis = (totalNanos / NANOS_PER_MILLIS).toLong()
             receiver.receive(aggregate = this)
         }
         reset()
@@ -111,6 +114,7 @@ internal class FrameMetricsAggregator(
     override fun accept(visitor: FrameMetricsVisitor) {
         visitor.targetKey = targetKey
         visitor.targetName = targetName
+        visitor.totalMillis = totalMillis
         visitor.intervalMillis = intervalMillis
         visitor.renderedFrames = renderedFrames
         visitor.avgFps = avgFps

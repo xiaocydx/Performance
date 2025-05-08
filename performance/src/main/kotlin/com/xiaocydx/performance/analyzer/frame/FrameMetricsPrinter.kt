@@ -69,6 +69,7 @@ class FrameMetricsPrinter(
             }
 
             json.put("targetName", visitor.targetName)
+            json.put("totalMillis", visitor.totalMillis)
             json.put("intervalMillis", visitor.intervalMillis)
             json.put("renderedFrames", visitor.renderedFrames)
             json.put("avgFps", visitor.avgFps.roundToInt())

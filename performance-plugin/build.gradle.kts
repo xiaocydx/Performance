@@ -19,7 +19,7 @@ kotlin {
 }
 
 dependencies {
-    implementation("com.android.tools.build:gradle:7.4.0")
+    compileOnly("com.android.tools.build:gradle:7.4.0")
     implementation("org.ow2.asm:asm:9.1")
     implementation("org.ow2.asm:asm-commons:9.1")
     implementation("com.google.code.gson:gson:2.13.0")

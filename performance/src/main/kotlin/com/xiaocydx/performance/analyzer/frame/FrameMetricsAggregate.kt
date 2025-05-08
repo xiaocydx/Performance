@@ -40,6 +40,11 @@ interface FrameMetricsAggregate {
     val targetName: String
 
     /**
+     * [renderedFrames]的总时长
+     */
+    val totalMillis: Long
+
+    /**
      * 聚合时间间隔，由[FrameMetricsReceiver]提供
      */
     @get:IntRange(from = 0)
@@ -169,6 +174,7 @@ class FrameMetricsVisitor : FrameMetricsAggregate {
 
     override var targetKey: Any = Unit; internal set
     override var targetName = ""; internal set
+    override var totalMillis = 0L; internal set
     override var intervalMillis = 0L; internal set
     override var renderedFrames = 0; internal set
     override var avgFps = 0f; internal set
@@ -185,6 +191,7 @@ class FrameMetricsVisitor : FrameMetricsAggregate {
     override fun accept(visitor: FrameMetricsVisitor) {
         visitor.targetKey = targetKey
         visitor.targetName = targetName
+        visitor.totalMillis = totalMillis
         visitor.intervalMillis = intervalMillis
         visitor.renderedFrames = renderedFrames
         visitor.avgFps = avgFps
