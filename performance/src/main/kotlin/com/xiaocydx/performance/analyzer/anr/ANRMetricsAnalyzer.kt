@@ -20,6 +20,7 @@ package com.xiaocydx.performance.analyzer.anr
 
 import android.app.ActivityManager.ProcessErrorStateInfo
 import android.app.ActivityManager.ProcessErrorStateInfo.NOT_RESPONDING
+import android.app.ActivityManager.RunningAppProcessInfo
 import android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
 import android.os.Handler
 import android.os.Looper
@@ -84,15 +85,18 @@ internal class ANRMetricsAnalyzer(
                 }
                 lastANRTime = anrTime
 
-                if (isBackground()) {
-                    // 可能是后台ANR
-                    proceed(lastANRTime, lastANRSample, lastFuture)
+                val runningAppProcesses = host.ams.runningAppProcesses ?: emptyList()
+                val processInfo = runningAppProcesses.firstOrNull { it.pid == host.pid }
+
+                // processInfo == null可能是前台ANR闪退或后台ANR，这两种情况会杀掉进程
+                if (processInfo == null || isBackground(processInfo)) {
+                    proceed(lastANRTime, lastANRSample, lastFuture, immediately = processInfo == null)
                     return@collect
                 }
 
-                // fast path：判断首个消息，处理前台ANR闪退
+                // fast path：判断首个消息，处理前台ANR
                 if (isPostpone(lastFuture)) {
-                    proceed(lastANRTime, lastANRSample, lastFuture)
+                    proceed(lastANRTime, lastANRSample, lastFuture, immediately = false)
                     return@collect
                 }
 
@@ -108,20 +112,18 @@ internal class ANRMetricsAnalyzer(
                         delay(AMS_ERROR_RETRY_MILLIS)
                     }
                     if (processErrorStateInfo != null) {
-                        proceed(lastANRTime, lastANRSample, lastFuture)
+                        proceed(lastANRTime, lastANRSample, lastFuture, immediately = false)
                     }
                 }
             }
         }
 
-        private fun isBackground(): Boolean {
+        private fun isBackground(processInfo: RunningAppProcessInfo): Boolean {
             if (host.getActiveActivityCount() == 0) return true
             // activeActivityCount > 0进程不一定处于前台，
             // 可能是主线程阻塞中，还没有处理生命周期消息，
-            // 获取runningAppProcesses做进一步判断。
-            val runningAppProcesses = host.ams.runningAppProcesses ?: emptyList()
-            val info = runningAppProcesses.firstOrNull { it.pid == host.pid }
-            return info == null || info.importance != IMPORTANCE_FOREGROUND
+            // 通过processInfo做进一步判断。
+            return processInfo.importance != IMPORTANCE_FOREGROUND
         }
 
         private fun isPostpone(future: List<PendingMessage>): Boolean {
@@ -130,7 +132,13 @@ internal class ANRMetricsAnalyzer(
             return first.`when` != 0L && first.uptimeMillis - first.`when` > POSTPONE_THRESHOLD
         }
 
-        private fun proceed(anrTime: Long, anrSample: Sample, future: List<PendingMessage>) {
+        private fun proceed(
+            anrTime: Long,
+            anrSample: Sample,
+            future: List<PendingMessage>,
+            immediately: Boolean
+        ) {
+            // TODO: immediately = true：不做调度、合并当前Segment、获取堆栈和快照
             mainHandler.postAtFrontOfQueue {
                 val startUptimeMillis = anrTime - anrConfig.recentDurationMillis
                 val ranges = host.segmentRange(startUptimeMillis, endUptimeMillis = anrTime)
