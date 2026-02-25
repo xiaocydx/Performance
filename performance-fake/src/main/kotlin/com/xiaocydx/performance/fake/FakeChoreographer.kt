@@ -30,12 +30,34 @@ internal class FakeChoreographer(private val choreographer: Choreographer) {
         return mLock != null && mFrameScheduledField != null
     }
 
+    /**
+     * [action]调用[postInputCallback]、[postAnimationCallback]、[postTraversalCallback]，不申请Vsync
+     *
+     * ```
+     * public final class Choreographer {
+     *     private boolean mFrameScheduled;
+     *
+     *     private void postCallbackDelayedInternal(...) {
+     *         ...
+     *         scheduleFrameLocked(now);
+     *         ...
+     *     }
+     *
+     *     private void scheduleFrameLocked(long now) {
+     *         if (!mFrameScheduled) { // 反射改为true，拦截申请Vsync
+     *            mFrameScheduled = true;
+     *            ...
+     *         }
+     *     }
+     * }
+     * ```
+     */
     fun interceptSchedule(action: () -> Unit) {
         synchronized(mLock!!) {
-            val before = mFrameScheduledField!!.get(choreographer) as Boolean
+            val prev = mFrameScheduledField!!.get(choreographer) as Boolean
+            if (!prev) mFrameScheduledField.set(choreographer, true)
             action()
-            // 拦截之前，已经申请Vsync，不需要恢复为false
-            if (!before) mFrameScheduledField.set(choreographer, false)
+            if (!prev) mFrameScheduledField.set(choreographer, false)
         }
     }
 
@@ -64,13 +86,13 @@ internal class FakeChoreographer(private val choreographer: Choreographer) {
 
         private val mLockField = try {
             Choreographer::class.java.getDeclaredField("mLock")
-        } catch (e: Throwable) {
+        } catch (_: Throwable) {
             null
         }
 
         private val mFrameScheduledField = try {
             Choreographer::class.java.getDeclaredField("mFrameScheduled")
-        } catch (e: Throwable) {
+        } catch (_: Throwable) {
             null
         }
 
