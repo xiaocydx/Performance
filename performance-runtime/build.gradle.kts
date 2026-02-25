@@ -36,7 +36,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.18.1"
+            version = "3.22.1"
         }
     }
 }
@@ -44,6 +44,6 @@ android {
 dependencies {
     implementation(project(":performance-fake"))
     implementation("androidx.appcompat:appcompat:1.2.0")
-    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:+")
     testImplementation("com.google.truth:truth:1.1.3")
 }
