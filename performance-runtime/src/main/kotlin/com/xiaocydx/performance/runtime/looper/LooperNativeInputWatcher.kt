@@ -16,10 +16,14 @@
 
 package com.xiaocydx.performance.runtime.looper
 
+import android.os.Build
 import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.Menu
 import android.view.MotionEvent
 import android.view.Window
 import androidx.annotation.MainThread
+import androidx.annotation.RequiresApi
 
 /**
  * @author xcc
@@ -49,6 +53,16 @@ internal class LooperNativeInputWatcher private constructor(
             val consumed = delegate.dispatchTouchEvent(event)
             dispatcher.end(scene = Scene.NativeInput, metadata = event)
             return consumed
+        }
+
+        @RequiresApi(Build.VERSION_CODES.N)
+        override fun onProvideKeyboardShortcuts(data: List<KeyboardShortcutGroup?>?, menu: Menu?, deviceId: Int) {
+            delegate.onProvideKeyboardShortcuts(data, menu, deviceId)
+        }
+
+        @RequiresApi(Build.VERSION_CODES.O)
+        override fun onPointerCaptureChanged(hasCapture: Boolean) {
+            delegate.onPointerCaptureChanged(hasCapture)
         }
 
         @MainThread
